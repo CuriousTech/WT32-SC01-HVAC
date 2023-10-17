@@ -1,0 +1,169 @@
+﻿<!DOCTYPE html>
+<html>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<head>
+<title>ESP-HVAC</title>
+<link rel="stylesheet" type="text/css" href="styles.css">
+<style type="text/css">
+body{width:340px;display:block;font-family: Arial, Helvetica, sans-serif;}
+</style>
+<script type="text/javascript">
+<!--
+
+var Json,ovrActive,rmtMode
+var a=document.all
+snd=new Array()
+var ws
+function startEvents()
+{
+ws=new WebSocket("ws://"+window.location.host+"/ws")
+//ws=new WebSocket("ws://192.168.31.125/ws")
+ws.onopen=function(evt){}
+ws.onclose=function(evt){alert("Connection closed.");}
+
+ws.onmessage = function(evt){
+ console.log(evt.data)
+ Json=JSON.parse(evt.data)
+ if(Json.cmd == 'settings')
+ {
+	a.idlemin.value=s2t(+Json.im)
+	a.cycmin.value=s2t(+Json.cn)
+	a.cycmax.value=s2t(+Json.cx)
+	a.thresh.value=+Json.ct/10
+	a.fandelay.value=s2t(+Json.fd)
+	a.fanpre.value=s2t(+Json.fp)
+	a.awaytime.value=s2t(+Json.at)
+	a.heatthr.value=+Json.ht
+	a.ppkwh.value=+Json.ppk/1000
+	a.ccf.value=+Json.ccf/1000
+	a.cfm.value=+Json.cfm/1000
+	a.fcr.value=+Json.fcr
+	a.fcd.value=+Json.fcd
+	a.fco.value=+Json.fco
+	a.acth.value=+Json.dl/10
+	a.fim.value=s2t(+Json.fim)
+	a.far.value=s2t(+Json.far)
+	a.cal.value=+Json.cal/10
+ }
+ else if(Json.cmd == 'state')
+ {
+	a.loc.innerHTML=(+Json.it/10).toFixed(1)+' '+(+Json.rh/10).toFixed(1)+'%'
+	snd=Json.snd
+	if(snd) setSenders()
+ }
+ else if(Json.cmd == 'alert')
+ {
+	alert(Json.text)
+ }
+}
+}
+
+function setSenders()
+{
+ for(i=0;i<7;i++)
+ {
+	item=document.getElementById('snd'+i)
+	item.setAttribute('style',i<snd.length?'':'visibility:collapse')
+ }
+ item=document.getElementById('int')
+ item.setAttribute('style',snd.length?'':'visibility:collapse')
+ a.WT.value=(+snd[0][3])>>2&0x1F
+
+ for(i=0;i<snd.length;i++)
+ {
+	document.getElementById('shr'+i).value=snd[i][4]
+	document.getElementById('sndpri'+i).setAttribute('class',snd[i][3]&1?'style5':'')
+	document.getElementById('snda'+i).setAttribute('class',snd[i][3]&2?'style5':'')
+	document.getElementById('rt'+i).innerHTML=(snd[i][1])?(snd[i][1]/10).toFixed(1)+' '+(snd[i][2]/10).toFixed(1)+'%':''
+ }
+}
+
+function jmp(v)
+{
+	window.location.assign('http://'+snd[+v.charAt(3)][0])
+}
+
+function setVar(varName, value)
+{
+	ws.send('{"key":"'+a.myToken.value+'","'+varName+'":'+value+'}')
+}
+
+function setSnd(n,v)
+{
+	setVar('rmtid',snd[n][0].split('.')[3])
+	flg=(snd[n][3]&1<<v)?0x100:0;
+	flg|=1<<v
+	snd[n][3]^=1<<v
+	setVar('rmtflg',flg)
+	setSenders()
+}
+function secsToTime(sec)
+{
+ date=new Date(1970,0,1)
+ date.setSeconds(sec)
+ d=date.getDate()-1
+ d=d?d+'d ':''
+ return d+date.toTimeString().replace(/.*(\d:\d{2}:\d{2}).*/, "$1")
+}
+
+function s2t(elap)
+{
+	m=Math.floor(elap/60)
+	s=elap-(m*60)
+	if(m==0) return s
+	if(s<10) s='0'+s
+	return m+':'+s
+}
+
+function t2s(v)
+{
+	if(typeof v == 'string') v = (+v.substr(0, v.indexOf(':'))*60) + (+v.substr(v.indexOf(':')+1))
+	return v
+}
+//--></script>
+</head>
+<body onload="{
+ myStorage1=localStorage.getItem('myStoredText1')
+ if(myStorage1!= null){
+	document.getElementById('myToken').value=myStorage1
+ }
+ startEvents()
+}" align="center">
+<strong><em>CuriousTech HVAC Settings</em></strong><br><br>
+<table style="width: 290px" cellspacing=0 cellpadding=0>
+<tr>
+<td style="width: 100px">Threshold</td>
+<td style="width: 90px"><input type=text size=4 id="thresh" onchange="{setVar('cyclethresh',(+this.value*10).toFixed())}"></td>
+<td style="width: 20px"></td><td><input type="submit" value=" Home " onClick="window.location='/iot';"></td></tr>
+<tr><td>Heat Thresh</td><td><input type=text size=4 id="heatthr" onchange="{setVar('eheatthresh',+this.value)}"></td><td></td><td><input type="submit" value=" Chart " onClick="window.location='/chart.html';"></td></tr>
+<tr><td>AC &#x2202; Limit</td><td><input type=text size=4 id="acth" onchange="{setVar('dl',(+this.value*10).toFixed())}"></td><td></td><td></td></tr>
+<tr><td>Fan Pre</td><td><input type=text size=4 id="fanpre" onchange="{setVar('fanpretime',t2s(this.value))}"></td><td>Post</td><td><input type=text size=3 id="fandelay" onchange="{setVar('fanpostdelay',t2s(this.value))}"></td></tr>
+<tr><td>cycle Min</td><td><input type=text size=4 id="cycmin" onchange="{setVar('cyclemin',t2s(this.value))}"></td><td>Max</td><td><input type=text size=3 id="cycmax" onchange="{setVar('cyclemax',t2s(this.value))}"></td></tr>
+<tr><td>Idle Min</td><td><input type=text size=4 id="idlemin" onchange="{setVar('idlemin',t2s(this.value))}"></td><td>PKW</td><td><input type=text size=3 id="ppkwh" onchange="{setVar('ppk',(+this.value*1000).toFixed())}"></td></tr>
+<tr><td>Away Limit</td><td><input type=text size=4 id="awaytime" onchange="{setVar('awaytime',t2s(this.value))}"></td><td>CFM</td><td><input type=text size=3 id="cfm" onchange="{setVar('cfm',(+this.value*1000).toFixed())}"></td></tr>
+<tr><td>FC Shift</td><td><input type=text size=4 id="fco" onchange="{setVar('fco',this.value)}"></td><td>CCF</td><td><input type=text size=3 id="ccf" onchange="{setVar('ccf',(+this.value*1000).toFixed())}"></td></tr>
+<tr><td>Lookahead</td><td><input type=text size=4 id="fcr" onchange="{setVar('fcrange',this.value)}"></td><td>Disp</td><td><input type=text size=3 id="fcd" onchange="{setVar('fcdisp',this.value)}"></td></tr>
+<tr><td>Fan Auto Run</td><td><input type=text size=4 id="fim" onchange="{setVar('fim',t2s(this.value))}"></td><td>Run</td><td><input type=text size=3 id="far" onchange="{setVar('far',t2s(this.value))}"></td></tr>
+<tr><td>Temp Weight</td><td><input type=text size=4 id="WT" onchange="{setVar('wt',this.value)}"></td><td>Cal</td><td><input type=text size=3 id="cal" onchange="{setVar('cal',(+this.value*10).toFixed())}"></td></tr>
+<tr><td><br></td></tr>
+<tr id="int"><td></td><td>Effective</td><td id="loc" colspan=2></td><td></td></tr>
+<tr id="snd0" style="visibility:collapse"><td id="s0"><input type="submit" ID="shr0"></td><td><input type="button" value="Pri" id="sndpri0" onClick="{setSnd(0,0)}"><input type="button" value="En" id="snda0" onClick="{setSnd(0,1)}"></td><td id="rt0" colspan=2></td><td></td></tr>
+<tr id="snd1" style="visibility:collapse"><td id="s1"><input type="submit" ID="shr1" onClick="{jmp(this.id)}"></td><td><input type="button" value="Pri" id="sndpri1" onClick="{setSnd(1,0)}"><input type="button" value="En" id="snda1" onClick="{setSnd(1,1)}"></td><td id="rt1" colspan=2></td><td></td></tr>
+<tr id="snd2" style="visibility:collapse"><td id="s2"><input type="submit" ID="shr2" onClick="{jmp(this.id)}"></td><td><input type="button" value="Pri" id="sndpri2" onClick="{setSnd(2,0)}"><input type="button" value="En" id="snda2" onClick="{setSnd(2,1)}"></td><td id="rt2" colspan=2></td><td></td></tr>
+<tr id="snd3" style="visibility:collapse"><td id="s3"><input type="submit" ID="shr3" onClick="{jmp(this.id)}"></td><td><input type="button" value="Pri" id="sndpri3" onClick="{setSnd(3,0)}"><input type="button" value="En" id="snda3" onClick="{setSnd(3,1)}"></td><td id="rt3" colspan=2></td><td></td></tr>
+<tr id="snd4" style="visibility:collapse"><td id="s4"><input type="submit" ID="shr4" onClick="{jmp(this.id)}"></td><td><input type="button" value="Pri" id="sndpri4" onClick="{setSnd(4,0)}"><input type="button" value="En" id="snda4" onClick="{setSnd(4,1)}"></td><td id="rt4" colspan=2></td><td></td></tr>
+<tr id="snd5" style="visibility:collapse"><td id="s5"><input type="submit" ID="shr5" onClick="{jmp(this.id)}"></td><td><input type="button" value="Pri" id="sndpri5" onClick="{setSnd(5,0)}"><input type="button" value="En" id="snda5" onClick="{setSnd(5,1)}"></td><td id="rt5" colspan=2></td><td></td></tr>
+<tr id="snd6" style="visibility:collapse"><td id="s6"><input type="submit" ID="shr6" onClick="{jmp(this.id)}"></td><td><input type="button" value="Pri" id="sndpri6" onClick="{setSnd(6,0)}"><input type="button" value="En" id="snda6" onClick="{setSnd(6,1)}"></td><td id="rt6" colspan=2></td><td></td></tr>
+</table>
+<table style="width: 290px">
+<tr><td>Password</td><td><input id="myToken" name="access_token" type=text size=40 placeholder="password" style="width: 98px"
+ onChange="{
+ localStorage.setItem('myStoredText1', a.myToken.value)
+ alert(a.myToken.value+' Has been stored')
+}">
+</td>
+</tr>
+</table>
+<small>&copy; 2016 CuriousTech.net</small>
+</body>
+</html>
