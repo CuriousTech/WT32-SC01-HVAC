@@ -81,6 +81,7 @@ extern void WsSend(String s);
 void setup()
 {
   pinMode(AMPWR, OUTPUT);
+  digitalWrite(AMPWR, HIGH);
   Serial.begin(115200);  // Just for debug
   Serial.println("starting");
   ee.init();
@@ -152,7 +153,9 @@ void loop()
 
     if(--read_delay == 0)
     {
-      if(sht.service())
+      if(digitalRead(AMPWR) == LOW)
+        digitalWrite(AMPWR, HIGH); // Power the SHT40
+      else if(sht.service())
       {
         tempMedian.add((ee.b.bCelcius ? sht.getTemperatureC():sht.getTemperatureF()) * 10);
         float temp;
@@ -205,7 +208,7 @@ void loop()
       float rh;
       if(digitalRead(AMPWR) == LOW)
         digitalWrite(AMPWR, HIGH); // Power the AM2320
-      if(am.measure(temp, rh))
+      else if(am.measure(temp, rh))
       {
         if(!ee.b.bCelcius)
           temp = temp * 9 / 5 + 32;
