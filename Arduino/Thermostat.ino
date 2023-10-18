@@ -36,14 +36,15 @@ SOFTWARE.
 #include "RunningMedian.h"
 
 // Uncomment only one of these
-//#include <SHT40.h> // //Libraries/SHT40
+//#include <SHT40.h> // //Move Libraries/SHT40 to Arduino/libraries
 //#include <DHT.h>  // http://www.github.com/markruys/arduino-DHT
 //#include <DallasTemperature.h> //DallasTemperature from library mamanger
-#include <AM2320.h> // //https://github.com/CuriousTech/ESP-HVAC/Libraries/AM2320
+#include <AM2320.h> // https://github.com/CuriousTech/ESP-HVAC/blob/master/Libraries/AM2320/AM2320.h
 
-//----- Deffault i2c pins - See HVAC.h for the rest -
+//----- Deffault i2c pins. Shared wiith touch. See HVAC.h for the rest -
 #define SDA      18
 #define SCL      19
+#define AMPWR    4 // Used for resetting the sensor in case of failure
 //------------------------
 
 Display display;
@@ -79,6 +80,7 @@ extern void WsSend(String s);
 
 void setup()
 {
+  pinMode(AMPWR, OUTPUT);
   Serial.begin(115200);  // Just for debug
   Serial.println("starting");
   ee.init();
@@ -118,16 +120,7 @@ void loop()
   }
 
   handleServer(); // handles mDNS, web
-#ifdef SHT40_H
-  if(sht.service())
-  {
-    tempMedian.add((ee.b.bCelcius ? sht.getTemperatureC():sht.getTemperatureF()) * 10);
-    float temp;
-    if (tempMedian.getAverage(2, temp) == tempMedian.OK) {
-      hvac.updateIndoorTemp( temp, sht.getRh() * 10 );
-    }
-  }
-#endif
+
 #ifdef DallasTemperature_h
   if(ds18lastreq > 0 && millis() - ds18lastreq >= ds18delay) { //new temp is ready
     tempMedian.add((ee.b.bCelcius ? ds18.getTempC(ds18addr):ds18.getTempF(ds18addr)) );
@@ -153,8 +146,36 @@ void loop()
     display.oneSec();
     hvac.service();   // all HVAC code
 
+#ifdef SHT40_H
+    static uint8_t read_delay = 2;
+    static uint8_t errCnt = 0;
+
+    if(--read_delay == 0)
+    {
+      if(sht.service())
+      {
+        tempMedian.add((ee.b.bCelcius ? sht.getTemperatureC():sht.getTemperatureF()) * 10);
+        float temp;
+        if (tempMedian.getAverage(2, temp) == tempMedian.OK) {
+          hvac.updateIndoorTemp( temp, sht.getRh() * 10 );
+        }
+        errCnt = 0;
+      }
+      else
+      {
+        digitalWrite(AMPWR, LOW); // Cut power to the SHT40
+        if(errCnt < 5)
+          errCnt++;
+        else
+          hvac.m_notif = Note_Sensor;
+      }
+      read_delay = 5; // update every 5 seconds
+    }
+#endif
+
 #ifdef dht_h
     static uint8_t read_delay = 2;
+
     if(--read_delay == 0)
     {
       float temp;
@@ -173,30 +194,38 @@ void loop()
       read_delay = 5; // update every 5 seconds
     }
 #endif
+
 #ifdef AM2303_H
     static uint8_t read_delay = 2;
+    static uint8_t errCnt = 0;
+
     if(--read_delay == 0)
     {
       float temp;
       float rh;
+      if(digitalRead(AMPWR) == LOW)
+        digitalWrite(AMPWR, HIGH); // Power the AM2320
       if(am.measure(temp, rh))
       {
-        Serial.print(temp);
-        Serial.print(" ");
-        Serial.println(rh);
         if(!ee.b.bCelcius)
           temp = temp * 9 / 5 + 32;
         tempMedian.add(temp * 10);
         if (tempMedian.getAverage(2, temp) == tempMedian.OK) {
           hvac.updateIndoorTemp( temp, rh * 10 );
         }
+        errCnt = 0;
       }
       else
       {
         Serial.print("AM2320 error: ");
         Serial.println(am.code);
+        digitalWrite(AMPWR, LOW); // Cut power to the AM2320
+        if(errCnt < 5)
+          errCnt++;
+        else
+          hvac.m_notif = Note_Sensor;
       }
-      read_delay = 10; // update every 5 seconds
+      read_delay = 5; // update every 5 seconds
     }
 #endif
 
