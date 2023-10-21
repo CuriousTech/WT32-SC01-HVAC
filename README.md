@@ -1,6 +1,6 @@
 # WT32-SC01-HVAC
-HVAC thermostat using WT32-SC01 (not PLUS)  
-  
+HVAC thermostat using WT32-SC01 (not PLUS)  [OSHPark Link](https://oshpark.com/shared_projects/ljZTJh9A) $15.65  
+
 Warning: The hardware has not been fully tested as of Oct 18, 2023. It should be complete early November. The only foreseeable issue may be with thhe onboard speaker which hasn't been purchased yet, and screw terminal.  Assuming there would be a 20mm round speaker, I oopted for a vertical mount terminal (needs larger hole in wall) for space. This is unneccessary with the smaller speaker.  
   
 This is the 3rd thermostat I've designed, only becuase new hardware makes it better.  
