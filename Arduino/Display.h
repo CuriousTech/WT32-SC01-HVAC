@@ -47,17 +47,35 @@ enum Page
   Page_Thermostat,
   Page_Clock,
   Page_Graph,
-  Page_Blank,
+  Page_ScreenSaver,
 };
 
-struct Line{
+enum Saver
+{
+  SS_Lines,
+  SS_Boing,
+  SS_Count,
+};
+
+struct Line
+{
   int16_t x1;
   int16_t y1;
   int16_t x2;
   int16_t y2;
 };
 
-struct Button{
+struct Ball
+{
+  int16_t x;
+  int16_t y;
+  int16_t dx;
+  int16_t dy;
+  int16_t color;
+};
+
+struct Button
+{
   uint8_t ID; // Warning: ID not used
   int16_t x;
   int16_t y;
@@ -89,7 +107,8 @@ union temps
   };
 };
 
-struct gPoint{
+struct gPoint
+{
   temps t;
   int8_t sens0;
   int8_t sens1;
@@ -122,17 +141,18 @@ private:
   void buttonRepeat(void);
   void loadImage(char *pName, uint16_t x, uint16_t y);
   void refreshAll(void);
-  void updateClock(void);
+  void drawClock(bool bInit);
   void cspoint(float &x2, float &y2, float x, float y, float angle, float size);
   void updateAdjMode(bool bRef);  // current adjust indicator of the 4 temp settings
   void updateRSSI(void);
   void updateRunIndicator(bool bForce);
-  void displayTime(void);
-  void displayOutTemp(void);
+  void drawTime(void);
+  void drawOutTemp(void);
   void addGraphPoints(void);
-  void fillGraph(void);
+  void drawGraph(void);
   void Lines(void);
-  void drawPoints(int w, uint16_t color);
+  void Boing(bool bInit);
+  void drawPointsTarget(uint16_t color);
   void drawPointsRh(uint16_t color);
   void drawPointsTemp(void);
   uint16_t stateColor(gflags v);
@@ -151,6 +171,7 @@ private:
   int m_tempMax;
   uint8_t m_currPage = 0;
   uint8_t m_brightness;
+  uint8_t m_saver;
 #define BTN_CNT 25
   const Button m_btn[BTN_CNT] = {
     {Btn_Dow, 30, 6, 50, 20},
