@@ -1,5 +1,8 @@
 #include "Openweathermap.h"
 // Openwathermap forecast reader
+// Format: https://openweathermap.org/forecast5
+
+extern void WsSend(String s); // for debug, open chrome console
 
 OpenWeather::OpenWeather()
 {
@@ -73,7 +76,7 @@ int OpenWeather::makeroom(uint32_t newTm)
     return 0;
   uint32_t tm2 = m_pfd->Date;
   int fcIdx;
-  for(fcIdx = 0; fcIdx < FC_CNT-4 && m_pfd->Data[fcIdx] != -127; fcIdx++)
+  for(fcIdx = 0; fcIdx < FC_CNT-4 && m_pfd->Data[fcIdx].temp != -127; fcIdx++)
   {
     if(tm2 >= newTm)
       break;
@@ -83,7 +86,7 @@ int OpenWeather::makeroom(uint32_t newTm)
   {
     int n = fcIdx - (FC_CNT - m_fcCnt - 1);
     uint8_t *p = (uint8_t*)m_pfd->Data;
-    memcpy(p, p + n, FC_CNT - n); // make room
+    memcpy(p, p + (n*sizeof(forecastItem)), FC_CNT - (n*sizeof(forecastItem)) ); // make room
     m_pfd->Date += m_pfd->Freq * n;
     fcIdx -= n;
   }
@@ -128,7 +131,7 @@ void OpenWeather::_onDisconnect(AsyncClient* client)
   }
 
   processJson(p, 0, jsonListOw);
-  m_pfd->Data[m_fcIdx] = -127;
+  m_pfd->Data[m_fcIdx].temp = -127;
   delete m_pBuffer;
 }
 
@@ -167,6 +170,18 @@ void OpenWeather::callback(int8_t iEvent, uint8_t iName, int32_t iValue, char *p
           }
           break;
         case 4: // city
+/*            "id": 3163858,
+              "name": "Zocca",
+              "coord": {
+                "lat": 44.34,
+                "lon": 10.99
+              },
+              "country": "IT",
+              "population": 4593,
+              "timezone": 7200,
+              "sunrise": 1661834187,
+              "sunset": 1661882248
+*/
           break;
       }
       break;
@@ -178,12 +193,12 @@ void OpenWeather::callback(int8_t iEvent, uint8_t iName, int32_t iValue, char *p
           {
             m_bFirst = true;
             m_fcIdx = makeroom(iValue);
-            if(m_pfd->Date == 0)
+            if(m_pfd->Date == 0) // first time uses external date, subsequent will shift
               m_pfd->Date = iValue;
           }
           else
           {
-            m_pfd->Freq = iValue - m_lastTm;
+            m_pfd->Freq = iValue - m_lastTm; // figure out frequency of periods
           }
           m_lastTm = iValue;
           break;
@@ -203,40 +218,41 @@ void OpenWeather::callback(int8_t iEvent, uint8_t iName, int32_t iValue, char *p
           }
           break;
         case 2: // weather
-        {
-            const char *jsonList[] = {
-              "id", // 802
-              "main", // Cluods
-              "description", // scattered clouds
-              "icon", // 03d
-              NULL
-            };
-            processJson(psValue, 3, jsonList);
-        }
-        break;
+          {
+              const char *jsonList[] = {
+                "id", // 802
+                "main", // Clouds
+                "description", // scattered clouds
+                "icon", // 03d
+                NULL
+              };
+              processJson(psValue, 3, jsonList);
+          }
+          if(m_fcIdx < m_fcCnt) m_fcIdx++;
+          break;
       }
       break;
     case 2: // main
       switch(iName)
       {
         case 0: // temp
-          m_pfd->Data[m_fcIdx] = iValue;
-          m_fcIdx++;
+          m_pfd->Data[m_fcIdx].temp = (atof(psValue)*10);
           break;
         case 5: // humidity
+          m_pfd->Data[m_fcIdx].humidity = (atof(psValue)*10);
           break;
       }
       break;
     case 3: // weather
       switch(iName)
       {
-        case 0: // id
+        case 0: // id 804
           break;
-        case 1: // main
+        case 1: // main "Clouds"
           break;
-        case 2: // description
+        case 2: // description "Overcast clouds"
           break;
-        case 3: // icon
+        case 3: // icon 04d
           break;
       }
       break;
