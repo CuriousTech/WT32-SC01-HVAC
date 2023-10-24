@@ -1,7 +1,6 @@
 // Do all the web stuff here
 
 #define OTA_ENABLE  //uncomment to enable Arduino IDE Over The Air update code
-#define USE_SPIFFS  // saves 11K of program space, loses 800 bytes dynamic (ESP8266 64K SPIFFS)
 
 #include <ESPmDNS.h>
 
@@ -22,7 +21,6 @@
 #include "eeMem.h"
 #include <FS.h>
 #include <SPIFFS.h>
-#include "pages.h"
 #include "jsonstring.h"
 #include "forecast.h"
 #include "Openweathermap.h"
@@ -37,7 +35,7 @@ bool bWscConnected;
 const char *hostName = "HVAC";
 IPAddress ipFcServer(192,168,31,100);    // local forecast server and port
 int nFcPort = 80;
-Forecast localFC;
+ForecastRead localFC;
 OpenWeather openWeatherFC;
 #endif
 
@@ -234,35 +232,19 @@ void startServer()
 #ifndef REMOTE
   server.on ( "/iot", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){ // Hidden instead of / due to being externally accessible. Use your own here.
     parseParams(request);
-#ifdef USE_SPIFFS
     request->send(SPIFFS, "/index.html");
-#else
-    request->send_P(200, "text/html", page_index);
-#endif
   });
   server.on ( "/settings", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
     parseParams(request);
-#ifdef USE_SPIFFS
     request->send(SPIFFS, "/settings.html");
-#else
-    request->send_P(200, "text/html", page_settings);
-#endif
   });
   server.on ( "/chart.html", HTTP_GET, [](AsyncWebServerRequest *request){
     parseParams(request);
-#ifdef USE_SPIFFS
     request->send(SPIFFS, "/chart.html");
-#else
-    request->send_P(200, "text/html", page_chart);
-#endif
   });
 
   server.on("/styles.css", HTTP_GET, [](AsyncWebServerRequest *request){
-#ifdef USE_SPIFFS
     request->send(SPIFFS, "/styles.css");
-#else
-    request->send_P(200, "text/css", page_styles);
-#endif
   });
 #endif // !REMOTE
 
@@ -277,13 +259,7 @@ void startServer()
     request->send(200, "text/plain", js.Close());
   });
   server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request){
-//#ifdef USE_SPIFFS
-//    request->send(SPIFFS, "/favicon.ico");
-//#else
-    AsyncWebServerResponse *response = request->beginResponse_P(200, "image/x-icon", favicon, sizeof(favicon));
-    response->addHeader("Content-Encoding", "gzip");
-    request->send(response);
-//#endif
+    request->send(SPIFFS, "/favicon.ico");
   });
   /*
   server.onNotFound([](AsyncWebServerRequest *request){
@@ -451,7 +427,7 @@ bool secondsServer() // called once per second
     display.m_bUpdateFcst = false;
     display.m_bUpdateFcstIdle = false;
     nUpdateDelay = 60;
-    WscSend("{\"bin\":0}"); // request forcast data
+    WscSend("{\"bin\":1}"); // request forcast data
   }
 #else  // !Remote
   String s = hvac.settingsJsonMod(); // returns "{}" if nothing has changed
@@ -507,12 +483,12 @@ bool secondsServer() // called once per second
     js.Var("text", "OpenWeatherMap failed");
     WsSend(js.Close());
   }
-
+/*
   if(display.m_bFcstUpdated && WsRemoteID)
   {
-    ws.binary(WsRemoteID, (uint8_t*)&display.m_fc, sizeof(display.m_fc));
+    ws.binary(WsRemoteID, (uint8_t*)&display.m_fc, sizeof(display.m_fc)); // **fix
   }
-
+*/
 #endif // !REMOTE
   return bConn;
 }
@@ -891,11 +867,11 @@ void remoteCallback(int16_t iName, int iValue, char *psValue)
         out += ",\"fcFreq\":";
         out += display.m_fc.Freq;
         out += ",\"fc\":[";
-        for(int i = 0; display.m_fc.Data[i] != -127 && i < FC_CNT; i++)
+        for(int i = 0; display.m_fc.Data[i].temp != -127 && i < FC_CNT; i++)
         {
           if(i) out += ",";
-          out += display.m_fc.Data[i];
-        }        
+          out += display.m_fc.Data[i].temp;
+        }
         out += "]}";
         ws.text(WsClientID, out);
       }
@@ -904,7 +880,20 @@ void remoteCallback(int16_t iName, int iValue, char *psValue)
         WsRemoteID = WsClientID; // Only remote uses binary
         switch(iValue)
         {
-          case 0: // forecast data
+          case 0: // backward compatible forecast data
+            {
+              forecastDataOld fco;
+              fco.Date = display.m_fc.Date;
+              fco.loadDate = display.m_fc.loadDate;
+              fco.Freq = display.m_fc.Freq;
+              for(int i = 0; i, FC_CNT; i++)
+              {
+                fco.Data[i] = display.m_fc.Data[i].temp / 10;
+              }
+              ws.binary(WsClientID, (uint8_t*)&fco, sizeof(fco));
+            }
+            break;
+          case 1: // new forecast data
             ws.binary(WsClientID, (uint8_t*)&display.m_fc, sizeof(display.m_fc));
             break;
         }
@@ -951,10 +940,10 @@ void webSocketEvent(WStype_t type, uint8_t * payload, size_t length)
       remoteParse.process((char*)payload);
       break;
     case WStype_BIN:
-      if(length == sizeof(forecastData) )
+      if(length == sizeof(display.m_fc) )
       {
-        memcpy((void*)&display.m_fc, payload, length);
-        display.m_fc.loadDate = now(); // fix for strange data
+        memcpy((void*)&display.m_fc, payload, sizeof(display.m_fc));
+        display.m_fc.loadDate = now();
         display.m_bUpdateFcstIdle = true;
         display.m_bFcstUpdated = true;
       }
