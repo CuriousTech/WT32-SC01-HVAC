@@ -87,6 +87,16 @@ bool HVAC::getHumidifierRunning()
   return m_bHumidRunning;
 }
 
+uint8_t HVAC::getHumidifierMode()
+{
+  return ee.b.humidMode;
+}
+
+void HVAC::setHumidifierMode(uint8_t m)
+{
+  ee.b.humidMode = m % (HM_Auto2 + 1);
+}
+
 uint8_t HVAC::getMode()
 {
   return ee.b.Mode;
