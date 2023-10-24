@@ -2,14 +2,14 @@
 
 // local server forecast retrieval
 
-Forecast::Forecast()
+ForecastRead::ForecastRead()
 {
-  m_ac.onConnect([](void* obj, AsyncClient* c) { (static_cast<Forecast*>(obj))->_onConnect(c); }, this);
-  m_ac.onDisconnect([](void* obj, AsyncClient* c) { (static_cast<Forecast*>(obj))->_onDisconnect(c); }, this);
-  m_ac.onData([](void* obj, AsyncClient* c, void* data, size_t len) { (static_cast<Forecast*>(obj))->_onData(c, static_cast<char*>(data), len); }, this);
+  m_ac.onConnect([](void* obj, AsyncClient* c) { (static_cast<ForecastRead*>(obj))->_onConnect(c); }, this);
+  m_ac.onDisconnect([](void* obj, AsyncClient* c) { (static_cast<ForecastRead*>(obj))->_onDisconnect(c); }, this);
+  m_ac.onData([](void* obj, AsyncClient* c, void* data, size_t len) { (static_cast<ForecastRead*>(obj))->_onData(c, static_cast<char*>(data), len); }, this);
 }
 
-void Forecast::start(IPAddress serverIP, uint16_t port, forecastData *pfd, bool bCelcius)
+void ForecastRead::start(IPAddress serverIP, uint16_t port, forecastData *pfd, bool bCelcius)
 {
     if(m_ac.connected() || m_ac.connecting())
       return;
@@ -21,7 +21,7 @@ void Forecast::start(IPAddress serverIP, uint16_t port, forecastData *pfd, bool 
       m_status = FCS_ConnectError;
 }
 
-int Forecast::checkStatus()
+int ForecastRead::checkStatus()
 {
   if(m_status == FCS_Done)
   {
@@ -31,7 +31,7 @@ int Forecast::checkStatus()
   return m_status;
 }
 
-void Forecast::_onConnect(AsyncClient* client)
+void ForecastRead::_onConnect(AsyncClient* client)
 {
   (void)client;
 
@@ -50,7 +50,7 @@ void Forecast::_onConnect(AsyncClient* client)
 }
 
 // build file in chunks
-void Forecast::_onData(AsyncClient* client, char* data, size_t len)
+void ForecastRead::_onData(AsyncClient* client, char* data, size_t len)
 {
   if(m_pBuffer == NULL || m_bufIdx + len >= FCBUF_SIZE)
     return;
@@ -59,13 +59,13 @@ void Forecast::_onData(AsyncClient* client, char* data, size_t len)
   m_pBuffer[m_bufIdx] = 0;
 }
 
-int Forecast::makeroom(uint32_t newTm)
+int ForecastRead::makeroom(uint32_t newTm)
 {
   if(m_pfd->Date == 0) // not filled in yet
     return 0;
   uint32_t tm2 = m_pfd->Date;
   int fcIdx;
-  for(fcIdx = 0; fcIdx < FC_CNT-4 && m_pfd->Data[fcIdx] != -127; fcIdx++)
+  for(fcIdx = 0; fcIdx < FC_CNT-4 && m_pfd->Data[fcIdx].temp != -127; fcIdx++)
   {
     if(tm2 >= newTm)
       break;
@@ -75,7 +75,7 @@ int Forecast::makeroom(uint32_t newTm)
   {
     int n = fcIdx - (FC_CNT - 56);
     uint8_t *p = (uint8_t*)m_pfd->Data;
-    memcpy(p, p + n, FC_CNT - n); // make room
+    memcpy(p, p + (n*sizeof(forecastItem)), FC_CNT - (n*sizeof(forecastItem)) ); // make room
     m_pfd->Date += m_pfd->Freq * n;
     fcIdx -= n;
   }
@@ -83,7 +83,7 @@ int Forecast::makeroom(uint32_t newTm)
 }
 
 // read data as comma delimited 'time,temp,rh' per line
-void Forecast::_onDisconnect(AsyncClient* client)
+void ForecastRead::_onDisconnect(AsyncClient* client)
 {
   (void)client;
 
@@ -121,12 +121,16 @@ void Forecast::_onDisconnect(AsyncClient* client)
       while(*p && *p != ',') p ++;
       if(*p == ',') p ++;
       else break;
-      m_pfd->Data[fcIdx] = atoi(p);
+      m_pfd->Data[fcIdx].temp = (atof(p)*10);
+      while(*p && *p != ',') p ++;
+      if(*p == ',') p ++;
+      else break;
+      m_pfd->Data[fcIdx].humidity = (atof(p)*10);
       fcIdx++;
     }
     while(*p && *p != '\r' && *p != '\n') p ++;
     while(*p == '\r' || *p == '\n') p ++;
   }
-  m_pfd->Data[fcIdx] = -127;
+  m_pfd->Data[fcIdx].temp = -127;
   delete m_pBuffer;
 }
