@@ -6,13 +6,31 @@
 
 #define FC_CNT 74
 
+struct forecastItem
+{
+  int16_t temp;
+  int16_t humidity;
+  char    icon[4];
+  int16_t rain[4];
+  uint8_t res[4];
+};
+
 struct forecastData
 {
   uint32_t Date;
   uint32_t loadDate;
   uint16_t Freq;
-  int8_t Data[FC_CNT];
+  forecastItem Data[FC_CNT];
 };
+
+struct forecastDataOld
+{
+  uint32_t Date;
+  uint32_t loadDate;
+  uint16_t Freq;
+  int8_t   Data[FC_CNT];
+};
+
 
 enum FCS_Status
 {
@@ -24,10 +42,10 @@ enum FCS_Status
   FCS_MemoryError,
 };
 
-class Forecast
+class ForecastRead
 {
 public:
-  Forecast(void);
+  ForecastRead(void);
   void start(IPAddress serverIP, uint16_t port, forecastData *pfd, bool bCelcius);
   int checkStatus();
 private:
