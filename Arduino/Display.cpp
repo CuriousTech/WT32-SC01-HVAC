@@ -6,14 +6,17 @@
 #include <SPIFFS.h>
 #define FileSys SPIFFS   // SPIFFS is needed for AsyncWebServer
 #include "eeMem.h"
+#include "screensavers.h"
 #include "music.h"
 Music mus;
-#include <TFT_eSPI.h>                                     // TFT_espi library
+#include <TFT_eSPI.h> // TFT_espi library
 TFT_eSPI tft = TFT_eSPI();
 
 // FT6206, FT6336U - touchscreen library                  // modified -> Wire.begin(18, 19)
 #include "Adafruit_FT6206.h"
 Adafruit_FT6206 ts = Adafruit_FT6206();
+
+ScreenSavers ss;
 
 #include "digitalFont.h"
 
@@ -62,11 +65,11 @@ int32_t pngSeek(PNGFILE *page, int32_t position) {
 
 void Display::init(void)
 {
-  memset(m_fc.Data, -127, sizeof(m_fc.Data));
+  for(int i = 0; i < FC_CNT; i++)
+   m_fc.Data[i].temp = -127;
   m_fc.Date = 0;
 
-  analogWrite(TFT_BL, 0);
-  m_brightness = 0;                   // black out while display is noise 
+  setBrightness(0, 0);                // black out while display is noise 
   ts.begin(40);                       // adafruit touch
   tft.init();                         // TFT_eSPI
   tft.setRotation(1);                 // set desired rotation
@@ -75,7 +78,7 @@ void Display::init(void)
 
   FileSys.begin();
   mus.init();
-
+  ss.init();
   screen(true);
 }
 
@@ -98,29 +101,27 @@ bool Display::screen(bool bOn)
     m_currPage = Page_Thermostat;
     loadImage("/bg.png", 0, 0);
     refreshAll();
-    m_brightness = 255;
+    setBrightness(0, 255);
   }
   else switch(m_currPage)
   {
     case Page_Clock: // already clock
-      randomSeed(micros());
       m_currPage = Page_ScreenSaver;
-      m_brightness = 180;
-      tft.fillScreen(TFT_BLACK);
-      m_saver = random(0, SS_Count);
-      if(m_saver == SS_Boing)
-        Boing(true); // init
+      setBrightness(0, 180);
+      ss.select( random(0, SS_Count) );
+      ss.reset();
       break;
     case Page_ScreenSaver:
+      ss.end();
       m_currPage = Page_Graph; // chart thing
       loadImage("/bgBlank.png", 0, 0);
-      m_brightness = 230;
+      setBrightness(0, 230);
       drawGraph();
       break;
     default:  // probably thermostat
       m_currPage = Page_Clock; // clock
       drawClock(true);
-      m_brightness = 140;
+      setBrightness(0, 140);
       break;
   }
   bOldOn = bOn;
@@ -134,13 +135,7 @@ void Display::service(void)
 
   dimmer();
   if(m_currPage == Page_ScreenSaver)
-  {
-    switch(m_saver)
-    {
-      case SS_Lines: Lines(); break;
-      case SS_Boing: Boing(false); break;
-    }
-  }
+    ss.run();
 
   if (ts.touched())
   {
@@ -200,11 +195,12 @@ void Display::service(void)
 
 void Display::buttonCmd(uint8_t btn)
 {
-  m_backlightTimer = DISPLAY_TIMEOUT;
-  m_brightness = 255;
-
-  if( m_backlightTimer == 0)
+  if( m_backlightTimer == 0) // if dimmed, undim and ignore click
+  {
+    m_backlightTimer = DISPLAY_TIMEOUT;
+    setBrightness(m_brightness, 255);
     return;
+  }
 
   mus.add(6000, 20);
 
@@ -239,6 +235,11 @@ void Display::buttonCmd(uint8_t btn)
     case Btn_HeatMode:
       if(ee.b.bLock) break;
       hvac.setHeatMode( (hvac.getHeatMode() + 1) % 3 );
+      updateModes(false); // faster feedback
+      break;
+    case Btn_Humid:
+      if(ee.b.bLock) break;
+      hvac.setHumidifierMode( hvac.getHumidifierMode() + 1 );
       updateModes(false); // faster feedback
       break;
     case Btn_Note:
@@ -330,7 +331,7 @@ void Display::drawOutTemp()
 
   if( tmNow >= fcTm)
   {
-    for(iH = 0; tmNow > fcTm && m_fc.Data[iH] != -127 && iH < FC_CNT - 1; iH++)
+    for(iH = 0; tmNow > fcTm && m_fc.Data[iH].temp != -127 && iH < FC_CNT - 1; iH++)
       fcTm += m_fc.Freq;
  
     if(iH)
@@ -343,7 +344,7 @@ void Display::drawOutTemp()
   }
 
   int r = m_fc.Freq / 60; // usually 3 hour range (180 m)
-  int outTempReal = tween(m_fc.Data[iH], m_fc.Data[iH+1], m, r);
+  int outTempReal = tween(m_fc.Data[iH].temp, m_fc.Data[iH+1].temp, m, r);
   int outTempShift = outTempReal;
   int fcOffset = ee.fcOffset[hvac.m_modeShadow == Mode_Heat];
 
@@ -365,7 +366,7 @@ void Display::drawOutTemp()
     fcOffset -= r;
   }
 
-  outTempShift = tween(m_fc.Data[iH], m_fc.Data[iH+1], m, r);
+  outTempShift = tween(m_fc.Data[iH].temp, m_fc.Data[iH+1].temp, m, r);
 
   tft.setTextColor( rgb16(0, 63, 31), rgb16(0, 4, 10) );
   tft.setFreeFont(&digitaldreamFatNarrow_14ptFont);
@@ -417,10 +418,11 @@ void Display::updateModes(bool bForce) // update any displayed settings
   static int8_t FanMode = 4;
   static uint8_t nMode = 10;
   static uint8_t heatMode = 10;
+  static int8_t humidMode = 10;
 
   if(m_currPage || bForce)
   {
-    FanMode = nMode = heatMode = 10;
+    humidMode = FanMode = nMode = heatMode = 10;
   }
 
   if(m_currPage)
@@ -458,6 +460,16 @@ void Display::updateModes(bool bForce) // update any displayed settings
     heatMode = hvac.getHeatMode();
     const char *szHeatModes[] = {"/hp.png", "/ng.png", "/hauto.png"};
     loadImage((char*)szHeatModes[heatMode], m_btn[Btn_HeatMode].x, m_btn[Btn_HeatMode].y);
+  }
+
+  if(humidMode != hvac.getHumidifierMode() + hvac.getHumidifierRunning())
+  {
+    humidMode = hvac.getHumidifierMode() + hvac.getHumidifierRunning();
+    const char *szHumidState[] = {"/humidOff.png", "/humidOn.png"};
+    loadImage((char*)szHumidState[(uint8_t)hvac.getHumidifierRunning()], m_btn[Btn_Humid].x, m_btn[Btn_Humid].y);
+    const char *szHmode[] = {"", "F", "R", "1", "2", ""};
+    tft.setTextColor( rgb16(0, 63, 31) );
+    tft.drawString((char*)szHmode[hvac.getHumidifierMode()], m_btn[Btn_Humid].x + 24, m_btn[Btn_Humid].y + 25);
   }
 }
 
@@ -563,7 +575,7 @@ bool Display::drawForecast(bool bRef)
   int fcCnt = 0;
   uint32_t tm = m_fc.Date;
 
-  for(fcCnt = 0; fcCnt < FC_CNT && m_fc.Data[fcCnt] != -127; fcCnt++) // get current time in forecast and valid count
+  for(fcCnt = 0; fcCnt < FC_CNT && m_fc.Data[fcCnt].temp != -127; fcCnt++) // get current time in forecast and valid count
   {
     if( tm < now() )
     {
@@ -572,7 +584,7 @@ bool Display::drawForecast(bool bRef)
     }
   }
 
-  if(fcCnt >= FC_CNT || m_fc.Data[fcOff] == -127 ) // outdated
+  if(fcCnt >= FC_CNT || m_fc.Data[fcOff].temp == -127 ) // outdated
   {
     if(m_bUpdateFcstIdle)
       m_bUpdateFcst = true;
@@ -585,13 +597,13 @@ bool Display::drawForecast(bool bRef)
     if(rng > ee.fcRange) rng = ee.fcRange;
 
     // Update min/max
-    int8_t tmin = m_fc.Data[0];
-    int8_t tmax = m_fc.Data[0];
+    int16_t tmin = m_fc.Data[0].temp;
+    int16_t tmax = m_fc.Data[0].temp;
 
     // Get min/max of current forecast
     for(int i = 1; i < rng && i < FC_CNT; i++)
     {
-      int8_t t = m_fc.Data[i];
+      int16_t t = m_fc.Data[i].temp;
       if(tmin > t) tmin = t;
       if(tmax < t) tmax = t;
     }
@@ -601,15 +613,17 @@ bool Display::drawForecast(bool bRef)
     hvac.m_outMin = tmin;
     hvac.m_outMax = tmax;
   }
+
   if(m_currPage) // on different page
     return true;
+
   drawOutTemp(); // update temp for HVAC
 
   tft.fillRect(Fc_Left, Fc_Top, Fc_Width, Fc_Height - 1, TFT_BLACK); // clear graph area
 
   // Update min/max
-  int8_t tmin = m_fc.Data[0];
-  int8_t tmax = m_fc.Data[0];
+  int16_t tmin = m_fc.Data[0].temp;
+  int16_t tmax = m_fc.Data[0].temp;
 
   int hrng = fcCnt;
   if(hrng > ee.fcDisplay) hrng = ee.fcDisplay; // shorten to user display range
@@ -617,7 +631,7 @@ bool Display::drawForecast(bool bRef)
   // Get min/max of current forecast for display
   for(int i = 1; i < hrng && i < FC_CNT; i++)
   {
-    int8_t t = m_fc.Data[i];
+    int16_t t = m_fc.Data[i].temp;
     if(tmin > t) tmin = t;
     if(tmax < t) tmax = t;
   }
@@ -634,7 +648,7 @@ bool Display::drawForecast(bool bRef)
   tft.setTextColor( rgb16(0, 31, 31), rgb16(8,16,8));
   for(int i = 0; i < 3; i++)
   {
-    tft.drawNumber(t, 8, y + 4);
+    tft.drawNumber(t/10, 8, y + 4);
     y += incy;
     t -= dec;
   }
@@ -648,7 +662,7 @@ bool Display::drawForecast(bool bRef)
   tft.setTextDatum(TC_DATUM); // center day on noon
 
   tmElements_t tmE;
-  breakTime(tm, tmE);
+  breakTime(m_fc.Date, tmE);
 
   int day = tmE.Wday - 1;              // current day
 
@@ -678,16 +692,19 @@ bool Display::drawForecast(bool bRef)
 
   int x2, y2;
 
-  for(int i = 0; i < hrng && m_fc.Data[i] != -127; i++) // should be 41 data points
+  for(int i = 0; i < hrng && m_fc.Data[i].temp != -127; i++) // should be 41 data points
   {
-    int y1 = Fc_Top+Fc_Height - 1 - (m_fc.Data[i] - tmin) * (Fc_Height-2) / (tmax-tmin);
+    int y1 = Fc_Top+Fc_Height - 1 - (m_fc.Data[i].temp - tmin) * (Fc_Height-2) / (tmax-tmin);
     int x1 = i * Fc_Width / hrng + Fc_Left;
 
     if(i)
-      tft.drawLine(x2, y2, x1, y1, rgb16(31, 0, 0) ); // red
-    if(i && i == fcOff)
     {
-      tft.drawLine(x2, Fc_Top + 5, x2, Fc_Height - 10, rgb16(11, 0, 11) ); // current time
+      if(i == fcOff)  // current 3 hour time
+      {
+        int x3 = (i+1) * Fc_Width / hrng + Fc_Left;
+        tft.drawRect(x2, Fc_Top + 30, x3-x2, 20, rgb16(0, 22, 11) );
+      }
+      tft.drawLine(x2, y2, x1, y1, rgb16(31, 0, 0) ); // red
     }
     x2 = x1;
     y2 = y1;
@@ -696,11 +713,11 @@ bool Display::drawForecast(bool bRef)
 }
 
 // get value at current minute between hours
-int Display::tween(int8_t t1, int8_t t2, int m, int r)
+int Display::tween(int16_t t1, int16_t t2, int m, int r)
 {
   if(r == 0) r = 1; // div by zero check
   float t = (float)(t2 - t1) * (m * 100 / r) / 100;
-  return (int)((t + (float)t1) * 10);
+  return (int)(t + (float)t1);
 }
 
 void Display::Note(char *cNote)
@@ -780,15 +797,26 @@ void Display::updateNotification(bool bRef)
   }
 }
 
+// Set screen brightness(first level, second level)
+void Display::setBrightness(uint8_t immediate, uint8_t deferred)
+{
+  analogWrite(TFT_BL, immediate);
+  m_brightness = deferred;
+}
+
 // smooth adjust brigthness (0-255)
 void Display::dimmer()
 {
   static uint8_t bright;
 
   if(bright == m_brightness)
+  {
     return;
+  }
   if(m_brightness > bright)
     bright ++;
+  else if(m_brightness < bright - 1)
+    bright -= 2;
   else
     bright --;
 
@@ -939,8 +967,8 @@ void Display::drawClock(bool bInit)
   tft.fillTriangle(x1,y1, x2,y2, x3, y3, rgb16(2, 4, 2) ); // hour hand
 
   cspoint(x1, y1, x, y, minute() * 6, 88);
-  cspoint(x2, y2, x, y, (minute()+5) * 6, 10);
-  cspoint(x3, y3, x, y, (minute()-5) * 6, 10);
+  cspoint(x2, y2, x, y, (minute()+5) * 6, 12);
+  cspoint(x3, y3, x, y, (minute()-5) * 6, 12);
   tft.fillTriangle(x1,y1, x2,y2, x3, y3, TFT_BLACK ); // minute hand
 
   tft.fillCircle(x, y, 12, TFT_BLACK ); // center cap
@@ -984,184 +1012,6 @@ void Display::cspoint(float &x2, float &y2, float x, float y, float angle, float
   y2 = y + size * cos(ang);  
 }
 
-// Lines demo
-void Display::Lines()
-{
-#define LINES 50
-  static Line line[LINES], delta;
-  uint16_t color;
-  static int16_t r=40, g=40, b=40;
-  static int8_t cnt = 0;
-  static bool bInit = false;
-
-  if(!bInit)
-  {
-    memset(&line, 10, sizeof(line));
-    memset(&delta, 1, sizeof(delta));
-    bInit = true;
-  }
-  // Erase oldest line
-  tft.drawLine(line[LINES - 1].x1, line[LINES - 1].y1, line[LINES - 1].x2, line[LINES - 1].y2, 0);
-
-  // FIFO the lines
-  for(int i = LINES - 2; i >= 0; i--)
-    line[i+1] = line[i];
-
-  if(--cnt <= 0)
-  {
-    cnt = 5; // every 5 runs
-    delta.x1 = constrain(delta.x1 + (int16_t)random(-1,2), -4, 4); // random direction delta
-    delta.x2 = constrain(delta.x2 + (int16_t)random(-1,2), -4, 4);
-    delta.y1 = constrain(delta.y1 + (int16_t)random(-1,2), -4, 4);
-    delta.y2 = constrain(delta.y2 + (int16_t)random(-1,2), -4, 4);
-  }
-
-  // add delta to positions
-  line[0].x1 = constrain(line[0].x1 + delta.x1, 0, DISPLAY_WIDTH-1); // keep it on the screen
-  line[0].x2 = constrain(line[0].x2 + delta.x2, 0, DISPLAY_WIDTH-1);
-  line[0].y1 = constrain(line[0].y1 + delta.y1, 0, DISPLAY_HEIGHT-1);
-  line[0].y2 = constrain(line[0].y2 + delta.y2, 0, DISPLAY_HEIGHT-1);
-
-  r += (int16_t)random(-1, 2);
-  if(r > 255) r = 255;
-  else if(r < 1) r = 1;
-  g += (int16_t)random(-1, 2);
-  if(g > 255) g = 255;
-  else if(g < 1) g = 1;
-  b += (int16_t)random(-1, 2);
-  if(b > 255) b = 255;
-  else if(b < 1) b = 1;
-  color = rgb(r, g, b);
-
-  tft.drawLine(line[0].x1, line[0].y1, line[0].x2, line[0].y2, color); // draw the new line
-
-  if(line[0].x1 == 0 && delta.x1 < 0) delta.x1 = -delta.x1; // bounce off edges
-  if(line[0].x2 == 0 && delta.x2 < 0) delta.x2 = -delta.x2;
-  if(line[0].y1 == 0 && delta.y1 < 0) delta.y1 = -delta.y1;
-  if(line[0].y2 == 0 && delta.y2 < 0) delta.y2 = -delta.y2;
-  if(line[0].x1 == DISPLAY_WIDTH-1 && delta.x1 > 0) delta.x1 = -delta.x1;
-  if(line[0].x2 == DISPLAY_WIDTH-1 && delta.x2 > 0) delta.x2 = -delta.x2;
-  if(line[0].y1 == DISPLAY_HEIGHT-1 && delta.y1 > 0) delta.y1 = -delta.y1;
-  if(line[0].y2 == DISPLAY_HEIGHT-1 && delta.y2 > 0) delta.y2 = -delta.y2;
-}
-
-void Display::Boing(bool bInit)
-{
-#define BALLS 8
-  const int16_t rad = 12;
-  static Ball ball[BALLS];
-  static uint8_t skipper = 4;
-
-  const uint16_t palette[] = {TFT_NAVY,TFT_DARKGREEN,TFT_DARKCYAN,TFT_MAROON,TFT_PURPLE,
-        TFT_OLIVE,TFT_LIGHTGREY,TFT_DARKGREY,TFT_BLUE,TFT_GREEN,TFT_CYAN,TFT_RED,TFT_MAGENTA,
-        TFT_YELLOW,TFT_WHITE,TFT_ORANGE,TFT_GREENYELLOW,TFT_PINK,
-        TFT_BROWN,TFT_GOLD,TFT_SILVER,TFT_SKYBLUE,TFT_VIOLET};
-
-  if(bInit)
-  {
-    for(uint8_t i = 0; i < BALLS; i++)
-    {
-      ball[i].x = DISPLAY_WIDTH/2;
-      ball[i].y = rad;
-      ball[i].dx = (int16_t)random(-2, 5);
-      ball[i].dy = (int16_t)random(3, 6);
-      ball[i].color = palette[ random(0, sizeof(palette) / sizeof(uint16_t) ) ];
-    }
-    return;
-  }
-
-  if(--skipper) // slow it down by x*loop delay of 2ms
-    return;
-  skipper = 8;
-
-  static double  bounce = 1.0;
-  static double  energy = 0.6;
-
-  // bouncy
-  for(uint8_t i = 0; i < BALLS; i++)
-  {
-    int x1 = ball[i].x;
-    int y1 = ball[i].y;
-
-    // check for wall collision
-    if(y1 <= rad && ball[i].dy < 0)   // top of screen
-      ball[i].dy = -ball[i].dy + (int16_t)random(0, 4);
-
-    if(y1 >= DISPLAY_HEIGHT - rad && ball[i].dy > 0) // bottom
-      ball[i].dy = -ball[i].dy - (int16_t)random(5, 17);
-
-    if(x1 <= rad && ball[i].dx < 0)  // left wall
-      ball[i].dx = -ball[i].dx + (int16_t)random(0, 2);
-
-    if(x1 >= DISPLAY_WIDTH - rad && ball[i].dx > 0)  // right wall
-      ball[i].dx = -ball[i].dx - (int16_t)random(0, 2);
-
-    static uint8_t dly = 1;
-    if(--dly == 0) // gravity
-    {
-      ball[i].dy++;
-      dly = 1;
-    }
-    if(ball[i].dx < 2 && ball[i].dx > -2)
-      ball[i].dx += (int16_t)random(-2, 4); // keep balls from sitting still
-
-    if(ball[i].dy < 2 && ball[i].dy > -2)
-      ball[i].dy += (int16_t)random(-2, 4); // keep balls from sitting still
-
-    // check for ball to ball collision
-    for(uint8_t i2 = i+1; i2 < BALLS; i2++)
-    {
-      double n, n2;
-      int x2, y2;
-  
-      x2 = ball[i2].x;
-      y2 = ball[i2].y;
-      if(x1 + rad >= x2 && x1 <= x2 + rad && y1 + rad >= y2 && y1 <= y2 + rad){
-        if(x1-x2 > 0){
-          n = ball[i].dx;
-          n2 = ball[i2].dx;
-          ball[i].dx = ((n *bounce) + (n2 * energy));
-          ball[i2].dx = -((n2 * bounce) - (n*energy));
-        }else{
-          n = ball[i].dx;
-          n2 = ball[i2].dx;
-          ball[i].dx = -((n * bounce) - (n2 * energy));
-          ball[i2].dx = ((n2 * bounce) + (n * energy));
-        }
-        if(y1-y2 > 0){
-          n = ball[i].dy;
-          ball[i].dy = ((n * bounce) + (ball[i2].dy * energy));
-          ball[i2].dy = -((ball[i2].dy * bounce) - (n * energy));
-        }else{
-          n = ball[i].dy;
-          ball[i].dy = -((n * bounce) - (ball[i2].dy * energy));
-          ball[i2].dy = ((ball[i2].dy * bounce) + (n * energy));
-        }
-      }
-    }
-
-    ball[i].dx = constrain(ball[i].dx, -20, 40); // speed limit
-    ball[i].dy = constrain(ball[i].dy, -20, 40);
-  }
-
-  // Erase last balls
-  for(uint8_t i = 0; i < BALLS; i++)
-  {
-    tft.fillCircle(ball[i].x, ball[i].y, rad, TFT_BLACK );
-  }
-  
-  // Draw balls
-  for(uint8_t i = 0; i < BALLS; i++)
-  {
-    ball[i].x += ball[i].dx;
-    ball[i].y += ball[i].dy;
-
-    // Draw at new positions
-    tft.fillCircle(ball[i].x, ball[i].y, rad, ball[i].color );
-  }
-
-}
-
 void Display::addGraphPoints()
 {
   if( hvac.m_inTemp == 0 || hvac.m_targetTemp == 0)
@@ -1193,6 +1043,8 @@ void Display::addGraphPoints()
   m_points[m_pointsIdx].t.u = 0; // mark as invalid data/end
 }
 
+#define RPAD 14
+
 // Draw the last 25 hours
 void Display::drawGraph()
 {
@@ -1210,7 +1062,7 @@ void Display::drawGraph()
 
   drawPointsTarget(rgb16( 6, 8, 4) ); // target (draw behind the other stuff)
 
-  int x = DISPLAY_WIDTH - 14 - (minute() / 5); // center over even hour, 5 mins per pixel
+  int x = DISPLAY_WIDTH - RPAD - (minute() / 5); // center over even hour, 5 mins per pixel
   int h = hourFormat12();
 
   while(x > 12 * 6)
@@ -1226,8 +1078,8 @@ void Display::drawGraph()
 
   for(int i = 0; i < 5; i++) // draw temp range over thresh
   {
-    tft.drawString( String(temp / 10), DISPLAY_WIDTH-18, y );
-    if(i > 0) tft.drawLine( 10, y+10, DISPLAY_WIDTH-14, y+8, rgb16(10, 20, 10) );
+    tft.drawString( String(temp / 10), DISPLAY_WIDTH-RPAD-4, y );
+    if(i > 0) tft.drawLine( 10, y+10, DISPLAY_WIDTH-RPAD, y+8, rgb16(10, 20, 10) );
     y -= (DISPLAY_HEIGHT - 30) /4;
     temp += tmpInc;
   }
@@ -1247,13 +1099,17 @@ void Display::drawPointsTarget(uint16_t color)
   if(m_tempHigh == m_tempLow) // divide by zero check
     return;
 
-  x2 = DISPLAY_WIDTH-14;
+  x2 = DISPLAY_WIDTH-RPAD;
   tOld = m_points[i].t.target;
 
-  for(int x = DISPLAY_WIDTH-14; x >= 10; x--)
+  for(int x = DISPLAY_WIDTH-RPAD; x >= 10; x--)
   {
     if(m_points[i].t.u == 0)
+    {
+      if(x2 != DISPLAY_WIDTH-RPAD) // draw last bit
+        tft.fillRect(x, DISPLAY_HEIGHT - 10 - y, x2 - x, y2 - y, color);
       return;
+    }
     y = constrain( (m_points[i].t.target - m_tempLow) * h / (m_tempHigh - m_tempLow), 0, h); // scale to 0~300
     y2 = constrain( (m_points[i].t.target + ee.cycleThresh[(hvac.m_modeShadow == Mode_Heat) ? 1:0] - m_tempLow) * h
       / (m_tempHigh - m_tempLow), 0, h );
@@ -1261,7 +1117,7 @@ void Display::drawPointsTarget(uint16_t color)
     int lastI = i;
     if(--i < 0)
       i = GPTS-1;
-    if( tOld != m_points[i].t.target && x != DISPLAY_WIDTH-14)
+    if( (tOld != m_points[i].t.target && x != DISPLAY_WIDTH-RPAD) || x == 10)
     {
       tft.fillRect(x, DISPLAY_HEIGHT - 10 - y, x2 - x, y2 - y, color);
       tOld = m_points[lastI].t.target;
@@ -1282,7 +1138,7 @@ void Display::drawPointsRh(uint16_t color)
 
   y2 = y2 * (DISPLAY_HEIGHT-20) / 1000; // 0.0~100.0 to 0~300
 
-  for(int x = DISPLAY_WIDTH-15, x2 = DISPLAY_WIDTH-14; x >= 10; x--)
+  for(int x = DISPLAY_WIDTH-RPAD-1, x2 = DISPLAY_WIDTH-RPAD; x >= 10; x--)
   {
     if(--i < 0)
       i = GPTS-1;
@@ -1305,19 +1161,19 @@ void Display::drawPointsTemp()
 {
   const int yOff = DISPLAY_HEIGHT-10;
   int y, y2;
-  int x2 = DISPLAY_WIDTH-14;
+  int x2 = DISPLAY_WIDTH-RPAD;
   int i = m_pointsIdx-1;
 
   if(i < 0) i = GPTS-1;
 
-  for(int x = DISPLAY_WIDTH-14; x >= 10; x--)
+  for(int x = DISPLAY_WIDTH-RPAD; x >= 10; x--)
   {
     if(m_points[i].t.u == 0)
       break; // end
     y = constrain(m_points[i].t.inTemp - m_tempLow, 0, m_tempHigh - m_tempLow) * (DISPLAY_HEIGHT-20) / (m_tempHigh - m_tempLow);
 //    if(y != y2)
 //    {
-      if(x != DISPLAY_WIDTH-14)
+      if(x != DISPLAY_WIDTH-RPAD)
       {
         tft.drawLine(x2, yOff - y2, x, yOff - y, stateColor(m_points[i].bits) );
       }
