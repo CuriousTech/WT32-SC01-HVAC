@@ -51,8 +51,8 @@ $(document).ready(function()
 {
  myStorage1 = localStorage.getItem('myStoredText1')
  if(myStorage1  != null) myToken=myStorage1
- ws=new WebSocket("ws://"+window.location.host+"/ws")
-// ws=new WebSocket("ws://192.168.31.46/ws")
+// ws=new WebSocket("ws://"+window.location.host+"/ws")
+ ws=new WebSocket("ws://192.168.31.110/ws")
  ws.onopen=function(evt){ws.send('{"sum":0}')}
  ws.onclose=function(evt){alert("Connection closed.")}
  ws.onmessage = function(evt){
@@ -588,11 +588,12 @@ function drawFC(){
 	max=-30
 	for(i=0;i<fc.length;i++)
 	{
-		if(min>fc[i]) min=fc[i]
-		if(max<fc[i]) max=fc[i]
+		if(min>fc[i]/10) min=fc[i]/10
+		if(max<fc[i]/10) max=fc[i]/10
 	}
 	max++
 	yRange=max-min
+	console.log('mm ' + max + ' ' + min)
 	c.textAlign="right"
 	c.textBaseline="middle"
 	c.fillStyle='black'
@@ -638,8 +639,8 @@ function drawFC(){
 		if(fc.length){
 			c.strokeStyle=grd
 			c.beginPath()
-			c.moveTo(getXPixel2(i),getYPixel2(fc[i]))
-			c.lineTo(getXPixel2(i-1),getYPixel2(fc[i-1]))
+			c.moveTo(getXPixel2(i),getYPixel2(fc[i]/10))
+			c.lineTo(getXPixel2(i-1),getYPixel2(fc[i-1]/10))
 			c.stroke()
 		}
 		date = new Date((fcDate+fcFreq*i)*1000)
@@ -715,11 +716,11 @@ function getTT(i,th)
 	for(j=strt1;j<i+fcr;j++)
 	{
 		if(j<fc.length){
-			if(min2>fc[j]) min2=fc[j]
-			if(max2<fc[j]) max2=fc[j]
+			if(min2>fc[j]/10) min2=fc[j]/10
+			if(max2<fc[j]/10) max2=fc[j]/10
 		}
 	}
-	tt=(fc[i]-min2)*iRng/(max2-min2)+iMin+th
+	tt=(fc[i]/10-min2)*iRng/(max2-min2)+iMin+th
  }else if(schedMode==1){
 	m=((date.getHours()+14)*60+date.getMinutes()+so)/4
 	r=(iRng/2)*Math.sin(Math.PI*(180-m)/180)
