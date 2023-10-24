@@ -2,7 +2,7 @@
 #define DISPLAY_H
 
 #include <Arduino.h>
-#include <PNGdec.h> // From Library Manager
+#include <PNGdec.h>  // From Library Manager
 #include "Forecast.h"
 
 // bit shifting for ease, to 5-6-5 format
@@ -36,6 +36,7 @@ enum BTN
   Btn_Fan,
   Btn_Mode,
   Btn_HeatMode,
+  Btn_Humid,
   Btn_Up,
   Btn_Dn,
   Btn_Note,
@@ -48,30 +49,8 @@ enum Page
   Page_Clock,
   Page_Graph,
   Page_ScreenSaver,
-};
-
-enum Saver
-{
-  SS_Lines,
-  SS_Boing,
-  SS_Count,
-};
-
-struct Line
-{
-  int16_t x1;
-  int16_t y1;
-  int16_t x2;
-  int16_t y2;
-};
-
-struct Ball
-{
-  int16_t x;
-  int16_t y;
-  int16_t dx;
-  int16_t dy;
-  int16_t color;
+  Page_Forecast,
+  Page_Usage,
 };
 
 struct Button
@@ -136,6 +115,7 @@ public:
 
 private:
   void buttonCmd(uint8_t btn);
+  void setBrightness(uint8_t immediate, uint8_t deferred);
   void dimmer(void);
   void updateModes(bool bForce); // update any displayed settings
   void buttonRepeat(void);
@@ -150,14 +130,12 @@ private:
   void drawOutTemp(void);
   void addGraphPoints(void);
   void drawGraph(void);
-  void Lines(void);
-  void Boing(bool bInit);
   void drawPointsTarget(uint16_t color);
   void drawPointsRh(uint16_t color);
   void drawPointsTemp(void);
   uint16_t stateColor(gflags v);
 
-  int  tween(int8_t t1, int8_t t2, int m, int r);
+  int  tween(int16_t t1, int16_t t2, int m, int r);
 
   uint16_t m_backlightTimer = 90; // backlight timers, seconds
 #define GPTS 640 // 320 px width - (10+10) padding
@@ -170,9 +148,7 @@ private:
   int m_tempHigh; // 90.0 top
   int m_tempMax;
   uint8_t m_currPage = 0;
-  uint8_t m_brightness;
-  uint8_t m_saver;
-#define BTN_CNT 25
+#define BTN_CNT 26
   const Button m_btn[BTN_CNT] = {
     {Btn_Dow, 30, 6, 50, 20},
     {Btn_Time, 110, 6, 180, 20},
@@ -194,9 +170,10 @@ private:
     {Btn_IndHH, DISPLAY_WIDTH-216, 244, 184, 20},
     {Btn_IndHL, DISPLAY_WIDTH-216, 279, 184, 20},
 
-    {Btn_Fan,       25, 140, 60, 60},
-    {Btn_Mode,      95, 140, 60, 60},
-    {Btn_HeatMode, 165, 140, 60, 60},
+    {Btn_Fan,       24, 140, 60, 60},
+    {Btn_Mode,     100, 140, 60, 60},
+    {Btn_HeatMode, 176, 140, 60, 60},
+    {Btn_Humid   ,  24, 204, 60, 60},
 
     {Btn_Up,   402, 176, 60, 60},
     {Btn_Dn,   402, 240, 60, 60},
@@ -212,6 +189,7 @@ public:
   bool    m_bUpdateFcst = true;
   bool    m_bUpdateFcstIdle = true;
   bool    m_bFcstUpdated = false;
+  uint8_t m_brightness;
 };
 
 #endif // DISPLAY_H
