@@ -56,6 +56,7 @@ enum Notif
   Note_Forecast,
   Note_Filter,
   Note_EspTouch,
+  Note_Sensor,
 };
 
 enum HeatMode
@@ -140,6 +141,8 @@ public:
   void    setHeatMode(int mode); // heat mode
   int8_t  getFan(void);           // fan mode
   bool    getHumidifierRunning(void);
+  uint8_t getHumidifierMode(void);
+  void    setHumidifierMode(uint8_t m);
   void    setFan(int8_t m);        // auto/on/s mode
   void    filterInc(void);
   bool    stateChange(void);      // change since last call = true
@@ -172,7 +175,7 @@ public:
   uint8_t  m_notif;
   bool     m_bRemoteStream; // remote is streaming temp/rh
   bool     m_bRemoteDisconnect;
-  int8_t   m_outMin, m_outMax;
+  int16_t   m_outMin, m_outMax;
   uint16_t m_iSecs[3];
   bool     m_bLink;         // link adjust mode
   uint8_t  m_DST;
