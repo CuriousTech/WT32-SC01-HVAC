@@ -631,11 +631,12 @@ void historyDump(bool bStart)
     }
 
     jsonString js("ref");
-    tempMin = display.minPointVal(0);
-    lMin = display.minPointVal(1);
-    hMin = display.minPointVal(2);
-    rhMin = display.minPointVal(3);
-    otMin = display.minPointVal(4);
+    int maxv;
+    tempMin = display.minPointVal(0, maxv);
+    lMin = display.minPointVal(1, maxv);
+    hMin = display.minPointVal(2, maxv);
+    rhMin = display.minPointVal(3, maxv);
+    otMin = display.minPointVal(4, maxv);
   
     js.Var("tb", display.m_lastPDate);
     js.Var("th", ee.cycleThresh[ (hvac.m_modeShadow == Mode_Heat) ? 1:0] ); // threshold
