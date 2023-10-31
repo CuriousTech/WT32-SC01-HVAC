@@ -10,6 +10,7 @@ extern TFT_eSPI tft;
 
 enum Saver
 {
+  SS_Clock,
   SS_Lines,
   SS_Boing,
   SS_Cube,
@@ -62,19 +63,21 @@ class ScreenSavers
 {
 public:
   ScreenSavers(){};
-  void init(void);
   void select(int n);
   void reset(void);
   void run(void);
   void end(void);
+
+  uint8_t m_saver;
+
 private:
+  void Clock(bool bInit);
+  void cspoint(float &x2, float &y2, float x, float y, float angle, float size);
   void Lines(bool bInit);
   void Boing(bool bInit);
   void Cube(bool bInit);
   void SetVars(void);
   void Transform(struct Line2d *ret, struct Line3d vec);
-
-  uint8_t m_saver;
 
   float xx, xy, xz;
   float yx, yy, yz;
