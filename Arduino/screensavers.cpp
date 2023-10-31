@@ -1,9 +1,7 @@
 #include "screensavers.h"
-
-void ScreenSavers::init()
-{
-  
-}
+#include <TimeLib.h>
+#include "digitalFont.h"
+#include "display.h"
 
 void ScreenSavers::select(int n)
 {
@@ -13,10 +11,12 @@ void ScreenSavers::select(int n)
 void ScreenSavers::reset()
 {
   randomSeed(micros());
-  tft.fillScreen(TFT_BLACK);
 
   switch(m_saver)
   {
+    case SS_Clock:
+        Clock(true);
+        break;
     case SS_Lines:
         Lines(true);
         break;
@@ -33,22 +33,96 @@ void ScreenSavers::run()
 {
     switch(m_saver)
     {
+      case SS_Clock: Clock(false); break;
       case SS_Lines: Lines(false); break;
       case SS_Boing: Boing(false); break;
       case SS_Cube: Cube(false); break;
     }
 }
 
-void ScreenSavers::end()
+void ScreenSavers::end() // Do any cleanup
 {
     switch(m_saver)
     {
+      case SS_Clock: break;
       case SS_Lines: break;
       case SS_Boing: break;
       case SS_Cube:  break;
     }
   
 }
+
+// Analog clock
+void ScreenSavers::Clock(bool bInit)
+{
+  if(bInit)
+    display.loadImage("/bgClock.png", 0, 0);
+
+  static uint8_t sec;
+  if(sec == second())
+    return;
+  sec = second();
+
+  const float x = 159; // center
+  const float y = 158;
+  const uint16_t bgColor = rgb16(9,18,9);
+  float x1,y1, x2,y2, x3,y3;
+
+  tft.fillCircle(x, y, 92, bgColor ); // no room for transparency
+
+  float a = (hour() + (minute() * 0.00833) ) * 30;
+  cspoint(x1, y1, x, y, a, 64);
+  a = (hour() + (minute() * 0.00833)+2 ) * 30;
+  cspoint(x2, y2, x, y, a, 10);
+  a = (hour() + (minute() * 0.00833)-2 ) * 30;
+  cspoint(x3, y3, x, y, a, 10);
+  tft.fillTriangle(x1,y1, x2,y2, x3, y3, rgb16(2, 4, 2) ); // hour hand
+
+  cspoint(x1, y1, x, y, minute() * 6, 88);
+  cspoint(x2, y2, x, y, (minute()+5) * 6, 12);
+  cspoint(x3, y3, x, y, (minute()-5) * 6, 12);
+  tft.fillTriangle(x1,y1, x2,y2, x3, y3, TFT_BLACK ); // minute hand
+
+  tft.fillCircle(x, y, 12, TFT_BLACK ); // center cap
+
+  cspoint(x2, y2, x, y, second() * 6, 91);
+  cspoint(x3, y3, x, y, (second()+30) * 6, 24);
+  tft.drawWideLine(x3, y3, x2, y2, 2.5, rgb16(31, 0, 0), bgColor ); // second hand
+
+  tft.setTextColor(rgb16(0, 31, 31) );
+  tft.setFreeFont(&digitaldreamFatNarrow_14ptFont);
+
+  String sTime = (hourFormat12() < 10) ? " ":"";
+  sTime += String( hourFormat12() );
+  sTime += ":";
+  if(minute() < 10) sTime += "0";
+  sTime += minute();
+  sTime += ":";
+  if(second() < 10) sTime += "0";
+  sTime += second();
+  sTime += " ";
+  sTime += isPM() ? "PM":"AM";
+
+  tft.fillRect(311, 17, 151, 25, rgb16(1,8,4));
+  tft.drawString(sTime, 320, 20);
+
+  tft.drawString(dayStr(weekday()), 320, 60);
+
+  sTime = monthStr(month());
+  sTime += " ";
+  sTime += String(day());
+  sTime += " ";
+  sTime += String(year());
+  tft.drawString(sTime, 320, 100);
+}
+
+void ScreenSavers::cspoint(float &x2, float &y2, float x, float y, float angle, float size)
+{
+  float ang =  M_PI * (180-angle) / 180;
+  x2 = x + size * sin(ang);
+  y2 = y + size * cos(ang);  
+}
+
 
 void ScreenSavers::Lines(bool bInit)
 {
@@ -60,6 +134,7 @@ void ScreenSavers::Lines(bool bInit)
 
   if(bInit)
   {
+    tft.fillScreen(TFT_BLACK);
     memset(&line, 10, sizeof(line));
     memset(&delta, 1, sizeof(delta));
     return;
@@ -82,7 +157,7 @@ void ScreenSavers::Lines(bool bInit)
   }
 
   // add delta to positions
-  line[0].x1 = constrain(line[0].x1 + delta.x1, 0, DISPLAY_WIDTH-1); // keep it on the screen
+  line[0].x1 = constrain(line[0].x1 + delta.x1, 0, tft.width()-1); // keep it on the screen
   line[0].x2 = constrain(line[0].x2 + delta.x2, 0, DISPLAY_WIDTH-1);
   line[0].y1 = constrain(line[0].y1 + delta.y1, 0, DISPLAY_HEIGHT-1);
   line[0].y2 = constrain(line[0].y2 + delta.y2, 0, DISPLAY_HEIGHT-1);
@@ -124,6 +199,7 @@ void ScreenSavers::Boing(bool bInit)
 
   if(bInit)
   {
+    tft.fillScreen(TFT_BLACK);
     for(uint8_t i = 0; i < BALLS; i++)
     {
       ball[i].x = DISPLAY_WIDTH/2;
@@ -156,10 +232,10 @@ void ScreenSavers::Boing(bool bInit)
       ball[i].dy = -ball[i].dy - (int16_t)random(5, 17);
 
     if(x1 <= rad && ball[i].dx < 0)  // left wall
-      ball[i].dx = -ball[i].dx - (int16_t)random(0, 1);
+      ball[i].dx = -ball[i].dx;
 
     if(x1 >= DISPLAY_WIDTH - rad && ball[i].dx > 0)  // right wall
-      ball[i].dx = -ball[i].dx + (int16_t)random(0, 1);
+      ball[i].dx = -ball[i].dx;
 
     static uint8_t dly = 1;
     if(--dly == 0) // gravity
@@ -233,7 +309,7 @@ void ScreenSavers::Cube(bool bInit)
 {
   /***********************************************************************************************************************************/
   // line segments to draw a cube. basically p0 to p1. p1 to p2. p2 to p3 so on.
-  static Line3d object[] = {
+  static const Line3d object[] = {
     // Front Face.
     {-50, -50,  50,  50, -50,  50},
     { 50, -50,  50,  50,  50,  50},
@@ -259,6 +335,7 @@ void ScreenSavers::Cube(bool bInit)
 
   if(bInit)
   {
+    tft.fillScreen(TFT_BLACK);
     Xpos = tft.width() / 2; // Position the center of the 3d conversion space into the center of the TFT screen.
     Ypos = tft.height() / 2;
     Zpos = 550; // Z offset in 3D space (smaller = closer and bigger rendering)
@@ -376,25 +453,15 @@ void ScreenSavers::Transform(struct Line2d *ret, struct Line3d vec)
   int rx1, ry1;
   int rx2, ry2;
 
-  int x1;
-  int y1;
-  int z1;
+  int x1 = vec.p0.x;
+  int y1 = vec.p0.y;
+  int z1 = vec.p0.z;
 
-  int x2;
-  int y2;
-  int z2;
+  int x2 = vec.p1.x;
+  int y2 = vec.p1.y;
+  int z2 = vec.p1.z;
 
-  bool Ok;
-
-  x1 = vec.p0.x;
-  y1 = vec.p0.y;
-  z1 = vec.p0.z;
-
-  x2 = vec.p1.x;
-  y2 = vec.p1.y;
-  z2 = vec.p1.z;
-
-  Ok = false; // defaults to not OK
+  bool Ok = false; // defaults to not OK
 
   xv1 = (x1 * xx) + (y1 * xy) + (z1 * xz);
   yv1 = (x1 * yx) + (y1 * yy) + (z1 * yz);
