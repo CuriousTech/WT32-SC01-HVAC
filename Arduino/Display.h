@@ -5,8 +5,6 @@
 #include <PNGdec.h>  // From Library Manager
 #include "Forecast.h"
 
-// bit shifting for ease, to 5-6-5 format
-#define rgb(r,g,b) ( (((uint16_t)r << 8) & 0xF800) | (((uint16_t)g << 3) & 0x07E0) | ((uint16_t)b >> 3) )
 // from 5-6-5 to 16 bit value (max 31, 63, 31)
 #define rgb16(r,g,b) ( ((uint16_t)r << 11) | ((uint16_t)g << 5) | (uint16_t)b )
 
@@ -106,12 +104,13 @@ public:
   void oneSec(void);
   bool screen(bool bOn);
   void service(void);
+  void loadImage(char *pName, uint16_t x, uint16_t y);
   void updateTemps(void);
   bool drawForecast(bool bRef);
   void Note(char *cNote);
   void updateNotification(bool bRef);
   bool getGrapthPoints(gPoint *pt, int n);
-  int  minPointVal(int n);
+  int  minPointVal(int n, int &max);
 
 private:
   void buttonCmd(uint8_t btn);
@@ -119,10 +118,7 @@ private:
   void dimmer(void);
   void updateModes(bool bForce); // update any displayed settings
   void buttonRepeat(void);
-  void loadImage(char *pName, uint16_t x, uint16_t y);
   void refreshAll(void);
-  void drawClock(bool bInit);
-  void cspoint(float &x2, float &y2, float x, float y, float angle, float size);
   void updateAdjMode(bool bRef);  // current adjust indicator of the 4 temp settings
   void updateRSSI(void);
   void updateRunIndicator(bool bForce);
@@ -138,15 +134,15 @@ private:
   int  tween(int16_t t1, int16_t t2, int m, int r);
 
   uint16_t m_backlightTimer = 90; // backlight timers, seconds
+  uint8_t m_bright; // current brightness;
 #define GPTS 640 // 320 px width - (10+10) padding
   gPoint m_points[GPTS];
   uint16_t m_pointsIdx = 0;
   uint16_t m_temp_counter = 2*60;
   uint8_t m_btnMode = 0;
   uint8_t m_btnDelay = 0;
-  int m_tempLow; // 66.0 base
-  int m_tempHigh; // 90.0 top
-  int m_tempMax;
+  int m_tempLow; // used forr chart
+  int m_tempHigh; // ""
   uint8_t m_currPage = 0;
 #define BTN_CNT 26
   const Button m_btn[BTN_CNT] = {
@@ -191,5 +187,7 @@ public:
   bool    m_bFcstUpdated = false;
   uint8_t m_brightness;
 };
+
+extern Display display;
 
 #endif // DISPLAY_H
