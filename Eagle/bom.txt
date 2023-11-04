@@ -3,8 +3,8 @@ PCB OSHPark $15.68 for 3
 WT32-SC01
 WT32-SC01 connector 98414-G06-40LF
 
-X1          TBP03R2-350-08BE (vertical) and TBP03P2-350-08BEOR or
-            39357-0008 (or 691322110008 and 691361100008) Screw terimal, 8 position 3.5mm pitch
+X1          691305140008 (right angle)  or  TBP03R2-350-08BE (vertical) , 8 position 3.5mm pitch
+            TBP03P2-350-08BEOR (plug with push connects) or 691361100008 (Screw terimal)
 
 SPK         CMR-12062S-67 (12x6mm 32ohm square) Alternatiive: CDS-203-32-SP (round 20mm 32ohm speaker)
 
