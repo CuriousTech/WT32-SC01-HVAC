@@ -17,7 +17,7 @@ enum Saver
   SS_Count, // Last one
 };
 
-struct intLine
+struct Line
 {
   int16_t x1;
   int16_t y1;
@@ -61,14 +61,22 @@ struct Line2d
 
 class ScreenSavers
 {
+#define LINES 50
+#define BALLS 8
+#define LINES3DREND 20 // max 256 for 2048 bytes
+#define BUFFER_SIZE 1024 // Caution: Also used by image loader (512 pixel width max)
+
+static_assert(sizeof(Ball) * BALLS < BUFFER_SIZE, "m_buffer size too small");
+static_assert(sizeof(Line) * LINES < BUFFER_SIZE, "m_buffer size too small");
+static_assert(sizeof(Line2d) * 2 * LINES3DREND < BUFFER_SIZE, "m_buffer size too small");
+
 public:
   ScreenSavers(){};
   void select(int n);
-  void reset(void);
   void run(void);
-  void end(void);
 
   uint8_t m_saver;
+  uint8_t m_buffer[BUFFER_SIZE];
 
 private:
   void Clock(bool bInit);
@@ -88,7 +96,6 @@ private:
   int Xpos;
   int Ypos;
   int Zpos;
-
 };
 
 
