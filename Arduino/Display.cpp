@@ -26,11 +26,28 @@ PNG png;
 
 void pngDraw(PNGDRAW *pDraw)
 {
-  static uint16_t lineBuffer[480+2];
-  intLine *pPos = (intLine *)pDraw->pUser;
+  ImageCtrl *pPos = (ImageCtrl *)pDraw->pUser;
 
-  png.getLineAsRGB565(pDraw, lineBuffer, PNG_RGB565_BIG_ENDIAN, 0xffffffff);
-  tft.pushImage(pPos->x1, pPos->y1 + pDraw->y, pDraw->iWidth, 1, lineBuffer);
+  if(pPos->srcY)
+  {
+    if(pDraw->y < pPos->srcY) // skip lines above
+      return;
+    if(pPos->srcY + pPos->h >= pDraw->y) // skip lines below
+      return;
+  }
+
+  // Uses shared bufffer (1024 bytes / 512 pixels max)
+  png.getLineAsRGB565(pDraw, (uint16_t *)ss.m_buffer, PNG_RGB565_BIG_ENDIAN, 0xffffffff);
+
+  uint16_t *pBuf = (uint16_t *)ss.m_buffer;
+  uint16_t w = pDraw->iWidth;
+  if(pPos->w) w = pPos->w; // crop to desired width (todo: should maybe to some checking)
+
+  uint16_t y = pPos->y + pDraw->y;
+  if(pPos->srcY) // offset lib incremented y pos to srcY offset
+    y -= pPos->srcY;
+
+  tft.pushImage(pPos->x, y, w, 1, pBuf + pPos->srcX);
 }
 
 File pngfile;
@@ -64,12 +81,13 @@ void Display::init(void)
    m_fc.Data[i].temp = -127;
   m_fc.Date = 0;
 
+  pinMode(39, INPUT); // touch int
+
   setBrightness(0, 0);                // black out while display is noise 
   ts.begin(40);                       // adafruit touch
   tft.init();                         // TFT_eSPI
   tft.setRotation(1);                 // set desired rotation
   tft.setTextDatum(TL_DATUM);
-  tft.setFreeFont(&FreeSans12pt7b);
 
   FileSys.begin();
   mus.init();
@@ -95,26 +113,22 @@ bool Display::screen(bool bOn)
     m_currPage = Page_Thermostat;
     setBrightness(0, 255);
     loadImage("/bg.png", 0, 0);
-    delay(10);
     refreshAll();
   }
   else switch(m_currPage)
   {
-    case Page_ScreenSaver:
-      ss.end();
-      m_currPage = Page_Graph; // chart thing
-      setBrightness(0, 230);
-      loadImage("/bgBlank.png", 0, 0);
-      delay(10);
-      drawGraph();
-      break;
-    default:  // probably thermostat
+    case Page_Forecast:
       m_currPage = Page_ScreenSaver;
       setBrightness(0, 180);
       ss.select( random(0, SS_Count) );
-      delay(5);
-      ss.reset();
       break;
+    case Page_ScreenSaver:
+      historyPage();
+      break;
+    default: // from thermostat
+      forecastPage();
+      break;
+      
   }
   bOldOn = bOn;
   return true;
@@ -126,24 +140,24 @@ void Display::service(void)
   static bool bPress;
 
   dimmer();
+  mus.service(); // sound handler
+
   if(m_currPage == Page_ScreenSaver)
     ss.run();
 
-  if (ts.touched())
+  static uint32_t lastms;
+  static uint32_t touchms;
+
+  if (digitalRead(39) == LOW)// ts.touched() can't be used with SHT40. Too many i2c sharing errors
   {
+    touchms = millis();
+    if(millis() - lastms < 100) // filter the pulses
+      return;
+    lastms = millis();
+
     TS_Point p = ts.getPoint();
     uint16_t y = 320 - p.x;     // adjust touch point for rotation = 1
     uint16_t x = p.y;
-
-    if(m_btnMode) // up/dn being held
-    {
-      if(--m_btnDelay <= 0)
-      {
-        buttonRepeat();
-        m_btnDelay = 40; // repeat speed
-      }
-      return;
-    }
 
     if(bPress == false) // only need 1 touch
     {
@@ -154,7 +168,7 @@ void Display::service(void)
       else
       {
         currBtn = -1;
-        for(uint8_t i = 0; i < BTN_CNT; i++)
+        for(uint8_t i = 0; i < Btn_Count; i++)
         {
           if (x >= m_btn[i].x && x <= m_btn[i].x + m_btn[i].w && y >= m_btn[i].y && y <= m_btn[i].y + m_btn[i].h)
           {
@@ -166,18 +180,25 @@ void Display::service(void)
         }
       }
     }
+    else if(m_btnMode) // up/dn being held
+    {
+      if(--m_btnDelay <= 0)
+      {
+        buttonRepeat();
+        mus.add(7000, 15);
+        m_btnDelay = 2; // repeat speed
+      }
+    }
     
     bPress = true;
   }
   else if(bPress) // release
   {
+    if(millis() - touchms < 30) // the touch interrupt pulses ~10ms
+      return;
+
     bPress = false;
-    if(currBtn >= 0)
-    {
-//      Serial.print("release ");
-//      Serial.println(currBtn);
-      m_btnMode = 0; // Up/Dn release
-    }
+    m_btnMode = 0; // Up/Dn release
     currBtn = -1;
   }
   else // idle
@@ -206,12 +227,12 @@ void Display::buttonCmd(uint8_t btn)
     case Btn_Up: // Up button
       m_btnMode = 1;
       buttonRepeat();
-      m_btnDelay = 80; // first repeat
+      m_btnDelay = 7; // first repeat
       break;
     case Btn_Dn: // Down button
       m_btnMode = 2;
       buttonRepeat();
-      m_btnDelay = 80;
+      m_btnDelay = 7;
       break;
 
     case Btn_Fan:
@@ -238,25 +259,22 @@ void Display::buttonCmd(uint8_t btn)
       if(ee.b.bLock) break;
       hvac.m_notif = Note_None;
       break;
-    case Btn_Fc: // forecast
-      m_currPage = Page_Graph;
-      setBrightness(0, 240);
-      loadImage("/bgBlank.png", 0, 0);
-      drawGraph();
-      break;
     case Btn_Time: // time
       m_currPage = Page_ScreenSaver;
       setBrightness(0, 240);
       ss.select( SS_Clock );
-      ss.reset();
       break;
     case Btn_TargetTemp:
       if(ee.b.bLock) break;
       hvac.enableRemote();
       break;
     case Btn_InTemp: // in
+      outlineAllButtons();
+      break;
+    case Btn_OutTemp:
+      forecastPage();
+      break;
     case Btn_Rh: // rh
-      updateTemps();
       break;
 //#define PWLOCK  // uncomment for password entry unlock
 #ifdef PWLOCK
@@ -281,9 +299,6 @@ void Display::buttonCmd(uint8_t btn)
 // called each second
 void Display::oneSec()
 {
-  if(WiFi.status() != WL_CONNECTED)
-    return;
-
   updateRunIndicator(false); // running stuff
   drawTime();    // time update every second
   updateModes(false);    // mode, heat mode, fan mode
@@ -309,14 +324,58 @@ void Display::oneSec()
   if(m_currPage == Page_Thermostat && m_bFcstUpdated)
   {
     m_bFcstUpdated = false;
-    drawForecast(true);
+    drawOutTemp();
   }
 }
 
 void Display::drawOutTemp()
 {
   if(m_fc.Date == 0) // not read yet or time not set
+  {
+    if(m_bUpdateFcstIdle)
+      m_bUpdateFcst = true;
     return;
+  }
+
+  int8_t fcOff = 0;
+  int8_t fcCnt = 0;
+  uint32_t tm = m_fc.Date;
+
+  for(fcCnt = 0; fcCnt < FC_CNT && m_fc.Data[fcCnt].temp != -127; fcCnt++) // get current time in forecast and valid count
+  {
+    if( tm < now() )
+    {
+      fcOff = fcCnt;
+      tm += m_fc.Freq;
+    }
+  }
+
+  if(fcCnt >= FC_CNT || m_fc.Data[fcOff].temp == -127 ) // outdated
+  {
+    if(m_bUpdateFcstIdle)
+      m_bUpdateFcst = true;
+    return;
+  }
+
+  int rng = fcCnt;
+  if(rng > ee.fcRange) rng = ee.fcRange;
+
+  // Update min/max
+  int16_t tmin = m_fc.Data[0].temp;
+  int16_t tmax = m_fc.Data[0].temp;
+
+  // Get min/max of current forecast
+  for(int i = 1; i < rng && i < FC_CNT; i++)
+  {
+    int16_t t = m_fc.Data[i].temp;
+    if(tmin > t) tmin = t;
+    if(tmax < t) tmax = t;
+  }
+
+  if(tmin == tmax) tmax++;   // div by 0 check
+
+  hvac.m_outMin = tmin; // set for hvac
+  hvac.m_outMax = tmax;
 
   int iH = 0;
   int m = minute();
@@ -362,13 +421,24 @@ void Display::drawOutTemp()
 
   outTempShift = tween(m_fc.Data[iH].temp, m_fc.Data[iH+1].temp, m, r);
 
-  tft.setTextColor( rgb16(0, 63, 31), rgb16(0, 4, 10) );
-  tft.setFreeFont(&digitaldreamFatNarrow_14ptFont);
-  if(m_currPage == Page_Thermostat)
-    tft.drawFloat((float)outTempReal/10, 1, m_btn[Btn_OutTemp].x, m_btn[Btn_OutTemp].y );
-
+  tft.setTextColor( rgb16(0, 63, 31), TFT_BLACK );
+  tft.setFreeFont(&digitaldreamSkew_28ptFont);
   // Summer/winter curve.  Summer is delayed 3 hours
   hvac.updateOutdoorTemp( outTempShift );
+
+  if(m_currPage == Page_Thermostat)
+  {
+    tft.drawFloat((float)outTempReal/10, 1, m_btn[Btn_OutTemp].x, m_btn[Btn_OutTemp].y );
+
+    static bool bInit = false; // make first time display update fast
+    if(!bInit)
+    {
+      int16_t t = hvac.getSetTemp(Mode_Off, 0 );
+      hvac.setTemp(Mode_Off, t, 0);
+      bInit = true;
+    }
+  }
+
 }
 
 void Display::updateTemps(void)
@@ -381,21 +451,27 @@ void Display::updateTemps(void)
     return;
   }
 
-  tft.setFreeFont(&digitaldreamFatNarrow_14ptFont);
-  tft.setTextColor( hvac.m_bRemoteStream ? rgb16(31, 0, 15) : rgb16(0, 63, 31), bgColor );
+  tft.setTextColor( rgb16(0, 63, 31), TFT_BLACK );
 
+  tft.setFreeFont(&digitaldreamSkew_48ptFont);
   if(last[0] != hvac.m_inTemp)
     tft.drawFloat((float)(last[0] = hvac.m_inTemp)/10, 1, m_btn[Btn_InTemp].x, m_btn[Btn_InTemp].y );
-  if(last[1] != hvac.m_rh)
-    tft.drawFloat((float)(last[1] = hvac.m_rh)/10, 1, m_btn[Btn_Rh].x, m_btn[Btn_Rh].y );
-
-  tft.setTextColor( rgb16(0, 63, 31), bgColor );
+  tft.setFreeFont(&digitaldreamSkew_28ptFont);
   if(last[2] != hvac.m_targetTemp)
     tft.drawFloat((float)(last[2] = hvac.m_targetTemp)/10, 1, m_btn[Btn_TargetTemp].x, m_btn[Btn_TargetTemp].y );
 
-  tft.setTextColor( rgb16(0, 8, 31), bgColor );
+  if(last[1] != hvac.m_rh)
+  {
+    tft.drawFloat((float)(last[1] = hvac.m_rh)/10, 1, m_btn[Btn_Rh].x, m_btn[Btn_Rh].y );
+    tft.setFreeFont(&digitaldreamFatNarrow_14ptFont);
+    tft.drawString("%", m_btn[Btn_Rh].x + 96, m_btn[Btn_Rh].y );
+  }
+  tft.setFreeFont(&digitaldreamFatNarrow_14ptFont);
+
+  tft.setTextColor( rgb16(0, 16, 31), bgColor );
   if(last[3] != ee.coolTemp[1])
     tft.drawFloat((float)(last[3] = ee.coolTemp[1])/10, 1, m_btn[Btn_CoolTempH].x, m_btn[Btn_CoolTempH].y );
+  tft.setTextColor( rgb16(0, 8, 31), bgColor );
   if(last[4] != ee.coolTemp[0])
     tft.drawFloat((float)(last[4] = ee.coolTemp[0])/10, 1, m_btn[Btn_CoolTempL].x, m_btn[Btn_CoolTempL].y );
   tft.setTextColor( rgb16(31, 4, 0), bgColor );
@@ -486,9 +562,18 @@ void Display::buttonRepeat()
 
 void Display::loadImage(char *pName, uint16_t x, uint16_t y)
 {
-  static intLine pos;
-  pos.x1 = x;
-  pos.y1 = y;
+  loadImage(pName, x, y, 0, 0, 0, 0);
+}
+
+void Display::loadImage(char *pName, uint16_t x, uint16_t y, uint16_t srcX, uint16_t srcY, uint16_t w, uint16_t h)
+{
+  static ImageCtrl pos;
+  pos.x = x;
+  pos.y = y;
+  pos.srcX = srcX;
+  pos.srcY = srcY;
+  pos.w = w;
+  pos.h = h;
 
   int16_t rc = png.open(pName, pngOpen, pngClose, pngRead, pngSeek, pngDraw);
 
@@ -552,176 +637,6 @@ void Display::drawTime()
     tft.drawString(dayShortStr(weekday()), m_btn[Btn_Dow].x, m_btn[Btn_Dow].y);
   }
   bRefresh = false;
-}
-
-#define Fc_Left     37
-#define Fc_Top      34
-#define Fc_Width   286
-#define Fc_Height   78
-
-bool Display::drawForecast(bool bRef)
-{
-  if(m_fc.Date == 0) // no data yet
-  {
-    if(m_bUpdateFcstIdle)
-      m_bUpdateFcst = true;
-    return false;
-  }
-
-  int8_t fcOff = 0;
-  int8_t fcDispOff = 0;
-  int8_t fcCnt = 0;
-  uint32_t tm = m_fc.Date;
-
-  for(fcCnt = 0; fcCnt < FC_CNT && m_fc.Data[fcCnt].temp != -127; fcCnt++) // get current time in forecast and valid count
-  {
-    if( tm < now() )
-    {
-      fcOff = fcCnt;
-      tm += m_fc.Freq;
-    }
-  }
-
-  if(fcCnt >= FC_CNT || m_fc.Data[fcOff].temp == -127 ) // outdated
-  {
-    if(m_bUpdateFcstIdle)
-      m_bUpdateFcst = true;
-    return false;
-  }
-
-  if(bRef)
-  {
-    int rng = fcCnt;
-    if(rng > ee.fcRange) rng = ee.fcRange;
-
-    // Update min/max
-    int16_t tmin = m_fc.Data[0].temp;
-    int16_t tmax = m_fc.Data[0].temp;
-
-    // Get min/max of current forecast
-    for(int i = 1; i < rng && i < FC_CNT; i++)
-    {
-      int16_t t = m_fc.Data[i].temp;
-      if(tmin > t) tmin = t;
-      if(tmax < t) tmax = t;
-    }
-
-    if(tmin == tmax) tmax++;   // div by 0 check
-
-    hvac.m_outMin = tmin;
-    hvac.m_outMax = tmax;
-  }
-
-  if(m_currPage) // on different page
-    return true;
-
-  drawOutTemp(); // update temp for HVAC
-
-  tft.fillRect(Fc_Left, Fc_Top, Fc_Width, Fc_Height - 1, TFT_BLACK); // clear graph area
-
-  if(fcOff > 8) // more than a of day history
-  {
-    fcDispOff = fcOff - 8;
-  }
-
-  // Update min/max
-  int16_t tmin = m_fc.Data[fcDispOff].temp;
-  int16_t tmax = m_fc.Data[fcDispOff].temp;
-
-  int hrng = fcCnt;
-  if(hrng > fcDispOff + ee.fcDisplay)
-    hrng = fcDispOff + ee.fcDisplay; // shorten to user display range
-
-  // Get min/max of current forecast for display
-  for(int i = fcDispOff + 1; i < hrng && i < FC_CNT; i++)
-  {
-    int16_t t = m_fc.Data[i].temp;
-    if(tmin > t) tmin = t;
-    if(tmax < t) tmax = t;
-  }
-
-  if(tmin == tmax) tmax++;   // div by 0 check
-
-  int16_t y = Fc_Top+1;
-  int16_t incy = (Fc_Height-10) / 2;
-  int16_t dec = (tmax - tmin) / 2;
-  int16_t t = tmax;
-
-  // temp scale
-  tft.setFreeFont(&FreeSans9pt7b);
-  tft.setTextColor( rgb16(0, 31, 31), rgb16(8,16,8));
-  for(int i = 0; i < 3; i++)
-  {
-    tft.drawNumber(t/10, 8, y + 4);
-    y += incy;
-    t -= dec;
-  }
-
-  int hrs = hrng * m_fc.Freq / 3600; // normally 180ish hours
-  int day_x = 0;
-  if(hrs <= 0) // divide by 0
-    return true;
-
-  tft.setTextColor(rgb16(0, 63, 31), 0); // cyan text
-  tft.setTextDatum(TC_DATUM); // center day on noon
-
-  tmElements_t tmE;
-  breakTime(m_fc.Date + (fcDispOff * m_fc.Freq), tmE);
-
-  int day = tmE.Wday - 1;              // current day
-
-  for(int i = 0, h = tmE.Hour; i < hrs; i++, h++)
-  {
-    int x = i * Fc_Width / hrs + Fc_Left;
-    h %= 24;
-    if(h == 12)
-    {
-      tft.drawLine(x, Fc_Top, x, Fc_Top+Fc_Height, rgb16(7, 14, 7) ); // dark gray
-      if(x - 16 > Fc_Left) // skip 1st day if too far left
-      {
-        tft.drawString( dayShortStr(day+1), day_x = x, Fc_Top+Fc_Height);
-      }
-    }
-    else if(h==0) // new day (draw line)
-    {
-      tft.drawLine(x, Fc_Top+1, x, Fc_Top+Fc_Height-2, rgb16(14, 28, 14) ); // (light gray)
-      if(++day > 6) day = 0;
-    }
-  }
-  day_x += 20;
-  if(day_x < Fc_Left+Fc_Width - 40 )  // last partial day
-    tft.drawString(dayShortStr(day+1), day_x, Fc_Top+Fc_Height );
-  tft.setFreeFont(&FreeSans12pt7b); // set font back to normal
-  tft.setTextDatum(TL_DATUM);
-
-  int x2, y2;
-
-  for(int i = fcDispOff; i < hrng && m_fc.Data[i].temp != -127; i++) // should be 41 data points
-  {
-    int y1 = Fc_Top+Fc_Height - 1 - (m_fc.Data[i].temp - tmin) * (Fc_Height-2) / (tmax-tmin);
-    int x1 = i * Fc_Width / hrng + Fc_Left;
-
-    if(i)
-    {
-//      if(i == fcOff)  // current 3 hour time
-//      {
-//        int x3 = (i+1) * Fc_Width / hrng + Fc_Left;
-//        tft.drawRect(x2, Fc_Top + 30, x3-x2, 20, rgb16(0, 22, 11) );
-//      }
-      tft.drawLine(x2, y2, x1, y1, (i== fcOff) ? rgb16(0, 31, 8) : rgb16(31, 0, 0) ); // red (current green)
-    }
-    x2 = x1;
-    y2 = y1;
-  }
-  return true;
-}
-
-// get value at current minute between hours
-int Display::tween(int16_t t1, int16_t t2, int m, int r)
-{
-  if(r == 0) r = 1; // div by zero check
-  float t = (float)(t2 - t1) * (m * 100 / r) / 100;
-  return (int)(t + (float)t1);
 }
 
 void Display::Note(char *cNote)
@@ -806,6 +721,7 @@ void Display::setBrightness(uint8_t immediate, uint8_t deferred)
 {
   m_bright = immediate;
   m_brightness = deferred;
+  analogWrite(TFT_BL, m_bright);
 }
 
 // smooth adjust brigthness (0-255)
@@ -814,10 +730,13 @@ void Display::dimmer()
   if(m_bright == m_brightness)
     return;
 
-  if(m_brightness > m_bright)
+  if(m_brightness > m_bright + 1)
+    m_bright += 2;
+  else if(m_brightness > m_bright)
     m_bright ++;
   else
     m_bright --;
+
   analogWrite(TFT_BL, m_bright);
 }
 
@@ -828,11 +747,9 @@ void Display::refreshAll()
   updateNotification(true);
   updateAdjMode(true);
   updateModes(true);
-
+  drawOutTemp();
   loadImage("/up.png", m_btn[Btn_Up].x, m_btn[Btn_Up].y);
   loadImage("/dn.png", m_btn[Btn_Dn].x, m_btn[Btn_Dn].y);
-
-  drawForecast(true);
 }
 
 void Display::updateAdjMode(bool bRef)  // current adjust indicator of the 4 temp settings
@@ -936,9 +853,151 @@ void Display::updateRunIndicator(bool bForce) // run and fan running
        loadImage("/ledoff.png", m_btn[Btn_IndR].x, m_btn[Btn_IndR].y);
     bCurrent = bOn;
   }
+}
 
-  if(bHumid != hvac.getHumidifierRunning())
-     loadImage((char *)((bHumid = hvac.getHumidifierRunning()) ? "/ledon.png" : "/ledoff.png"), m_btn[Btn_IndH].x, m_btn[Btn_IndH].y);
+#define FC_Left     37
+#define FC_Top      34
+#define FC_Width   430
+#define FC_Height  143
+
+void Display::forecastPage()
+{
+  if(m_fc.Date == 0) // no data yet
+  {
+    if(m_bUpdateFcstIdle)
+      m_bUpdateFcst = true;
+    return;
+  }
+
+  m_currPage = Page_Forecast;
+  setBrightness(0, 230);
+  loadImage("/bgForecast.png", 0, 0);
+
+  int8_t fcOff = 0;
+  int8_t fcDispOff = 0;
+  int8_t fcCnt = 0;
+  uint32_t tm = m_fc.Date;
+
+  for(fcCnt = 0; fcCnt < FC_CNT && m_fc.Data[fcCnt].temp != -127; fcCnt++) // get current time in forecast and valid count
+  {
+    if( tm < now() )
+    {
+      fcOff = fcCnt;
+      tm += m_fc.Freq;
+    }
+  }
+
+  if(fcCnt >= FC_CNT || m_fc.Data[fcOff].temp == -127 ) // outdated
+  {
+    if(m_bUpdateFcstIdle)
+      m_bUpdateFcst = true;
+    return;
+  }
+
+  tft.fillRect(FC_Left, FC_Top, FC_Width, FC_Height - 1, TFT_BLACK); // clear graph area
+
+  if(fcOff > 8) // more than a of day history
+  {
+    fcDispOff = fcOff - 8;
+  }
+
+  // Update min/max
+  int16_t tmin = m_fc.Data[fcDispOff].temp;
+  int16_t tmax = tmin;
+
+  int hrng = fcCnt;
+  if(hrng > fcDispOff + ee.fcDisplay)
+    hrng = fcDispOff + ee.fcDisplay; // shorten to user display range
+
+  // Get min/max of current forecast for display
+  for(int i = fcDispOff + 1; i < hrng && i < FC_CNT; i++)
+  {
+    int16_t t = m_fc.Data[i].temp;
+    if(tmin > t) tmin = t;
+    if(tmax < t) tmax = t;
+  }
+
+  if(tmin == tmax) tmax++;   // div by 0 check
+
+  int16_t y = FC_Top+1;
+  int16_t incy = (FC_Height-20) / 2;
+  int16_t dec = (tmax - tmin) / 2;
+  int16_t t = tmax;
+
+  // temp scale
+  tft.setFreeFont(&FreeSans9pt7b);
+  tft.setTextColor(rgb16(0, 63, 31)); // cyan text
+  for(int i = 0; i < 3; i++)
+  {
+    tft.drawNumber(t/10, 8, y + 4);
+    y += incy;
+    t -= dec;
+  }
+
+  int hrs = hrng * m_fc.Freq / 3600; // normally 180ish hours
+  uint16_t day_x = 0;
+  if(hrs <= 0) // divide by 0
+    return;
+
+  tft.setTextDatum(TC_DATUM); // center day on noon
+
+  tmElements_t tmE;
+  breakTime(m_fc.Date + (fcDispOff * m_fc.Freq), tmE);
+
+  uint8_t day = tmE.Wday - 1;              // current day
+
+  for(int i = 0, h = tmE.Hour; i < hrs; i++, h++)
+  {
+    int x = i * FC_Width / hrs + FC_Left;
+    h %= 24;
+    if(h == 12)
+    {
+      tft.drawLine(x, FC_Top, x, FC_Top+FC_Height, rgb16(7, 14, 7) ); // dark gray
+      if(day_x < FC_Left + FC_Width - 100) // skip last day if too far right
+      {
+        tft.drawString( dayShortStr(day+1), day_x = x, 10);
+      }
+    }
+    else if(h==0) // new day (draw line)
+    {
+      tft.drawLine(x, FC_Top+1, x, FC_Top+FC_Height-2, rgb16(14, 28, 14) ); // (light gray)
+      if(++day > 6) day = 0;
+    }
+  }
+  tft.setTextDatum(TL_DATUM);
+
+  uint16_t x2, y2, rh2;
+
+  for(uint16_t i = fcDispOff; i < hrng && m_fc.Data[i].temp != -127; i++) // should be 41 data points
+  {
+    uint16_t y1 = FC_Top+FC_Height - 1 - (m_fc.Data[i].temp - tmin) * (FC_Height-2) / (tmax-tmin);
+    uint16_t x1 = i * FC_Width / hrng + FC_Left;
+    int rhY = (FC_Top + FC_Height) - (FC_Height * m_fc.Data[i].humidity / 1000);
+
+    if(i)
+    {
+//      if(i == fcOff)  // current 3 hour time
+//      {
+//        int x3 = (i+1) * FC_Width / hrng + FC_Left;
+//        tft.drawRect(x2, FC_Top + 30, x3-x2, 20, rgb16(0, 22, 11) );
+//      }
+
+      tft.drawLine(x2, rh2, x1, rhY, rgb16(0, 30, 0) ); // rh (green)
+
+      tft.drawLine(x2, y2, x1, y1, (i== fcOff) ? rgb16(20, 0, 8) : rgb16(31, 0, 0) ); // red (current purple)
+    }
+    x2 = x1;
+    y2 = y1;
+    rh2 = rhY;
+  }
+}
+
+// get value at current minute between hours
+int Display::tween(int16_t t1, int16_t t2, int m, int r)
+{
+  if(r == 0) r = 1; // div by zero check
+  float t = (float)(t2 - t1) * (m * 100 / r) / 100;
+  return (int)(t + (float)t1);
 }
 
 void Display::addGraphPoints()
@@ -975,8 +1034,12 @@ void Display::addGraphPoints()
 #define RPAD 16 // right edge
 
 // Draw the last 25 hours
-void Display::drawGraph()
+void Display::historyPage()
 {
+  m_currPage = Page_Graph; // chart thing
+  setBrightness(0, 230);
+  loadImage("/bgBlank.png", 0, 0);
+  
   int minTh, maxTh, maxTemp;
 
   m_tempLow  = minPointVal(0, maxTemp);
@@ -1023,7 +1086,6 @@ void Display::drawGraph()
 
   drawPointsRh( rgb16(  0, 48,  0) ); // rh green
   drawPointsTemp(); // off/cool/heat colors
-  tft.setFreeFont(&FreeSans12pt7b); // set font back to normal
 }
 
 void Display::drawPointsTarget(uint16_t color)
@@ -1187,4 +1249,12 @@ int Display::minPointVal(int n, int &max)
   }
   max = maxv;
   return minv;
+}
+
+void Display::outlineAllButtons()
+{
+  for(int i = 0; i < Btn_Count; i++)
+  {
+    tft.drawRect(m_btn[i].x, m_btn[i].y, m_btn[i].w, m_btn[i].h, rgb16(0,31,0));
+  }
 }
