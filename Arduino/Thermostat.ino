@@ -138,43 +138,37 @@ void loop()
     ds18reqlastreq = ds18lastreq;
   }
 #endif
+
+#ifdef SHT40_H
+  static uint8_t shtCount = 10;
+
+  if(sht.service())
+  {
+    tempMedian.add((ee.b.bCelcius ? sht.getTemperatureC():sht.getTemperatureF()) * 10);
+    float temp;
+    if (tempMedian.getAverage(2, temp) == tempMedian.OK) {
+      hvac.updateIndoorTemp( temp, sht.getRh() * 10 );
+    }
+    shtCount = 10;
+  }
+#endif
+  
   if(sec_save != second()) // only do stuff once per second
   {
     sec_save = second();
-
+#ifdef SHT40_H
+    if(--shtCount == 0)
+    {
+      shtCount = 10;
+      if( digitalRead(AMPWR) )
+        hvac.m_notif = Note_Sensor;
+      digitalWrite(AMPWR, !digitalRead(AMPWR)); // Toggle power to SHT40
+    }
+#endif
     if(secondsServer()) // once per second stuff, returns true once on connect
       uTime.start();
     display.oneSec();
     hvac.service();   // all HVAC code
-
-#ifdef SHT40_H
-    static uint8_t read_delay = 2;
-    static uint8_t errCnt = 0;
-
-    if(--read_delay == 0)
-    {
-      if(digitalRead(AMPWR) == LOW)
-        digitalWrite(AMPWR, HIGH); // Power the SHT40
-      else if(sht.service())
-      {
-        tempMedian.add((ee.b.bCelcius ? sht.getTemperatureC():sht.getTemperatureF()) * 10);
-        float temp;
-        if (tempMedian.getAverage(2, temp) == tempMedian.OK) {
-          hvac.updateIndoorTemp( temp, sht.getRh() * 10 );
-        }
-        errCnt = 0;
-      }
-      else
-      {
-        digitalWrite(AMPWR, LOW); // Cut power to the SHT40
-        if(errCnt < 5)
-          errCnt++;
-        else
-          hvac.m_notif = Note_Sensor;
-      }
-      read_delay = 5; // update every 5 seconds
-    }
-#endif
 
 #ifdef dht_h
     static uint8_t read_delay = 2;
@@ -220,8 +214,6 @@ void loop()
       }
       else
       {
-        Serial.print("AM2320 error: ");
-        Serial.println(am.code);
         digitalWrite(AMPWR, LOW); // Cut power to the AM2320
         if(errCnt < 5)
           errCnt++;
