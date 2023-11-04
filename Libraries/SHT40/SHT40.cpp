@@ -34,7 +34,7 @@ SHT40::SHT40() {
 }
 
 void SHT40::init(uint8_t seconds) {
-  Wire.begin();
+//  Wire.begin();
   m_mil = millis();
   m_interval = seconds * 10;
 }
