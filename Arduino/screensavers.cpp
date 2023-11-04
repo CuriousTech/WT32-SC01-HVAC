@@ -6,10 +6,6 @@
 void ScreenSavers::select(int n)
 {
   m_saver = n;
-}
-
-void ScreenSavers::reset()
-{
   randomSeed(micros());
 
   switch(m_saver)
@@ -38,18 +34,6 @@ void ScreenSavers::run()
       case SS_Boing: Boing(false); break;
       case SS_Cube: Cube(false); break;
     }
-}
-
-void ScreenSavers::end() // Do any cleanup
-{
-    switch(m_saver)
-    {
-      case SS_Clock: break;
-      case SS_Lines: break;
-      case SS_Boing: break;
-      case SS_Cube:  break;
-    }
-  
 }
 
 // Analog clock
@@ -108,7 +92,7 @@ void ScreenSavers::Clock(bool bInit)
 
   tft.drawString(dayStr(weekday()), 320, 60);
 
-  sTime = monthStr(month());
+  sTime = monthShortStr(month());
   sTime += " ";
   sTime += String(day());
   sTime += " ";
@@ -126,41 +110,38 @@ void ScreenSavers::cspoint(float &x2, float &y2, float x, float y, float angle, 
 
 void ScreenSavers::Lines(bool bInit)
 {
-#define LINES 50
-  static intLine line[LINES], delta;
+  static Line *line = (Line *)m_buffer, delta;
   uint16_t color;
   static int16_t r=40, g=40, b=40;
-  static int8_t cnt = 0;
+  static uint8_t idx;
 
   if(bInit)
   {
     tft.fillScreen(TFT_BLACK);
-    memset(&line, 10, sizeof(line));
+    memset(line, 0, sizeof(Line) * LINES);
     memset(&delta, 1, sizeof(delta));
+    idx = 0;
     return;
   }
 
-  // Erase oldest line
-  tft.drawLine(line[LINES - 1].x1, line[LINES - 1].y1, line[LINES - 1].x2, line[LINES - 1].y2, 0);
-
-  // FIFO the lines
-  for(int i = LINES - 2; i >= 0; i--)
-    line[i+1] = line[i];
-
-  if(--cnt <= 0)
+  static int8_t dly = 0;
+  if(--dly <= 0)
   {
-    cnt = 5; // every 5 runs
+    dly = 5; // every 5 runs
     delta.x1 = constrain(delta.x1 + (int16_t)random(-1,2), -4, 4); // random direction delta
     delta.x2 = constrain(delta.x2 + (int16_t)random(-1,2), -4, 4);
     delta.y1 = constrain(delta.y1 + (int16_t)random(-1,2), -4, 4);
     delta.y2 = constrain(delta.y2 + (int16_t)random(-1,2), -4, 4);
   }
 
+  uint8_t next = (idx + 1) % LINES;
+  tft.drawLine(line[next].x1, line[next].y1, line[next].x2, line[next].y2, 0);
+
   // add delta to positions
-  line[0].x1 = constrain(line[0].x1 + delta.x1, 0, tft.width()-1); // keep it on the screen
-  line[0].x2 = constrain(line[0].x2 + delta.x2, 0, DISPLAY_WIDTH-1);
-  line[0].y1 = constrain(line[0].y1 + delta.y1, 0, DISPLAY_HEIGHT-1);
-  line[0].y2 = constrain(line[0].y2 + delta.y2, 0, DISPLAY_HEIGHT-1);
+  line[next].x1 = constrain(line[idx].x1 + delta.x1, 0, tft.width()-1); // keep it on the screen
+  line[next].x2 = constrain(line[idx].x2 + delta.x2, 0, DISPLAY_WIDTH-1);
+  line[next].y1 = constrain(line[idx].y1 + delta.y1, 0, DISPLAY_HEIGHT-1);
+  line[next].y2 = constrain(line[idx].y2 + delta.y2, 0, DISPLAY_HEIGHT-1);
 
   r += (int16_t)random(-1, 2);
   if(r > 255) r = 255;
@@ -173,23 +154,24 @@ void ScreenSavers::Lines(bool bInit)
   else if(b < 1) b = 1;
   color = tft.color565(r, g, b);
 
-  tft.drawLine(line[0].x1, line[0].y1, line[0].x2, line[0].y2, color); // draw the new line
+  // Draw new line
+  tft.drawLine(line[next].x1, line[next].y1, line[next].x2, line[next].y2, color);
 
-  if(line[0].x1 == 0 && delta.x1 < 0) delta.x1 = -delta.x1; // bounce off edges
-  if(line[0].x2 == 0 && delta.x2 < 0) delta.x2 = -delta.x2;
-  if(line[0].y1 == 0 && delta.y1 < 0) delta.y1 = -delta.y1;
-  if(line[0].y2 == 0 && delta.y2 < 0) delta.y2 = -delta.y2;
-  if(line[0].x1 == DISPLAY_WIDTH-1 && delta.x1 > 0) delta.x1 = -delta.x1;
-  if(line[0].x2 == DISPLAY_WIDTH-1 && delta.x2 > 0) delta.x2 = -delta.x2;
-  if(line[0].y1 == DISPLAY_HEIGHT-1 && delta.y1 > 0) delta.y1 = -delta.y1;
-  if(line[0].y2 == DISPLAY_HEIGHT-1 && delta.y2 > 0) delta.y2 = -delta.y2;
+  if(line[next].x1 == 0 && delta.x1 < 0) delta.x1 = -delta.x1; // bounce off edges
+  if(line[next].x2 == 0 && delta.x2 < 0) delta.x2 = -delta.x2;
+  if(line[next].y1 == 0 && delta.y1 < 0) delta.y1 = -delta.y1;
+  if(line[next].y2 == 0 && delta.y2 < 0) delta.y2 = -delta.y2;
+  if(line[next].x1 == DISPLAY_WIDTH-1 && delta.x1 > 0) delta.x1 = -delta.x1;
+  if(line[next].x2 == DISPLAY_WIDTH-1 && delta.x2 > 0) delta.x2 = -delta.x2;
+  if(line[next].y1 == DISPLAY_HEIGHT-1 && delta.y1 > 0) delta.y1 = -delta.y1;
+  if(line[next].y2 == DISPLAY_HEIGHT-1 && delta.y2 > 0) delta.y2 = -delta.y2;
+  idx = next;
 }
 
 void ScreenSavers::Boing(bool bInit)
 {
-#define BALLS 8
   const int16_t rad = 12;
-  static Ball ball[BALLS];
+  static Ball *ball = (Ball *)m_buffer;
   static uint8_t skipper = 4;
 
   const uint16_t palette[] = {TFT_MAROON,TFT_PURPLE,TFT_OLIVE,TFT_LIGHTGREY,
@@ -300,7 +282,6 @@ void ScreenSavers::Boing(bool bInit)
     // Draw at new positions
     tft.drawCircle(ball[i].x, ball[i].y, rad, ball[i].color );
   }
-
 }
 
 // 3D polygon code yanked from https://github.com/seaniefs/WT32-SC01-Exp
@@ -329,9 +310,9 @@ void ScreenSavers::Cube(bool bInit)
     { 50,  50, 50,  50,  50, -50},
   };
   uint8_t LinestoRender = 12; // lines in the object
- 
-  static Line2d Render[20];
-  static Line2d ORender[20];
+
+  static Line2d *Render = (Line2d *)m_buffer;
+  static Line2d *ORender = (Line2d *)m_buffer + (sizeof(Line2d) * LINES3DREND);
 
   if(bInit)
   {
@@ -339,6 +320,7 @@ void ScreenSavers::Cube(bool bInit)
     Xpos = tft.width() / 2; // Position the center of the 3d conversion space into the center of the TFT screen.
     Ypos = tft.height() / 2;
     Zpos = 550; // Z offset in 3D space (smaller = closer and bigger rendering)
+    memset(m_buffer, 0, sizeof(m_buffer));
     return;
   }
 
@@ -396,12 +378,13 @@ void ScreenSavers::Cube(bool bInit)
     tft.drawLine(ORender[i].p0.x, ORender[i].p0.y, ORender[i].p1.x, ORender[i].p1.y, TFT_BLACK); // erase the old lines.
   }
 
+  uint8_t r = 7, g = 63, b = 19;
   for (int i = 0; i < LinestoRender; i++ )
   {
-    uint16_t color = TFT_BLUE;
-    if (i < 4) color = TFT_RED;
-    if (i > 7) color = TFT_GREEN;
+    uint16_t color = rgb16(r, g, b);
     tft.drawLine(Render[i].p0.x, Render[i].p0.y, Render[i].p1.x, Render[i].p1.y, color);
+    g -= 2;
+    b ++;
   }
 }
 
