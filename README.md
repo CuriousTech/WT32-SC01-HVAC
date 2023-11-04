@@ -1,8 +1,8 @@
 # WT32-SC01-HVAC
 HVAC thermostat using WT32-SC01 (not PLUS)  [OSHPark Link](https://oshpark.com/shared_projects/ljZTJh9A) $15.65  
   
-This is the 3rd thermostat I've designed, only becuase new hardware makes it better.  
-All sensors from [ESP-HVAC](https://github.com/CuriousTech/ESP-HVAC) and older models can be used as remote units by compiling as REMOTE. This model can be changed to remote with just a temp/humidity sensor on the i2c pins, and use the USB for power.  
+This is the 3rd thermostat I've designed, only becuase new hardware makes it better, and tends to remove some limitations.  
+All sensors from [ESP-HVAC](https://github.com/CuriousTech/ESP-HVAC) and older models can be used as remote units by building as REMOTE. This model can be changed to remote with just a temp/humidity sensor on the i2c pins, plus speaker if desired, and use the USB for power.  Also view the ESP-HVAC page for operation instructions.  
   
 This first version just emulated the Nextion HMI and kept all the code the same, except for Display.cpp/h, removal of any ESP8266 specific code, and the addition of an I/O pin to power the H/T sensor for reset purposes since it shares the i2c with the touch interface.  
 Encoder.cpp/h was removed, but can be added back easily, with 4 extra I/O pins for expansion (IO36 is input only).  
@@ -21,6 +21,11 @@ Some lines in code to change:
 &nbsp;&nbsp;&nbsp;&nbsp; eeMem.h: This has the SSID/password (or use EspTouch to set up), web access password, and OpenWeatherMap city ID, and many other default EEPROM values.  
 &nbsp;&nbsp;&nbsp;&nbsp; OpenWeaetherMap.h: #define APPID "app id" is the long string from OpenWeatherMap.  
 
-First test of the booard came out almost perfect. The via close to the rectangle speaker can touch metal on the speaker and short. Use capton tape. It can go oon the bottom or top. Bottom is better. The right capacitor doesn't clear the ESP32, even at 7mm tall. It only needs about 100uF at 25V, but more is better. They can be mounted to the back if the case is redesigned, which I'm doing now.  
-
-![Thermostat](Thermostat.jpg)
+First test of the booard came out almost perfect. The via close to the rectangle speaker can touch metal on the speaker and short. Use capton tape. It can go on the bottom or top. Bottom is better. The right capacitor doesn't clear the ESP32, even at 7mm tall. It only needs about 100uF at 25V, but more is better. They can be mounted to the back with the ccurrent case design.  
+  
+![Thermostat](Thermostat.jpg)  
+  
+  
+With the printed case. I added about 5 inches of black before the white, to match the display face.  
+  
+![Case](Case.jpg)  
