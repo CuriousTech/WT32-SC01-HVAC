@@ -20,15 +20,8 @@ enum BTN
   Btn_InTemp,
   Btn_Rh,
   Btn_TargetTemp,
-  Btn_CoolTempH,
-  Btn_CoolTempL,
-  Btn_HeatTempH,
-  Btn_HeatTempL,
-  Btn_IndR,
-  Btn_IndCH,
-  Btn_IndCL,
-  Btn_IndHH,
-  Btn_IndHL,
+  Btn_SetTempH,
+  Btn_SetTempL,
   Btn_Fan,
   Btn_Mode,
   Btn_HeatMode,
@@ -129,9 +122,7 @@ private:
   void updateModes(bool bForce); // update any displayed settings
   void buttonRepeat(void);
   void refreshAll(void);
-  void updateAdjMode(bool bRef);  // current adjust indicator of the 4 temp settings
   void updateRSSI(void);
-  void updateRunIndicator(bool bForce);
   void drawTime(void);
   void drawOutTemp(void);
   void forecastPage(void);
@@ -156,39 +147,31 @@ private:
   int m_tempHigh; // ""
   uint8_t m_currPage = 0;
   const Button m_btn[Btn_Count] = {
-    {Btn_Dow, 30, 6, 50, 20},
-    {Btn_Time, 110, 6, 180, 20},
-    {Btn_OutTemp, DISPLAY_WIDTH-130, 22, 112, 40},
-    {Btn_InTemp, 24, 50, 170, 64},
-    {Btn_Rh, 204, 42, 100, 38},
-    {Btn_TargetTemp, 204, 86, 100, 38},
-    {Btn_CoolTempH, DISPLAY_WIDTH-146, 174, 60, 20},
-    {Btn_CoolTempL, DISPLAY_WIDTH-146, 209, 60, 20},
-    {Btn_HeatTempH, DISPLAY_WIDTH-146, 244, 60, 20},
-    {Btn_HeatTempL, DISPLAY_WIDTH-146, 279, 60, 20},
+    {Btn_Dow, 30, 8, 50, 20},
+    {Btn_Time, 108, 8, 180, 20},
+    {Btn_OutTemp, DISPLAY_WIDTH-126, 22, 112, 40},
+    {Btn_InTemp, 20, 50, 174, 64},
+    {Btn_Rh, 204, 42, 100, 40},
+    {Btn_TargetTemp, DISPLAY_WIDTH-186, 124, 100, 40},
+    {Btn_SetTempH, DISPLAY_WIDTH-185, 185, 103, 43},
+    {Btn_SetTempL, DISPLAY_WIDTH-185, 250, 103, 43},
 
-    {Btn_IndR, DISPLAY_WIDTH-143, 130, 28, 24},
+    {Btn_Fan,       15, 204, 60, 60},
+    {Btn_Mode,      82, 204, 60, 60},
+    {Btn_HeatMode, 149, 204, 60, 60},
+    {Btn_Humid   , 216, 204, 60, 60},
 
-    {Btn_IndCH, DISPLAY_WIDTH-216, 174, 130, 20}, // used for cool/heat adjust select
-    {Btn_IndCL, DISPLAY_WIDTH-216, 209, 130, 20},
-    {Btn_IndHH, DISPLAY_WIDTH-216, 244, 130, 20},
-    {Btn_IndHL, DISPLAY_WIDTH-216, 279, 130, 20},
+    {Btn_Up,   DISPLAY_WIDTH-73, 179, 60, 60},
+    {Btn_Dn,   DISPLAY_WIDTH-73, 243, 60, 60},
 
-    {Btn_Fan,       24, 140, 60, 60},
-    {Btn_Mode,     100, 140, 60, 60},
-    {Btn_HeatMode, 176, 140, 60, 60},
-    {Btn_Humid   ,  24, 204, 60, 60},
-
-    {Btn_Up,   402, 176, 60, 60},
-    {Btn_Dn,   402, 240, 60, 60},
-
-    {Btn_Note,  21, DISPLAY_HEIGHT-44, 230, 30},
-    {Btn_RSSI, 220, 236, 24, 24},
+    {Btn_Note,  14, DISPLAY_HEIGHT-44, 265, 30},
+    {Btn_RSSI, DISPLAY_WIDTH-38, 80, 24, 24},
   };
 public:
   uint32_t m_lastPDate = 0;
   forecastData m_fc;
   uint8_t m_adjustMode = 0; // which of 4 temps to adjust with rotary encoder/buttons
+  bool     m_bLink;         // link adjust mode
   bool    m_bUpdateFcst = true;
   bool    m_bUpdateFcstIdle = true;
   bool    m_bFcstUpdated = false;
