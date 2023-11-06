@@ -215,13 +215,21 @@ void Display::buttonCmd(uint8_t btn)
     return;
   }
 
+  m_backlightTimer = DISPLAY_TIMEOUT; // update the auto backlight timer
+
   mus.add(6000, 20);
 
   switch(btn)
   {
-    case Btn_IndCH ... Btn_IndHL: // indicator + values cool hi, lo, heat hi, lo
-      hvac.m_bLink = (m_adjustMode == btn-Btn_IndCH);
-      m_adjustMode = btn-Btn_IndCH;
+    case Btn_SetTempH:
+      m_bLink = !m_bLink;
+      m_adjustMode = 0;
+      updateTemps();
+      break;
+    case Btn_SetTempL:
+      m_bLink = !m_bLink;
+      m_adjustMode = 1;
+      updateTemps();
       break;
 
     case Btn_Up: // Up button
@@ -299,11 +307,9 @@ void Display::buttonCmd(uint8_t btn)
 // called each second
 void Display::oneSec()
 {
-  updateRunIndicator(false); // running stuff
   drawTime();    // time update every second
   updateModes(false);    // mode, heat mode, fan mode
   updateTemps();    // 
-  updateAdjMode(false); // update touched temp settings
   updateNotification(false);
   updateRSSI();     //
   if( m_backlightTimer ) // the dimmer thing
@@ -438,13 +444,11 @@ void Display::drawOutTemp()
       bInit = true;
     }
   }
-
 }
 
 void Display::updateTemps(void)
 {
   static uint16_t last[7];  // only draw changes
-  const uint16_t bgColor = rgb16(0, 5, 10);
   if(m_currPage)
   {
     memset(last, 0, sizeof(last));
@@ -457,29 +461,69 @@ void Display::updateTemps(void)
   if(last[0] != hvac.m_inTemp)
     tft.drawFloat((float)(last[0] = hvac.m_inTemp)/10, 1, m_btn[Btn_InTemp].x, m_btn[Btn_InTemp].y );
   tft.setFreeFont(&digitaldreamSkew_28ptFont);
-  if(last[2] != hvac.m_targetTemp)
-    tft.drawFloat((float)(last[2] = hvac.m_targetTemp)/10, 1, m_btn[Btn_TargetTemp].x, m_btn[Btn_TargetTemp].y );
+  if(last[1] != hvac.m_targetTemp)
+    tft.drawFloat((float)(last[1] = hvac.m_targetTemp)/10, 1, m_btn[Btn_TargetTemp].x, m_btn[Btn_TargetTemp].y );
 
-  if(last[1] != hvac.m_rh)
+  if(last[2] != hvac.m_rh)
   {
-    tft.drawFloat((float)(last[1] = hvac.m_rh)/10, 1, m_btn[Btn_Rh].x, m_btn[Btn_Rh].y );
-    tft.setFreeFont(&digitaldreamFatNarrow_14ptFont);
-    tft.drawString("%", m_btn[Btn_Rh].x + 96, m_btn[Btn_Rh].y );
+    tft.drawFloat((float)(last[2] = hvac.m_rh)/10, 1, m_btn[Btn_Rh].x, m_btn[Btn_Rh].y );
+    tft.setFreeFont(&FreeSans12pt7b);//&digitaldreamFatNarrow_14ptFont);
+    tft.drawString("%", m_btn[Btn_Rh].x + 106, m_btn[Btn_Rh].y );
   }
-  tft.setFreeFont(&digitaldreamFatNarrow_14ptFont);
 
-  tft.setTextColor( rgb16(0, 16, 31), bgColor );
-  if(last[3] != ee.coolTemp[1])
-    tft.drawFloat((float)(last[3] = ee.coolTemp[1])/10, 1, m_btn[Btn_CoolTempH].x, m_btn[Btn_CoolTempH].y );
-  tft.setTextColor( rgb16(0, 8, 31), bgColor );
-  if(last[4] != ee.coolTemp[0])
-    tft.drawFloat((float)(last[4] = ee.coolTemp[0])/10, 1, m_btn[Btn_CoolTempL].x, m_btn[Btn_CoolTempL].y );
-  tft.setTextColor( rgb16(31, 4, 0), bgColor );
-  if(last[5] != ee.heatTemp[1])
-    tft.drawFloat((float)(last[5] = ee.heatTemp[1])/10, 1, m_btn[Btn_HeatTempH].x, m_btn[Btn_HeatTempH].y );
-  tft.setTextColor( rgb16(31, 4, 4), bgColor );
-  if(last[6] != ee.heatTemp[0])
-    tft.drawFloat((float)(last[6] = ee.heatTemp[0])/10, 1, m_btn[Btn_HeatTempL].x, m_btn[Btn_HeatTempL].y );
+  tft.setFreeFont(&digitaldreamSkew_28ptFont);
+
+  uint8_t nMode = hvac.getSetMode();
+
+  if(nMode == Mode_Auto)
+    nMode = (hvac.getAutoMode() == Mode_Cool) ? Mode_Cool : Mode_Heat;
+
+  static const uint16_t colors[] = {rgb16(21, 44, 21), rgb16(0, 4, 31), rgb16(31, 13, 10) };
+  tft.setTextColor( colors[nMode], TFT_BLACK );
+
+  if( last[5] != nMode || last[6] != ((m_adjustMode<<1) | m_bLink) ) // force temp redraw
+  {
+    last[3] = last[4] = 0;
+    last[5] = nMode;
+  }
+
+  switch(nMode)
+  {
+    case Mode_Off:
+    case Mode_Cool:
+      if(last[3] != ee.coolTemp[1])
+      {
+        tft.drawFloat((float)(last[3] = ee.coolTemp[1])/10, 1, m_btn[Btn_SetTempH].x+1, m_btn[Btn_SetTempH].y+2 );
+        last[6] = 10; // force outline refresh 
+      }
+      if(last[4] != ee.coolTemp[0])
+      {
+        tft.drawFloat((float)(last[4] = ee.coolTemp[0])/10, 1, m_btn[Btn_SetTempL].x+1, m_btn[Btn_SetTempL].y+2 );
+        last[6] = 10;
+      }
+      break;
+    case Mode_Heat:
+      if(last[3] != ee.heatTemp[1])
+      {
+        tft.drawFloat((float)(last[3] = ee.heatTemp[1])/10, 1, m_btn[Btn_SetTempH].x+1, m_btn[Btn_SetTempH].y+2 );
+        last[6] = 10;
+      }
+      if(last[4] != ee.heatTemp[0])
+      {
+        tft.drawFloat((float)(last[4] = ee.heatTemp[0])/10, 1, m_btn[Btn_SetTempL].x+1, m_btn[Btn_SetTempL].y+2 );
+        last[6] = 10;
+      }
+      break;
+  }
+
+  if( last[6] != ((m_adjustMode<<1) | m_bLink) )
+  {
+    last[6] = (m_adjustMode<<1) | m_bLink;
+    int8_t am = m_adjustMode;
+    tft.drawRect(m_btn[Btn_SetTempH+am].x, m_btn[Btn_SetTempH+am].y, m_btn[Btn_SetTempH+am].w, m_btn[Btn_SetTempH+am].h, rgb16(0,31,0));
+    tft.drawRect(m_btn[Btn_SetTempH+(am^1)].x, m_btn[Btn_SetTempH+(am^1)].y, m_btn[Btn_SetTempH+(am^1)].w, m_btn[Btn_SetTempH+(am^1)].h, (m_bLink) ? rgb16(0,31,0) : TFT_BLACK);
+ 
+  }
 }
 
 void Display::updateModes(bool bForce) // update any displayed settings
@@ -487,12 +531,13 @@ void Display::updateModes(bool bForce) // update any displayed settings
   static bool bFan = true; // set these to something other than default to trigger them all
   static int8_t FanMode = 4;
   static uint8_t nMode = 10;
+  static uint8_t nState = 3;
   static uint8_t heatMode = 10;
   static int8_t humidMode = 10;
 
   if(m_currPage || bForce)
   {
-    humidMode = FanMode = nMode = heatMode = 10;
+    nState = humidMode = FanMode = nMode = heatMode = 10;
   }
 
   if(m_currPage)
@@ -513,16 +558,21 @@ void Display::updateModes(bool bForce) // update any displayed settings
     loadImage((char*)pFan[idx], m_btn[Btn_Fan].x, m_btn[Btn_Fan].y);
   }
 
-  if(nMode != hvac.getSetMode())
+  if(nMode != hvac.getSetMode() || nState != hvac.getState())
   {
     nMode = hvac.getSetMode();
 
     const char *szModes[] = {"/off.png", "/cool.png", "/heat.png", "/auto.png", "/auto.png"};
     loadImage((char*)szModes[nMode], m_btn[Btn_Mode].x, m_btn[Btn_Mode].y);
 
-    hvac.m_bLink = true;
-    m_adjustMode = (nMode == Mode_Heat) ? 2:0; // set adjust to selected heat/cool
-    updateAdjMode(false);
+    m_bLink = true;
+    m_adjustMode = 0;
+    updateTemps();
+
+    nState = hvac.getState();
+    if(nState) // draw the ON indicator on the button
+      loadImage("/btnled.png", m_btn[Btn_Mode].x + 1, m_btn[Btn_Mode].y);
+
   }
 
   if(heatMode != hvac.getHeatMode())
@@ -532,27 +582,36 @@ void Display::updateModes(bool bForce) // update any displayed settings
     loadImage((char*)szHeatModes[heatMode], m_btn[Btn_HeatMode].x, m_btn[Btn_HeatMode].y);
   }
 
-  if(humidMode != hvac.getHumidifierMode() + hvac.getHumidifierRunning())
+  if(humidMode != (hvac.getHumidifierMode() + hvac.getHumidifierRunning()) )
   {
-    humidMode = hvac.getHumidifierMode() + hvac.getHumidifierRunning();
-    const char *szHumidState[] = {"/humidOff.png", "/humidOn.png"};
-    loadImage((char*)szHumidState[(uint8_t)hvac.getHumidifierRunning()], m_btn[Btn_Humid].x, m_btn[Btn_Humid].y);
+    humidMode = (hvac.getHumidifierMode() + hvac.getHumidifierRunning());
+
+    loadImage("/humid.png", m_btn[Btn_Humid].x, m_btn[Btn_Humid].y);
+
     const char *szHmode[] = {"", "F", "R", "1", "2", ""};
+    tft.setFreeFont(&FreeSans9pt7b);
     tft.setTextColor( rgb16(0, 63, 31) );
-    tft.drawString((char*)szHmode[hvac.getHumidifierMode()], m_btn[Btn_Humid].x + 24, m_btn[Btn_Humid].y + 25);
+    tft.drawString((char*)szHmode[hvac.getHumidifierMode()], m_btn[Btn_Humid].x + 25, m_btn[Btn_Humid].y + 26);
+
+    if(hvac.getHumidifierRunning())
+      loadImage("/btnled.png", m_btn[Btn_Humid].x + 1, m_btn[Btn_Humid].y);
   }
 }
 
 void Display::buttonRepeat()
 {
-  int8_t m = (m_adjustMode < 2) ? Mode_Cool : Mode_Heat; // lower 2 are cool
+  int8_t m = hvac.getMode();
+  if(m == Mode_Auto) m = hvac.getAutoMode();
+  if(m == Mode_Off)
+    return;
+
   int8_t hilo = (m_adjustMode ^ 1) & 1; // hi or low of set
   int16_t t = hvac.getSetTemp(m, hilo );
 
   t += (m_btnMode==1) ? 1:-1; // inc by 0.1
   hvac.setTemp(m, t, hilo);
 
-  if(hvac.m_bLink) // adjust both high and low
+  if(m_bLink) // adjust both high and low
   {
     t = hvac.getSetTemp(m, hilo^1 ) + ((m_btnMode==1) ? 1:-1); // adjust opposite hi/lo the same
     hvac.setTemp(m, t, hilo^1);
@@ -621,8 +680,8 @@ void Display::drawTime()
 
 #define TIME_OFFSET 80
   tft.fillRect(m_btn[Btn_Time].x + TIME_OFFSET, m_btn[Btn_Time].y, m_btn[Btn_Time].w - TIME_OFFSET, m_btn[Btn_Time].h, rgb16(8,16,8));
-  tft.setTextColor(rgb16(0, 31, 31), rgb16(8,16,8) );
-  tft.setFreeFont(&digitaldreamFatNarrow_14ptFont);
+  tft.setTextColor(rgb16(16,63,0), rgb16(8,16,8) );
+  tft.setFreeFont(&FreeSans12pt7b);
   tft.drawString(sTime, m_btn[Btn_Time].x + TIME_OFFSET, m_btn[Btn_Time].y);
 
   if(bRefresh) // Cut down on flicker a bit
@@ -654,6 +713,8 @@ void Display::Note(char *cNote)
 // update the notification text box
 void Display::updateNotification(bool bRef)
 {
+  if(m_currPage)
+    return;
   static uint8_t note_last = Note_None; // Needs a clear after startup
   if(!bRef && note_last == hvac.m_notif) // nothing changed
     return;
@@ -743,32 +804,12 @@ void Display::dimmer()
 // things to update on page change to thermostat
 void Display::refreshAll()
 {
-  updateRunIndicator(true);
   updateNotification(true);
-  updateAdjMode(true);
+  updateTemps();
   updateModes(true);
   drawOutTemp();
   loadImage("/up.png", m_btn[Btn_Up].x, m_btn[Btn_Up].y);
   loadImage("/dn.png", m_btn[Btn_Dn].x, m_btn[Btn_Dn].y);
-}
-
-void Display::updateAdjMode(bool bRef)  // current adjust indicator of the 4 temp settings
-{
-  static uint8_t am = 0;
-  static bool bl = false;
-
-  if(m_currPage || (bRef == false && am == m_adjustMode && bl == hvac.m_bLink) )
-    return;
-
-  loadImage("/ledoff.png", m_btn[Btn_IndCH+am].x, m_btn[Btn_IndCH+am].y);
-  loadImage("/ledoff.png", m_btn[Btn_IndCH + (am^1)].x, m_btn[Btn_IndCH + (am^1)].y);
-
-  am = m_adjustMode;
-  loadImage("/ledon.png", m_btn[Btn_IndCH+am].x, m_btn[Btn_IndCH+am].y);
-  if(hvac.m_bLink)
-    loadImage("/ledon.png", m_btn[Btn_IndCH + (am^1)].x, m_btn[Btn_IndCH + (am^1)].y);
-
-  bl = hvac.m_bLink;
 }
 
 void Display::updateRSSI()
@@ -803,9 +844,9 @@ void Display::updateRSSI()
 //  nex.itemText(22, String(rssiT = rssiAvg) + "dB");
 
   int sigStrength = 127 + rssiT;
-  int wh = 24; // width and height
-  int x = 220; // X/Y position
-  int y = 236;
+  int wh = m_btn[Btn_RSSI].w; // width and height
+  int x = m_btn[Btn_RSSI].x; // X/Y position
+  int y = m_btn[Btn_RSSI].y;
   int sect = 127 / 5; //
   int dist = wh  / 5; // distance between blocks
 
@@ -814,44 +855,6 @@ void Display::updateRSSI()
   for (int i = 1; i < 6; i++)
   {
     tft.fillRect( x + i*dist, y - i*dist, dist-2, i*dist, (sigStrength > i * sect) ? rgb16(0, 63,31) : rgb16(5, 10, 5) );
-  }
-}
-
-void Display::updateRunIndicator(bool bForce) // run and fan running
-{
-  static bool bOn = false; // blinker
-  static bool bCurrent = false; // run indicator
-  static bool bHeat = false; // red/blue
-  static bool bHumid = false; // next to rH
-
-  if(bForce)
-  {
-    bOn = false;
-    bCurrent = false;
-    bHeat = false;
-    bHumid = false;
-  }
-
-  if(m_currPage)
-    return;
-
-  if(hvac.getState()) // running
-  {
-    if(bHeat != (hvac.getState() > State_Cool) ? true:false)
-      bHeat = (hvac.getState() > State_Cool) ? true:false;
-    if(hvac.m_bRemoteStream)
-      bOn = !bOn; // blink indicator if remote temp
-    else bOn = true; // just on
-  }
-  else bOn = false;
-
-  if(bCurrent != bOn)
-  {
-    if(bOn)
-       loadImage((char *)(bHeat ? "/ledred.png" : "/ledblue.png"), m_btn[Btn_IndR].x, m_btn[Btn_IndR].y);
-    else
-       loadImage("/ledoff.png", m_btn[Btn_IndR].x, m_btn[Btn_IndR].y);
-    bCurrent = bOn;
   }
 }
 
@@ -1031,7 +1034,7 @@ void Display::addGraphPoints()
   m_points[m_pointsIdx].t.u = 0; // mark as invalid data/end
 }
 
-#define RPAD 16 // right edge
+#define RPAD 22 // right edge
 
 // Draw the last 25 hours
 void Display::historyPage()
