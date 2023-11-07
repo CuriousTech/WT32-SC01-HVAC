@@ -177,7 +177,6 @@ public:
   bool     m_bRemoteDisconnect;
   int16_t   m_outMin, m_outMax;
   uint16_t m_iSecs[3];
-  bool     m_bLink;         // link adjust mode
   uint8_t  m_DST;
   int8_t   m_modeShadow = Mode_Cool;  // shadow last valid mode
 #define SNS_CNT 8
