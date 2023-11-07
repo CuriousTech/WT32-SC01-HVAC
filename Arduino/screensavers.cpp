@@ -73,8 +73,8 @@ void ScreenSavers::Clock(bool bInit)
   cspoint(x3, y3, x, y, (second()+30) * 6, 24);
   tft.drawWideLine(x3, y3, x2, y2, 2.5, rgb16(31, 0, 0), bgColor ); // second hand
 
-  tft.setTextColor(rgb16(0, 31, 31) );
-  tft.setFreeFont(&digitaldreamFatNarrow_14ptFont);
+  tft.setTextColor(rgb16(16,63,0) );
+  tft.setFreeFont(&FreeSans12pt7b);//&digitaldreamFatNarrow_14ptFont);
 
   String sTime = (hourFormat12() < 10) ? " ":"";
   sTime += String( hourFormat12() );
