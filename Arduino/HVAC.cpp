@@ -95,6 +95,10 @@ uint8_t HVAC::getHumidifierMode()
 void HVAC::setHumidifierMode(uint8_t m)
 {
   ee.b.humidMode = m % (HM_Auto2 + 1);
+  if(ee.b.humidMode == HM_Off)
+    humidSwitch(false);
+  else if( getFanRunning() && (ee.b.humidMode == HM_Fan || ee.b.humidMode == HM_Run) )
+    humidSwitch(true);
 }
 
 uint8_t HVAC::getMode()
