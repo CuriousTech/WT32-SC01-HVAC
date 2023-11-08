@@ -111,7 +111,7 @@ bool Display::screen(bool bOn)
     if( bOn == bOldOn )
       return false; // no change occurred
     m_currPage = Page_Thermostat;
-    setBrightness(0, 255);
+    setBrightness(0, m_maxBrightness);
     loadImage("/bg.png", 0, 0);
     refreshAll();
   }
@@ -148,10 +148,10 @@ void Display::service(void)
   static uint32_t lastms;
   static uint32_t touchms;
 
-  if (digitalRead(39) == LOW)// ts.touched() can't be used with SHT40. Too many i2c sharing errors
+  if (digitalRead(39) == LOW)// touch I/O causes SHT40 errors. SHT40 really not recommended. Use AM2320 or AM2322.
   {
     touchms = millis();
-    if(millis() - lastms < 100) // filter the pulses
+    if(millis() - lastms < 100) // filter the pulses, also repeat speed
       return;
     lastms = millis();
 
@@ -189,6 +189,14 @@ void Display::service(void)
         m_btnDelay = 2; // repeat speed
       }
     }
+    else if(m_lockDelay) // lock button held
+    {
+      if(--m_lockDelay == 0)
+      {
+        mus.add(3000, 25);
+        ee.b.bLock = 0;
+      }
+    }
     
     bPress = true;
   }
@@ -211,7 +219,7 @@ void Display::buttonCmd(uint8_t btn)
   if( m_backlightTimer == 0) // if dimmed, undim and ignore click
   {
     m_backlightTimer = DISPLAY_TIMEOUT;
-    setBrightness(m_brightness, 255);
+    setBrightness(m_brightness, m_maxBrightness);
     return;
   }
 
@@ -269,7 +277,7 @@ void Display::buttonCmd(uint8_t btn)
       break;
     case Btn_Time: // time
       m_currPage = Page_ScreenSaver;
-      setBrightness(0, 240);
+      setBrightness(0, 150);
       ss.select( SS_Clock );
       break;
     case Btn_TargetTemp:
@@ -277,29 +285,17 @@ void Display::buttonCmd(uint8_t btn)
       hvac.enableRemote();
       break;
     case Btn_InTemp: // in
-      outlineAllButtons();
+    case Btn_Rh: // rh
+      historyPage();
       break;
     case Btn_OutTemp:
       forecastPage();
       break;
-    case Btn_Rh: // rh
-      break;
-//#define PWLOCK  // uncomment for password entry unlock
-#ifdef PWLOCK
-    case 25: // lock
-      if(ee.b.bLock)
-      {
-        textIdx = 2;
-//        nex.itemText(0, ""); // clear last text
-//        nex.setPage("keyboard"); // go to keyboard
-//        nex.itemText(1, "Enter Password");
-      }
-      else
+    case Btn_Lock: // lock
+      if(!ee.b.bLock)
         ee.b.bLock = 1;
-#else
-      ee.b.bLock = !ee.b.bLock;
-#endif
-//      nex.itemPic(9, ee.b.bLock ? 20:21);
+      else
+        m_lockDelay = 30; // press and hold ~5 seconds
       break;
   }
 }
@@ -468,7 +464,7 @@ void Display::updateTemps(void)
   {
     tft.drawFloat((float)(last[2] = hvac.m_rh)/10, 1, m_btn[Btn_Rh].x, m_btn[Btn_Rh].y );
     tft.setFreeFont(&FreeSans12pt7b);//&digitaldreamFatNarrow_14ptFont);
-    tft.drawString("%", m_btn[Btn_Rh].x + 106, m_btn[Btn_Rh].y );
+    tft.drawString("%", m_btn[Btn_Rh].x + 101, m_btn[Btn_Rh].y );
   }
 
   tft.setFreeFont(&digitaldreamSkew_28ptFont);
@@ -591,11 +587,14 @@ void Display::updateModes(bool bForce) // update any displayed settings
     const char *szHmode[] = {"", "F", "R", "1", "2", ""};
     tft.setFreeFont(&FreeSans9pt7b);
     tft.setTextColor( rgb16(0, 63, 31) );
-    tft.drawString((char*)szHmode[hvac.getHumidifierMode()], m_btn[Btn_Humid].x + 25, m_btn[Btn_Humid].y + 26);
+    tft.drawString((char*)szHmode[hvac.getHumidifierMode()], m_btn[Btn_Humid].x + 27, m_btn[Btn_Humid].y + 28);
 
     if(hvac.getHumidifierRunning())
       loadImage("/btnled.png", m_btn[Btn_Humid].x + 1, m_btn[Btn_Humid].y);
   }
+
+  loadImage( (char*) ( (ee.b.bLock) ? "/lock.png" : "/unlock.png" ), m_btn[Btn_Lock].x, m_btn[Btn_Lock].y);
+
 }
 
 void Display::buttonRepeat()
@@ -873,7 +872,7 @@ void Display::forecastPage()
   }
 
   m_currPage = Page_Forecast;
-  setBrightness(0, 230);
+  setBrightness(0, 150);
   loadImage("/bgForecast.png", 0, 0);
 
   int8_t fcOff = 0;
@@ -1040,7 +1039,7 @@ void Display::addGraphPoints()
 void Display::historyPage()
 {
   m_currPage = Page_Graph; // chart thing
-  setBrightness(0, 230);
+  setBrightness(0, 150);
   loadImage("/bgBlank.png", 0, 0);
   
   int minTh, maxTh, maxTemp;
