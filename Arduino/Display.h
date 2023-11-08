@@ -30,6 +30,7 @@ enum BTN
   Btn_Dn,
   Btn_Note,
   Btn_RSSI,
+  Btn_Lock,
   Btn_Count,
 };
 
@@ -137,6 +138,7 @@ private:
 
   uint16_t m_backlightTimer = 90; // backlight timers, seconds
   uint8_t m_bright; // current brightness;
+  uint8_t m_lockDelay;
 #define GPTS 640 // 480 px width - (10+10) padding
   gPoint m_points[GPTS];
   uint16_t m_pointsIdx = 0;
@@ -149,12 +151,12 @@ private:
   const Button m_btn[Btn_Count] = {
     {Btn_Dow, 30, 8, 50, 20},
     {Btn_Time, 108, 8, 180, 20},
-    {Btn_OutTemp, DISPLAY_WIDTH-126, 22, 112, 40},
-    {Btn_InTemp, 20, 50, 174, 64},
-    {Btn_Rh, 204, 42, 100, 40},
-    {Btn_TargetTemp, DISPLAY_WIDTH-186, 124, 100, 40},
-    {Btn_SetTempH, DISPLAY_WIDTH-185, 185, 103, 43},
-    {Btn_SetTempL, DISPLAY_WIDTH-185, 250, 103, 43},
+    {Btn_OutTemp, DISPLAY_WIDTH-126, 24, 103, 41},
+    {Btn_InTemp, 23, 52, 174, 64},
+    {Btn_Rh, 203, 52, 100, 40},
+    {Btn_TargetTemp, DISPLAY_WIDTH-184, 124, 105, 41},
+    {Btn_SetTempH, DISPLAY_WIDTH-185, 185, 105, 43},
+    {Btn_SetTempL, DISPLAY_WIDTH-185, 250, 105, 43},
 
     {Btn_Fan,       15, 204, 60, 60},
     {Btn_Mode,      82, 204, 60, 60},
@@ -166,16 +168,18 @@ private:
 
     {Btn_Note,  14, DISPLAY_HEIGHT-44, 265, 30},
     {Btn_RSSI, DISPLAY_WIDTH-38, 80, 24, 24},
+    {Btn_Lock, DISPLAY_WIDTH-60, 80, 24, 25},
   };
 public:
   uint32_t m_lastPDate = 0;
   forecastData m_fc;
   uint8_t m_adjustMode = 0; // which of 4 temps to adjust with rotary encoder/buttons
-  bool     m_bLink;         // link adjust mode
+  bool    m_bLink;         // link adjust mode
   bool    m_bUpdateFcst = true;
   bool    m_bUpdateFcstIdle = true;
   bool    m_bFcstUpdated = false;
   uint8_t m_brightness;
+  uint8_t m_maxBrightness = 100;
 };
 
 extern Display display;
