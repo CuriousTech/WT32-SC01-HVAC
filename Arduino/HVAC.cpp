@@ -15,6 +15,7 @@
 #include "jsonstring.h"
 #include "music.h"
 extern Music mus;
+#include <SPIFFS.h>
 
 #ifdef REMOTE
 #include <ESPAsyncWebServer.h> // https://github.com/me-no-dev/ESPAsyncWebServer
@@ -50,7 +51,6 @@ void HVAC::init()
   if(ee.b.Mode) m_modeShadow = ee.b.Mode;
   m_idleTimer = ee.idleMin - 60; // about 1 minute
   m_setHeat = ee.b.heatMode;
-  m_filterMinutes = ee.filterMinutes; // save a few EEPROM writes
 
 #ifndef REMOTE
   m_Sensor[0].IP= 192 | 168<<8 | 1<<24; // Setup sensor 0 as internal sensor
@@ -468,6 +468,14 @@ void HVAC::service()
   }
 
   tempCheck();
+
+  static bool bLoaded;
+  if(!bLoaded && year() > 2020) // ensure date is valid
+  {
+    bLoaded = true;
+    loadStats();
+  }
+  
 #endif // !REMOTE
 }
 
@@ -1473,7 +1481,7 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       break;
     case 45: // rmttemp
       snsIdx = getSensorID(ip);
-      for(i = 0; i < 3; i++)
+      for(i = 0; i < SNS_CNT; i++)
       {
         if(ee.sensorActive[i] == m_Sensor[snsIdx].ID) // find in active list
         {
@@ -1672,14 +1680,14 @@ void HVAC::activateSensor(int idx)
 {
   int8_t found = -1;
   int8_t i;
-  for(i = 0; i < 3; i++)
+  for(i = 0; i < SNS_CNT; i++)
   {
     if(ee.sensorActive[i] == m_Sensor[idx].ID) // find if previously active. Shouldn't be
       found = i;
   }
   if(found < 0)
   {
-    for(i = 0; i < 3; i++)
+    for(i = 0; i < SNS_CNT; i++)
       if(ee.sensorActive[i] == 0) // open spot
       {
         ee.sensorActive[i] = m_Sensor[idx].ID;
@@ -1691,7 +1699,7 @@ void HVAC::activateSensor(int idx)
 void HVAC::deactivateSensor(int idx)
 {
   m_Sensor[idx].f.val = 0;
-  for(int j = 0; j < 3; j++)
+  for(int j = 0; j < SNS_CNT; j++)
   {
     if(ee.sensorActive[j] == m_Sensor[idx].ID) // remove from eeprom set
     {
@@ -1704,9 +1712,9 @@ void HVAC::deactivateSensor(int idx)
 void HVAC::dayTotals(int d)
 {
 #ifndef REMOTE
-  ee.iSecsDay[d][0] += m_iSecs[0];
-  ee.iSecsDay[d][1] += m_iSecs[1];
-  ee.iSecsDay[d][2] += m_iSecs[2];
+  m_SecsDay[d][0] += m_iSecs[0];
+  m_SecsDay[d][1] += m_iSecs[1];
+  m_SecsDay[d][2] += m_iSecs[2];
   m_iSecs[0] = 0;
   m_iSecs[1] = 0;
   m_iSecs[2] = 0;
@@ -1714,9 +1722,9 @@ void HVAC::dayTotals(int d)
   jsonString js("update");
   js.Var("type", "day");
   js.Var("e", day() - 1);
-  js.Var("d0", ee.iSecsDay[d][0]);
-  js.Var("d1", ee.iSecsDay[d][1]);
-  js.Var("d2", ee.iSecsDay[d][2]);
+  js.Var("d0", m_SecsDay[d][0]);
+  js.Var("d1", m_SecsDay[d][1]);
+  js.Var("d2", m_SecsDay[d][2]);
   WsSend( js.Close() );
 #endif
 }
@@ -1731,14 +1739,67 @@ void HVAC::monthTotal(int m, int dys)
     dys = monthDays[m];
   for(int i = 0; i < dys; i++) // Todo: leap year
   {
-    sec[0] += ee.iSecsDay[i][0];
-    sec[1] += ee.iSecsDay[i][1];
-    sec[2] += ee.iSecsDay[i][2];
+    sec[0] += m_SecsDay[i][0];
+    sec[1] += m_SecsDay[i][1];
+    sec[2] += m_SecsDay[i][2];
   }
-  ee.iSecsMon[m][0] = sec[0];
-  ee.iSecsMon[m][1] = sec[1];
-  ee.iSecsMon[m][2] = sec[2];
+  m_SecsMon[m][0] = sec[0];
+  m_SecsMon[m][1] = sec[1];
+  m_SecsMon[m][2] = sec[2];
 #endif
+}
+
+void HVAC::loadStats()
+{
+  String sFile = "/daystats";
+  sFile += year();
+  sFile += ".dat";
+  
+  File F = SPIFFS.open(sFile, "r");
+  if(F)
+  {
+    F.read((byte*) &m_SecsDay, sizeof(m_SecsDay));
+    F.close();
+    m_filterMinutes = m_SecsDay[31][0];
+  }
+  m_daySum = ee.Fletcher16( (uint8_t*)&m_SecsDay, sizeof(m_SecsDay) );
+
+  F = SPIFFS.open("/monthstats.dat", "r");
+  if(F)
+  {
+    F.read((byte*) &m_SecsMon, sizeof(m_SecsMon));
+    F.close();
+  }
+  m_monSum = ee.Fletcher16( (uint8_t*)&m_SecsMon, sizeof(m_SecsMon) );
+}
+
+void HVAC::saveStats()
+{
+  uint16_t sum;
+
+  m_SecsDay[31][0] = m_filterMinutes; // store the filter timer with data that will change at the same frequency
+
+  String sFile = "/daystats"; // add year since this is the most often written data
+  sFile += year();
+  sFile += ".dat";
+
+  sum = ee.Fletcher16( (uint8_t*) &m_SecsDay, sizeof(m_SecsDay) );
+  if(sum != m_daySum)
+  {
+    m_daySum = sum;
+    File F = SPIFFS.open(sFile, "w");
+    F.write((byte*) &m_SecsDay, sizeof(m_SecsDay));
+    F.close();
+  }
+
+  sum = ee.Fletcher16( (uint8_t*)&m_SecsMon, sizeof(m_SecsMon) );
+  if(sum != m_monSum)
+  {
+    m_monSum = sum;
+    File F = SPIFFS.open("/monthstats.dat", "w");
+    F.write((byte*) &m_SecsMon, sizeof(m_SecsMon));
+    F.close();
+  }
 }
 
 void HVAC::setSettings(int iName, int iValue)// remote settings
