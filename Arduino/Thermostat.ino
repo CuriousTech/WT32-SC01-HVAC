@@ -85,8 +85,8 @@ void setup()
   Serial.begin(115200);  // Just for debug
   Serial.println("starting");
   ee.init();
-  hvac.init();
   display.init();
+  hvac.init();
   startServer();
 
 #ifdef SHT40_H
@@ -241,23 +241,19 @@ void loop()
             hvac.monthTotal(month() - 1, day());
           }
           lastDay = day() - 1;
-          ee.iSecsDay[lastDay][0] = 0; // reset
-          ee.iSecsDay[lastDay][1] = 0;
-          ee.iSecsDay[lastDay][2] = 0;
+          hvac.m_SecsDay[lastDay][0] = 0; // reset
+          hvac.m_SecsDay[lastDay][1] = 0;
+          hvac.m_SecsDay[lastDay][2] = 0;
           if(lastDay == 0) // new month
           {
             int m = (month() + 10) % 12; // last month: Dec = 10, Jan = 11, Feb = 0
             hvac.monthTotal(m, -1);
           }
         }
-        if(ee.check())
-        {
-          if((hour_save & 1) == 0) // every other hour
-          {
-            ee.filterMinutes = hvac.m_filterMinutes;
-            ee.update();
-          }
-        }
+
+        ee.update();
+        if((hour_save & 1) == 0) // every other hour
+          hvac.saveStats();
       }
     }
   }
