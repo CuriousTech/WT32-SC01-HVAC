@@ -291,9 +291,8 @@ void startServer()
   ArduinoOTA.onStart([]() {
     hvac.disable();
     hvac.dayTotals(day() - 1); // save for reload
-    ee.filterMinutes = hvac.m_filterMinutes;
-    if(ee.check())
-      ee.update();
+    ee.update();
+    hvac.saveStats();
     jsonString js("alert");
     js.Var("text", "OTA Update Started");
     ws.textAll(js.Close());
@@ -440,7 +439,7 @@ bool secondsServer() // called once per second
   if(nWrongPass)
     nWrongPass--;
 
-  if(display.m_bUpdateFcst && display.m_bUpdateFcstIdle && nUpdateDelay == 0)
+  if(display.m_bUpdateFcst && display.m_bUpdateFcstIdle && nUpdateDelay == 0 && year() > 2020)
   {
     display.m_bUpdateFcst = false;
     display.m_bUpdateFcstIdle = false;
@@ -843,11 +842,11 @@ void remoteCallback(int16_t iName, int iValue, char *psValue)
         {
           if(i) out += ",";
           out += "[";
-          out += ee.iSecsMon[i][0];
+          out += hvac.m_SecsMon[i][0];
           out += ",";
-          out += ee.iSecsMon[i][1];
+          out += hvac.m_SecsMon[i][1];
           out += ",";
-          out += ee.iSecsMon[i][2];
+          out += hvac.m_SecsMon[i][2];
           out += "]";
         }
         out += "],\"day\":[";
@@ -855,11 +854,11 @@ void remoteCallback(int16_t iName, int iValue, char *psValue)
         {
           if(i) out += ",";
           out += "[";
-          out += ee.iSecsDay[i][0];
+          out += hvac.m_SecsDay[i][0];
           out += ",";
-          out += ee.iSecsDay[i][1];
+          out += hvac.m_SecsDay[i][1];
           out += ",";
-          out += ee.iSecsDay[i][2];
+          out += hvac.m_SecsDay[i][2];
           out += "]";
         }
         out += "],";
