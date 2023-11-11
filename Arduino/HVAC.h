@@ -163,6 +163,8 @@ public:
   String  getPushData(void);  // get states/temps/data in json
   void    dayTotals(int d);
   void    monthTotal(int m, int dys);
+  void    loadStats(void);
+  void    saveStats(void);
 
   int16_t  m_outTemp;       // adjusted current temp *10
   int16_t  m_outRh;
@@ -181,6 +183,16 @@ public:
   int8_t   m_modeShadow = Mode_Cool;  // shadow last valid mode
 #define SNS_CNT 8
   Sensor   m_Sensor[SNS_CNT]; // remote and sensors
+
+  uint16_t m_daySum, m_monSum;
+  uint16_t m_SecsDay[32][3] = { // Saved from latest
+   {0,7396,32420},{0,6258,21905},{0,3447,5030},{0,1745,3520},{0,765,2640},{0,886,2721},{0,0,1794},{0,0,1196},{0,0,1495},{0,0,1794},{0,1204,14357},
+   {0,0,1794},{0,0,1495},{0,0,1794},{0,0,1794},{0,903,11620},{0,614,2694},{0,800,2732},{0,0,1794},{0,0,1794},{0,801,2358},{0,353,2328},{0,1266,15364},
+   {0,0,10578},{0,0,1794},{0,0,1794},{0,0,1495},{0,0,0},{0,0,2694},{0,1114,3141}};
+
+  uint32_t m_SecsMon[12][3] = { // Save from latest (compressor,gas,fan)
+    {0,296735,430668},{0,171978,400569},{2534,198024,414386},{0,77071,165180},{28835,19350,99480},{87365,0,144130},
+    {316063,0,375962},{293594,0,354753},{153320,0,206981},{29046,16604,139397},{0,20497,71226},{0,246638,377412}};
 
 private:
   void  fanSwitch(bool bOn);
