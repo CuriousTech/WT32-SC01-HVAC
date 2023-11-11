@@ -33,7 +33,8 @@ bool eeMem::init()
 
 bool eeMem::update() // write the settings if changed
 {
-  check(); // make sure sum is correct
+  if(!check()) // make sure sum is correct, and if save needed
+    return false;
 #ifdef ESP32
   EEPROM.writeBytes(0, this + offsetof(eeMem, size), EESIZE);
 #else
