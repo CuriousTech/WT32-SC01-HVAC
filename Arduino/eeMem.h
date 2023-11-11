@@ -25,8 +25,6 @@ public:
   bool check(void);
   bool update(void);
   uint16_t getSum(void);
-
-private:
   uint16_t Fletcher16( uint8_t* data, int count);
 
 public:
@@ -42,7 +40,6 @@ public:
   uint16_t cycleMin = 60*4;         // min time to run a cycle in minutes
   uint16_t cycleMax = 60*30;        // max time to run a cycle in minutes
   uint16_t idleMin = 60*8;          // min time to not run in minutes
-  uint16_t filterMinutes;           // resettable minutes run timer (200 hours is standard change interval)
   uint16_t fanPostDelay[2] = {60*2, 60*2}; // delay to run auto fan after [hp/cool] stops
   uint16_t fanPreTime[2] = {60*1, 60*1}; // fan pre-run before [cool/heat]
   uint16_t overrideTime = 60*10;    // time used for an override in minutes
@@ -57,13 +54,6 @@ public:
   char     password[24] = "password"; // Web interface password
   uint8_t  fcRange = 23;            // number in forecasts (3 hours)
   uint8_t  fcDisplay = 46;          // number in forecasts (3 hours)
-  uint16_t iSecsDay[32][3] = { // Saved from latest
-   {0,0,1794},{0,0,1794},{0,0,1196},{5460,0,9072},{14343,0,21945},{14635,0,21993},{16979,0,26391},{2783,0,5246},{2675,0,4414},{0,0,1794},{3183,0,5402},
-   {6896,0,9241},{5280,0,7381},{6663,0,8945},{8941,0,11168},{10682,0,16647},{7228,0,12776},{3022,0,4879},{4659,1156,8608},{6037,0,8319},{4487,0,6289},
-   {2327,0,4184},{3012,0,5050},{5853,0,7954},{14164,0,16753},{16901,0,19671},{10425,0,12589},{11859,0,14747},{10630,0,13156},{11409,0,13998},{0,0,1794}};
-  uint32_t iSecsMon[12][3] = { // Save from latest (compressor,gas,fan)
-   {199124,36845,336081},{126280,83138,300374},{16171,197083,325546},{5454,83386,181057},{42333,0,128681},{233391,0,397051},
-   {498314,0,631186},{425863,0,483085},{208447,0,254682},{3696,53010,181822},{0,151234,337204},{0,251368,492489}};
   uint16_t ppkwh = 147;             // price per KWH in cents * 10000 (0.147)
   uint16_t ccf = 1190;              // nat gas cost per 1000 cubic feet in 10th of cents * 1000 ($1.190)
   uint16_t cfm = 820;               // cubic feet per minute * 1000 of furnace (0.82)         // cubic feet per minute
@@ -77,7 +67,8 @@ public:
   uint16_t fanIdleMax = 60*4;       // fan idle max in minutes
   uint8_t  fanAutoRun = 5;          // 5 minutes on
   int16_t  sineOffset[2] = {0, 0};  // sine offset adjust (cool/heat)
-  uint32_t sensorActive[3];          // sensor IDs for restart
+  uint32_t sensorActive[8];         // sensor IDs for restart
+  uint8_t  reserved[320];
   uint8_t  end;
 }; // 512 bytes
 
