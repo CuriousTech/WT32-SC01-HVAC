@@ -107,6 +107,7 @@ public:
   void init(void);
   void oneSec(void);
   bool screen(bool bOn);
+  void setBrightness(uint8_t immediate, uint8_t deferred);
   void service(void);
   void loadImage(char *pName, uint16_t x, uint16_t y);
   void loadImage(char *pName, uint16_t x, uint16_t y, uint16_t srcX, uint16_t srcY, uint16_t w, uint16_t h);
@@ -118,7 +119,6 @@ public:
 
 private:
   void buttonCmd(uint8_t btn);
-  void setBrightness(uint8_t immediate, uint8_t deferred);
   void dimmer(void);
   void updateModes(bool bForce); // update any displayed settings
   void buttonRepeat(void);
@@ -150,7 +150,7 @@ private:
   uint8_t m_currPage = 0;
   const Button m_btn[Btn_Count] = {
     {Btn_Dow, 30, 8, 50, 20},
-    {Btn_Time, 108, 8, 180, 20},
+    {Btn_Time, 106, 8, 182, 20},
     {Btn_OutTemp, DISPLAY_WIDTH-126, 24, 103, 41},
     {Btn_InTemp, 23, 52, 174, 64},
     {Btn_Rh, 203, 52, 100, 40},
