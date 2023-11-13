@@ -21,7 +21,9 @@ Some lines in code to change:
 &nbsp;&nbsp;&nbsp;&nbsp; eeMem.h: This has the SSID/password (or use EspTouch to set up), web access password, and OpenWeatherMap city ID, and many other default EEPROM values.  
 &nbsp;&nbsp;&nbsp;&nbsp; OpenWeaetherMap.h: #define APPID "app id" is the long string from OpenWeatherMap.  
 
-First test of the booard came out almost perfect. The via close to the rectangle speaker can touch metal on the speaker and short. Use capton tape. It can go on the bottom or top. Bottom is better. The right capacitor doesn't clear the ESP32, even at 7mm tall. It only needs about 100uF at 25V, but more is better. They can be mounted to the back with the ccurrent case design.  
+First test of the booard came out almost perfect. The via close to the rectangle speaker can touch metal on the speaker and short. Use capton tape. It can go on the bottom or top. Bottom is better. The right capacitor doesn't clear the ESP32, even at 7mm tall. It only needs about 100uF at 25V, but more is better. They can be mounted to the back with the current case design.  
+  
+Thermal issues have been a struggle with this design, and the SHT40 is horrible sharing the i2c bus with the touchscreen. The AM2322 or AM2320 is a much better option. To reduce current, which effectively reduces heat, several changes were made: Setting clock to 80MHz instead of the default 240MHz, disabing the bluetooth radio, and lowering the LED backlight brightness (100 of 255) drops it from ~250mA to 150mA at 5V. Reducing the brightness further to 50 brings it down to ~80mA. At this point it produces very little heat, and is still almost bright enough for indoor visibility. 100 is really preferable.  
   
 ![Thermostat](Thermostat.jpg)  
   
