@@ -21,8 +21,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
 
-// Build with Arduino IDE 1.8.19
-//  ESP32: (2.0.13) ESP Wrover Module, 115200 baud, 80MHz Flash, QIO, Default 4MB with spiffs
+// Build with Arduino IDE 1.8.57.0
+//  ESP32: (2.0.13) ESP32 Dev Module, CPU Freq 80MHz (for power reduction), QIO, Default 4MB with spiffs
 // For remote unit, uncomment #define REMOTE in HVAC.h
 
 #include <ESPAsyncWebServer.h> // https://github.com/me-no-dev/ESPAsyncWebServer
@@ -102,6 +102,7 @@ void setup()
   ds18lastreq = millis();
   ds18delay = 750 / (1 << (12 - ds18Resolution)); //delay based on resolution
 #endif
+  btStop(); // power saving
 }
 
 void loop()
