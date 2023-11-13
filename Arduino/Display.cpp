@@ -77,13 +77,14 @@ int32_t pngSeek(PNGFILE *page, int32_t position) {
 
 void Display::init(void)
 {
+  setBrightness(0, 0);                // black out while display is noise 
+
   for(int i = 0; i < FC_CNT; i++)
    m_fc.Data[i].temp = -127;
   m_fc.Date = 0;
 
   pinMode(39, INPUT); // touch int
 
-  setBrightness(0, 0);                // black out while display is noise 
   ts.begin(40);                       // adafruit touch
   tft.init();                         // TFT_eSPI
   tft.setRotation(1);                 // set desired rotation
@@ -119,7 +120,7 @@ bool Display::screen(bool bOn)
   {
     case Page_Forecast:
       m_currPage = Page_ScreenSaver;
-      setBrightness(0, 180);
+      setBrightness(0, m_maxBrightness);
       ss.select( random(0, SS_Count) );
       break;
     case Page_ScreenSaver:
@@ -277,7 +278,7 @@ void Display::buttonCmd(uint8_t btn)
       break;
     case Btn_Time: // time
       m_currPage = Page_ScreenSaver;
-      setBrightness(0, 150);
+      setBrightness(0, m_maxBrightness);
       ss.select( SS_Clock );
       break;
     case Btn_TargetTemp:
@@ -658,9 +659,11 @@ void Display::loadImage(char *pName, uint16_t x, uint16_t y, uint16_t srcX, uint
 void Display::drawTime()
 {
   static bool bRefresh = true;
-  if(m_currPage) // not main page
+  static uint8_t last_day;
+  if(m_currPage || last_day != day() ) // not main page
   {
     bRefresh = true;
+    last_day = day();
     return;
   }
   
@@ -677,21 +680,18 @@ void Display::drawTime()
   sTime += isPM() ? "PM":"AM";
   sTime += " ";
 
-#define TIME_OFFSET 80
-  tft.fillRect(m_btn[Btn_Time].x + TIME_OFFSET, m_btn[Btn_Time].y, m_btn[Btn_Time].w - TIME_OFFSET, m_btn[Btn_Time].h, rgb16(8,16,8));
+#define TIME_X_OFFSET 80
   tft.setTextColor(rgb16(16,63,0), rgb16(8,16,8) );
   tft.setFreeFont(&FreeSans12pt7b);
-  tft.drawString(sTime, m_btn[Btn_Time].x + TIME_OFFSET, m_btn[Btn_Time].y);
+  tft.drawString(sTime, m_btn[Btn_Time].x + TIME_X_OFFSET, m_btn[Btn_Time].y);
 
   if(bRefresh) // Cut down on flicker a bit
   {
     sTime = monthShortStr(month());
     sTime += " ";
     sTime += String(day());
-    tft.fillRect(m_btn[Btn_Time].x, m_btn[Btn_Time].y, TIME_OFFSET - 20, m_btn[Btn_Time].h, rgb16(8,16,8));
     tft.drawString(sTime, m_btn[Btn_Time].x, m_btn[Btn_Time].y);
 
-    tft.fillRect(m_btn[Btn_Dow].x, m_btn[Btn_Dow].y, m_btn[Btn_Dow].w, m_btn[Btn_Dow].h, rgb16(8,16,8));
     tft.drawString(dayShortStr(weekday()), m_btn[Btn_Dow].x, m_btn[Btn_Dow].y);
   }
   bRefresh = false;
@@ -790,7 +790,7 @@ void Display::dimmer()
   if(m_bright == m_brightness)
     return;
 
-  if(m_brightness > m_bright + 1)
+  if(m_brightness > m_bright + 1 && m_maxBrightness > 50)
     m_bright += 2;
   else if(m_brightness > m_bright)
     m_bright ++;
@@ -872,7 +872,7 @@ void Display::forecastPage()
   }
 
   m_currPage = Page_Forecast;
-  setBrightness(0, 150);
+  setBrightness(0, m_maxBrightness);
   loadImage("/bgForecast.png", 0, 0);
 
   int8_t fcOff = 0;
@@ -1039,7 +1039,7 @@ void Display::addGraphPoints()
 void Display::historyPage()
 {
   m_currPage = Page_Graph; // chart thing
-  setBrightness(0, 150);
+  setBrightness(0, m_maxBrightness);
   loadImage("/bgBlank.png", 0, 0);
   
   int minTh, maxTh, maxTemp;
@@ -1107,7 +1107,7 @@ void Display::drawPointsTarget(uint16_t color)
   {
     if(m_points[i].t.u == 0)
     {
-      if(x2 != DISPLAY_WIDTH-RPAD) // draw last bit
+      if(x2 != DISPLAY_WIDTH-RPAD) // draw last bit if valid
         tft.fillRect(x, DISPLAY_HEIGHT - 10 - y, x2 - x, y2 - y, color);
       return;
     }
