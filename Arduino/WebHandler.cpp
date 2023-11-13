@@ -586,6 +586,11 @@ void parseParams(AsyncWebServerRequest *request)
     {
       ESP.restart();
     }
+    else if(p->name() == "led")
+    {
+      display.m_maxBrightness = constrain(s.toInt(), 5, 255);
+      display.setBrightness(display.m_brightness, display.m_maxBrightness );
+    }
     else
     {
       if(p->name() == "fc")
