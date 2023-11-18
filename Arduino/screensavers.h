@@ -63,7 +63,7 @@ class ScreenSavers
 {
 #define LINES 50
 #define BALLS 8
-#define LINES3DREND 20 // max 256 for 2048 bytes
+#define LINES3DREND 20 // max 170 for 2048 bytes
 #define BUFFER_SIZE 1024 // Caution: Also used by image loader (512 pixel width max)
 
 static_assert(sizeof(Ball) * BALLS < BUFFER_SIZE, "m_buffer size too small");
@@ -80,7 +80,7 @@ public:
 
 private:
   void Clock(bool bInit);
-  void cspoint(float &x2, float &y2, float x, float y, float angle, float size);
+  void cspoint(uint16_t &x2, uint16_t &y2, uint16_t x, uint16_t y, float angle, float size);
   void Lines(bool bInit);
   void Boing(bool bInit);
   void Cube(bool bInit);
