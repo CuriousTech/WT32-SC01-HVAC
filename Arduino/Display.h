@@ -109,13 +109,14 @@ public:
   bool screen(bool bOn);
   void setBrightness(uint8_t immediate, uint8_t deferred);
   void service(void);
-  void loadImage(char *pName, uint16_t x, uint16_t y);
-  void loadImage(char *pName, uint16_t x, uint16_t y, uint16_t srcX, uint16_t srcY, uint16_t w, uint16_t h);
+  void loadImage(String Name, uint16_t x, uint16_t y);
+  void loadImage(String Name, uint16_t x, uint16_t y, uint16_t srcX, uint16_t srcY, uint16_t w, uint16_t h);
   void updateTemps(void);
   void Note(char *cNote);
   void updateNotification(bool bRef);
   bool getGrapthPoints(gPoint *pt, int n);
   int  minPointVal(int n, int &max);
+  String makeName(uint8_t icon, uint8_t h);
 
 private:
   void buttonCmd(uint8_t btn);
