@@ -37,11 +37,11 @@ void pngDraw(PNGDRAW *pDraw)
   }
 
   // Uses shared bufffer (1024 bytes / 512 pixels max)
-  png.getLineAsRGB565(pDraw, (uint16_t *)ss.m_buffer, PNG_RGB565_BIG_ENDIAN, 0xffffffff);
-
   uint16_t *pBuf = (uint16_t *)ss.m_buffer;
+  png.getLineAsRGB565(pDraw, pBuf, PNG_RGB565_BIG_ENDIAN, 0xffffffff);
+
   uint16_t w = pDraw->iWidth;
-  if(pPos->w) w = pPos->w; // crop to desired width (todo: should maybe to some checking)
+  if(pPos->w) w = pPos->w; // crop to desired width (todo: should maybe do some checking)
 
   uint16_t y = pPos->y + pDraw->y;
   if(pPos->srcY) // offset lib incremented y pos to srcY offset
@@ -82,7 +82,7 @@ void Display::init(void)
   for(int i = 0; i < FC_CNT; i++)
    m_fc.Data[i].temp = -127;
   m_fc.Date = 0;
-
+  memset(m_points, 0, sizeof(m_points));
   pinMode(39, INPUT); // touch int
 
   ts.begin(40);                       // adafruit touch
@@ -226,8 +226,6 @@ void Display::buttonCmd(uint8_t btn)
 
   m_backlightTimer = DISPLAY_TIMEOUT; // update the auto backlight timer
 
-  mus.add(6000, 20);
-
   switch(btn)
   {
     case Btn_SetTempH:
@@ -299,6 +297,7 @@ void Display::buttonCmd(uint8_t btn)
         m_lockDelay = 30; // press and hold ~5 seconds
       break;
   }
+  mus.add(6000, 20); // beep after any long screen loads
 }
 
 // called each second
@@ -552,7 +551,7 @@ void Display::updateModes(bool bForce) // update any displayed settings
     }
 
     const char *pFan[] = {"/fanOff.png", "/fanOn.png", "/fanAutoOn.png",};
-    loadImage((char*)pFan[idx], m_btn[Btn_Fan].x, m_btn[Btn_Fan].y);
+    loadImage(pFan[idx], m_btn[Btn_Fan].x, m_btn[Btn_Fan].y);
   }
 
   if(nMode != hvac.getSetMode() || nState != hvac.getState())
@@ -560,7 +559,7 @@ void Display::updateModes(bool bForce) // update any displayed settings
     nMode = hvac.getSetMode();
 
     const char *szModes[] = {"/off.png", "/cool.png", "/heat.png", "/auto.png", "/auto.png"};
-    loadImage((char*)szModes[nMode], m_btn[Btn_Mode].x, m_btn[Btn_Mode].y);
+    loadImage(szModes[nMode], m_btn[Btn_Mode].x, m_btn[Btn_Mode].y);
 
     m_bLink = true;
     m_adjustMode = 0;
@@ -576,7 +575,7 @@ void Display::updateModes(bool bForce) // update any displayed settings
   {
     heatMode = hvac.getHeatMode();
     const char *szHeatModes[] = {"/hp.png", "/ng.png", "/hauto.png"};
-    loadImage((char*)szHeatModes[heatMode], m_btn[Btn_HeatMode].x, m_btn[Btn_HeatMode].y);
+    loadImage(szHeatModes[heatMode], m_btn[Btn_HeatMode].x, m_btn[Btn_HeatMode].y);
   }
 
   if(humidMode != (hvac.getHumidifierMode() + hvac.getHumidifierRunning()) )
@@ -594,7 +593,7 @@ void Display::updateModes(bool bForce) // update any displayed settings
       loadImage("/btnled.png", m_btn[Btn_Humid].x + 1, m_btn[Btn_Humid].y);
   }
 
-  loadImage( (char*) ( (ee.b.bLock) ? "/lock.png" : "/unlock.png" ), m_btn[Btn_Lock].x, m_btn[Btn_Lock].y);
+  loadImage( ( (ee.b.bLock) ? "/lock.png" : "/unlock.png" ), m_btn[Btn_Lock].x, m_btn[Btn_Lock].y);
 
 }
 
@@ -619,12 +618,12 @@ void Display::buttonRepeat()
   updateTemps();
 }
 
-void Display::loadImage(char *pName, uint16_t x, uint16_t y)
+void Display::loadImage(String Name, uint16_t x, uint16_t y)
 {
-  loadImage(pName, x, y, 0, 0, 0, 0);
+  loadImage(Name, x, y, 0, 0, 0, 0);
 }
 
-void Display::loadImage(char *pName, uint16_t x, uint16_t y, uint16_t srcX, uint16_t srcY, uint16_t w, uint16_t h)
+void Display::loadImage(String Name, uint16_t x, uint16_t y, uint16_t srcX, uint16_t srcY, uint16_t w, uint16_t h)
 {
   static ImageCtrl pos;
   pos.x = x;
@@ -634,7 +633,7 @@ void Display::loadImage(char *pName, uint16_t x, uint16_t y, uint16_t srcX, uint
   pos.w = w;
   pos.h = h;
 
-  int16_t rc = png.open(pName, pngOpen, pngClose, pngRead, pngSeek, pngDraw);
+  int16_t rc = png.open(Name.c_str(), pngOpen, pngClose, pngRead, pngSeek, pngDraw);
 
   if(rc == PNG_SUCCESS)
   {
@@ -649,7 +648,7 @@ void Display::loadImage(char *pName, uint16_t x, uint16_t y, uint16_t srcX, uint
   }
   else
   {
-    Serial.print(pName);
+    Serial.print(Name);
     Serial.print(" loadImage error: ");
     Serial.println(rc);
   }
@@ -857,10 +856,88 @@ void Display::updateRSSI()
   }
 }
 
+struct iconConv
+{
+  uint16_t id;
+  uint8_t icon;
+};
+
+static const iconConv ic[55] = {
+  {200,11}, // Thunderstorm  thunderstorm with light rain   11d
+  {201,11}, // Thunderstorm  thunderstorm with rain   11d
+  {202,11}, // Thunderstorm  thunderstorm with heavy rain   11d
+  {210,11}, // Thunderstorm  light thunderstorm   11d
+  {211,11}, // Thunderstorm  thunderstorm   11d
+  {212,11}, // Thunderstorm  heavy thunderstorm   11d
+  {221,11}, // Thunderstorm  ragged thunderstorm  11d
+  {230,11}, // Thunderstorm  thunderstorm with light drizzle  11d
+  {231,11}, // Thunderstorm  thunderstorm with drizzle  11d
+  {232,11}, // Thunderstorm  thunderstorm with heavy drizzle  11d
+  {300,9}, // Drizzle light intensity drizzle  09d
+  {301,9}, // Drizzle drizzle  09d
+  {302,9}, // Drizzle heavy intensity drizzle  09d
+  {310,9}, // Drizzle light intensity drizzle rain   09d
+  {311,9}, // Drizzle drizzle rain   09d
+  {312,9}, // Drizzle heavy intensity drizzle rain   09d
+  {313,9}, // Drizzle shower rain and drizzle  09d
+  {314,9}, // Drizzle heavy shower rain and drizzle  09d
+  {321,9}, // Drizzle shower drizzle   09d
+  {500,10}, // Rain  light rain   10d
+  {501,10}, // Rain  moderate rain  10d
+  {502,10}, // Rain  heavy intensity rain   10d
+  {503,10}, // Rain  very heavy rain  10d
+  {504,10}, // Rain  extreme rain   10d
+  {511,13}, // Rain  freezing rain  13d
+  {520,9}, // Rain  light intensity shower rain  09d
+  {521,9}, // Rain  shower rain  09d
+  {522,9}, // Rain  heavy intensity shower rain  09d
+  {531,9}, // Rain  ragged shower rain   09d
+  {600,13}, // Snow  light snow   13d
+  {601,13}, // Snow  snow   13d
+  {602,13}, // Snow  heavy snow   13d
+  {611,13}, // Snow  sleet  13d
+  {612,13}, // Snow  light shower sleet   13d
+  {613,13}, // Snow  shower sleet   13d
+  {615,13}, // Snow  light rain and snow  13d
+  {616,13}, // Snow  rain and snow  13d
+  {620,13}, // Snow  light shower snow  13d
+  {621,13}, // Snow  shower snow  13d
+  {622,13}, // Snow  heavy shower snow  13d
+  {701,50}, // Mist  mist   50d
+  {711,50}, // Smoke smoke  50d
+  {721,50}, // Haze  haze   50d
+  {731,50}, // Dust  sand/dust whirls   50d
+  {741,50}, // Fog fog  50d
+  {751,50}, // Sand  sand   50d
+  {761,50}, // Dust  dust   50d
+  {762,50}, // Ash volcanic ash   50d
+  {771,50}, // Squall  squalls  50d
+  {781,50}, // Tornado tornado  50d
+  {800,1}, // Clear clear sky  01d
+  {801,2}, // Clouds  few clouds: 11-25%   02d
+  {802,3}, // Clouds  scattered clouds: 25-50%   03d
+  {803,4}, // Clouds  broken clouds: 51-84%  04d
+  {804,4}, // Clouds  overcast clouds: 85-100%   04d
+};
+
 #define FC_Left     37
 #define FC_Top      34
 #define FC_Width   430
 #define FC_Height  143
+
+String Display::makeName(uint8_t icon, uint8_t h)
+{
+  static String sName;
+  sName = "/";
+  if(icon < 10) sName += "0";
+  sName += icon;
+  if(icon == 3 || icon == 4) // don't have 'n' for these
+    sName += 'd';
+  else
+    sName += (h > 5 && h < 20) ? "d" : "n";
+  sName += ".png";
+  return sName;
+}
 
 void Display::forecastPage()
 {
@@ -873,7 +950,7 @@ void Display::forecastPage()
 
   m_currPage = Page_Forecast;
   setBrightness(0, m_maxBrightness);
-  loadImage("/bgForecast.png", 0, 0);
+  loadImage("/bgForecast.png", 0, 0); // load the background image
 
   int8_t fcOff = 0;
   int8_t fcDispOff = 0;
@@ -896,11 +973,9 @@ void Display::forecastPage()
     return;
   }
 
-  tft.fillRect(FC_Left, FC_Top, FC_Width, FC_Height - 1, TFT_BLACK); // clear graph area
-
   if(fcOff > 8) // more than a of day history
   {
-    fcDispOff = fcOff - 8;
+    fcDispOff = fcOff - 8; // shift to a day max
   }
 
   // Update min/max
@@ -911,7 +986,7 @@ void Display::forecastPage()
   if(hrng > fcDispOff + ee.fcDisplay)
     hrng = fcDispOff + ee.fcDisplay; // shorten to user display range
 
-  // Get min/max of current forecast for display
+  // Get min/max of current forecast for range
   for(int i = fcDispOff + 1; i < hrng && i < FC_CNT; i++)
   {
     int16_t t = m_fc.Data[i].temp;
@@ -936,8 +1011,9 @@ void Display::forecastPage()
     t -= dec;
   }
 
-  int hrs = hrng * m_fc.Freq / 3600; // normally 180ish hours
-  uint16_t day_x = 0;
+  int hrs = hrng * m_fc.Freq / 3600; // normally ~180 hours
+  uint16_t day_x = 0, lastDayX = 0;
+
   if(hrs <= 0) // divide by 0
     return;
 
@@ -948,9 +1024,34 @@ void Display::forecastPage()
 
   uint8_t day = tmE.Wday - 1;              // current day
 
-  for(int i = 0, h = tmE.Hour; i < hrs; i++, h++)
+  int16_t low = 1500, high = -1500;
+  uint16_t i2 = fcDispOff;
+  uint8_t icon = 1;
+  String sIcon;
+  int x, h = tmE.Hour;
+
+  for(int i = 0; i < hrs; i++, h++)
   {
-    int x = i * FC_Width / hrs + FC_Left;
+    uint16_t t = m_fc.Data[i2].temp;
+    uint16_t id = m_fc.Data[i2].id;
+
+    for(int j = 0; ic[j].id; j++)
+    {
+      if(id == ic[j].id)
+      {
+        if(ic[j].icon > icon) // pick highest
+          icon = ic[j].icon;
+        break;
+      }
+    }
+
+    if((i % (m_fc.Freq / 3600)) == 0) // 3 hours
+      i2++;
+
+    if( high <= t) high = t;// highest
+    if( low >= t)  low = t; // lowest
+
+    x = i * FC_Width / hrs + FC_Left;
     h %= 24;
     if(h == 12)
     {
@@ -964,28 +1065,66 @@ void Display::forecastPage()
     {
       tft.drawLine(x, FC_Top+1, x, FC_Top+FC_Height-2, rgb16(14, 28, 14) ); // (light gray)
       if(++day > 6) day = 0;
+
+      if(low != 1500) // show peaks
+      {
+        tft.drawFloat((float)high / 10, 1, x - 20, FC_Top+FC_Height + 8);
+        if(x > 110) // first one shouldn't go too far left
+          tft.drawFloat((float)low / 10, 1, x - 44, FC_Top+FC_Height + 8 + 21);
+      }
+
+      sIcon = makeName(icon, h);
+
+      if(x >= 90)
+        loadImage(sIcon, x - 80, DISPLAY_HEIGHT - 96);
+      else // left side partial image
+        loadImage(sIcon, 10, DISPLAY_HEIGHT - 96, 90 - x, 0, x - 10, 80);
+
+      lastDayX = x;
+
+      icon = 1; // clear ffor next day
+      low = 1500;
+      high = -1500;
     }
   }
+
+  // get that last partial day
+  x = lastDayX + ((FC_Width / hrs + FC_Left) * 2);
+  
+  if(x < DISPLAY_WIDTH + 60 && low != 1500)
+  {
+    if(x < DISPLAY_WIDTH - 10)
+      tft.drawFloat((float)high / 10, 1, x - 20, FC_Top+FC_Height + 8);
+    tft.drawFloat((float)low / 10, 1, x - 44, FC_Top+FC_Height + 8 + 21);
+
+    sIcon = makeName(icon, h);
+
+    if(x <= DISPLAY_WIDTH-90)
+    {
+      loadImage(sIcon, x - 80, DISPLAY_HEIGHT - 96);
+    }
+    else // right side partial image
+    {
+      x -= 80;
+      int16_t w = min(DISPLAY_WIDTH - 10 - x, 80);
+      loadImage(sIcon, x, DISPLAY_HEIGHT - 96, 0, 0, w, 80);
+    }
+  }
+
   tft.setTextDatum(TL_DATUM);
 
   uint16_t x2, y2, rh2;
 
   for(uint16_t i = fcDispOff; i < hrng && m_fc.Data[i].temp != -127; i++) // should be 41 data points
   {
-    uint16_t y1 = FC_Top+FC_Height - 1 - (m_fc.Data[i].temp - tmin) * (FC_Height-2) / (tmax-tmin);
+    uint16_t t = m_fc.Data[i].temp;
+    uint16_t y1 = FC_Top+FC_Height - 1 - (t - tmin) * (FC_Height-2) / (tmax-tmin);
     uint16_t x1 = i * FC_Width / hrng + FC_Left;
     int rhY = (FC_Top + FC_Height) - (FC_Height * m_fc.Data[i].humidity / 1000);
 
     if(i)
     {
-//      if(i == fcOff)  // current 3 hour time
-//      {
-//        int x3 = (i+1) * FC_Width / hrng + FC_Left;
-//        tft.drawRect(x2, FC_Top + 30, x3-x2, 20, rgb16(0, 22, 11) );
-//      }
-
       tft.drawLine(x2, rh2, x1, rhY, rgb16(0, 30, 0) ); // rh (green)
-
       tft.drawLine(x2, y2, x1, y1, (i== fcOff) ? rgb16(20, 0, 8) : rgb16(31, 0, 0) ); // red (current purple)
     }
     x2 = x1;
@@ -1006,6 +1145,7 @@ void Display::addGraphPoints()
 {
   if( hvac.m_inTemp == 0 || hvac.m_targetTemp == 0)
     return;
+  
   m_temp_counter = 5*60;         // update every 5 minutes
   gPoint *p = &m_points[m_pointsIdx];
 
@@ -1080,7 +1220,7 @@ void Display::historyPage()
 
   for(int i = 0; i < 5; i++) // draw temp range over thresh
   {
-    tft.drawString( String(temp / 10), DISPLAY_WIDTH-RPAD-4, y );
+    tft.drawString( String(temp / 10), DISPLAY_WIDTH-20, y );
     if(i > 0) tft.drawLine( 10, y+10, DISPLAY_WIDTH-RPAD, y+8, rgb16(10, 20, 10) );
     y -= (DISPLAY_HEIGHT - 30) /4;
     temp += tmpInc;
@@ -1111,8 +1251,8 @@ void Display::drawPointsTarget(uint16_t color)
         tft.fillRect(x, DISPLAY_HEIGHT - 10 - y, x2 - x, y2 - y, color);
       return;
     }
-    y = constrain( (m_points[i].t.target - m_tempLow) * h / (m_tempHigh - m_tempLow), 0, h); // scale to 0~300
-    y2 = constrain( (m_points[i].t.target + ee.cycleThresh[(hvac.m_modeShadow == Mode_Heat) ? 1:0] - m_tempLow) * h
+    y2 = constrain( (m_points[i].t.target - m_tempLow) * h / (m_tempHigh - m_tempLow), 0, h); // scale to 0~300
+    y = constrain( (m_points[i].t.target + ee.cycleThresh[(hvac.m_modeShadow == Mode_Heat) ? 1:0] - m_tempLow) * h
       / (m_tempHigh - m_tempLow), 0, h );
 
     int lastI = i;
@@ -1172,15 +1312,12 @@ void Display::drawPointsTemp()
     if(m_points[i].t.u == 0)
       break; // end
     y = constrain(m_points[i].t.inTemp - m_tempLow, 0, m_tempHigh - m_tempLow) * (DISPLAY_HEIGHT-20) / (m_tempHigh - m_tempLow);
-//    if(y != y2)
-//    {
-      if(x != DISPLAY_WIDTH-RPAD)
-      {
-        tft.drawLine(x2, yOff - y2, x, yOff - y, stateColor(m_points[i].bits) );
-      }
-      y2 = y;
-      x2 = x;
-//    }
+    if(x != DISPLAY_WIDTH-RPAD)
+    {
+      tft.drawLine(x2, yOff - y2, x, yOff - y, stateColor(m_points[i].bits) );
+    }
+    y2 = y;
+    x2 = x;
     if(--i < 0)
       i = GPTS-1;
   }
