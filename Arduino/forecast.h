@@ -10,9 +10,7 @@ struct forecastItem
 {
   int16_t temp;
   int16_t humidity;
-  char    icon[4];
-  int16_t rain[4];
-  uint8_t res[4];
+  int16_t id;
 };
 
 struct forecastData
