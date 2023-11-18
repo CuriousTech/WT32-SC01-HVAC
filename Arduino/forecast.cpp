@@ -11,14 +11,14 @@ ForecastRead::ForecastRead()
 
 void ForecastRead::start(IPAddress serverIP, uint16_t port, forecastData *pfd, bool bCelcius)
 {
-    if(m_ac.connected() || m_ac.connecting())
-      return;
-    m_pfd = pfd;
-    m_status = FCS_Busy;
-    m_bCelcius = bCelcius;
-    m_serverIP = serverIP;
-    if(!m_ac.connect(serverIP, port))
-      m_status = FCS_ConnectError;
+  if(m_ac.connected() || m_ac.connecting())
+    return;
+  m_pfd = pfd;
+  m_status = FCS_Busy;
+  m_bCelcius = bCelcius;
+  m_serverIP = serverIP;
+  if(!m_ac.connect(serverIP, port))
+    m_status = FCS_ConnectError;
 }
 
 int ForecastRead::checkStatus()
@@ -126,6 +126,11 @@ void ForecastRead::_onDisconnect(AsyncClient* client)
       if(*p == ',') p ++;
       else break;
       m_pfd->Data[fcIdx].humidity = (atof(p)*10);
+      while(*p && *p != ',') p ++;
+      if(*p == ',') p ++;
+      {
+        m_pfd->Data[fcIdx].id = atoi(p);
+      }
       fcIdx++;
     }
     while(*p && *p != '\r' && *p != '\n') p ++;
