@@ -3,6 +3,8 @@
 #include "digitalFont.h"
 #include "display.h"
 
+extern void WsSend(String s);
+
 void ScreenSavers::select(int n)
 {
   m_saver = n;
@@ -50,31 +52,23 @@ void ScreenSavers::Clock(bool bInit)
   const float x = 159; // center
   const float y = 158;
   const uint16_t bgColor = rgb16(9,18,9);
-  float x1,y1, x2,y2, x3,y3;
-
-  tft.fillCircle(x, y, 92, bgColor ); // no room for transparency
+  uint16_t xH,yH, xM,yM, xS,yS, xS2,yS2;
 
   float a = (hour() + (minute() * 0.00833) ) * 30;
-  cspoint(x1, y1, x, y, a, 64);
-  a = (hour() + (minute() * 0.00833)+2 ) * 30;
-  cspoint(x2, y2, x, y, a, 10);
-  a = (hour() + (minute() * 0.00833)-2 ) * 30;
-  cspoint(x3, y3, x, y, a, 10);
-  tft.fillTriangle(x1,y1, x2,y2, x3, y3, rgb16(2, 4, 2) ); // hour hand
+  cspoint(xH, yH, x, y, a, 64);
+  cspoint(xM, yM, x, y, minute() * 6, 87);
+  cspoint(xS, yS, x, y, second() * 6, 91);
+  cspoint(xS2, yS2, x, y, (second()+30) * 6, 24);
 
-  cspoint(x1, y1, x, y, minute() * 6, 88);
-  cspoint(x2, y2, x, y, (minute()+5) * 6, 12);
-  cspoint(x3, y3, x, y, (minute()-5) * 6, 12);
-  tft.fillTriangle(x1,y1, x2,y2, x3, y3, TFT_BLACK ); // minute hand
-
+  tft.fillCircle(x, y, 92, bgColor ); // no sprites
+  tft.drawWedgeLine(x, y, xH, yH, 10, 2, TFT_BLACK, bgColor); // hour hand
+  tft.drawWedgeLine(x, y, xM, yM, 6, 2, TFT_BLACK, bgColor); // minute hand
   tft.fillCircle(x, y, 12, TFT_BLACK ); // center cap
+  tft.drawWideLine(xS2, yS2, xS, yS, 2.5, rgb16(31, 0, 0), bgColor ); // second hand
 
-  cspoint(x2, y2, x, y, second() * 6, 91);
-  cspoint(x3, y3, x, y, (second()+30) * 6, 24);
-  tft.drawWideLine(x3, y3, x2, y2, 2.5, rgb16(31, 0, 0), bgColor ); // second hand
-
+/// text
   tft.setTextColor(rgb16(16,63,0) );
-  tft.setFreeFont(&FreeSans12pt7b);//&digitaldreamFatNarrow_14ptFont);
+  tft.setFreeFont(&FreeSans12pt7b);
 
   String sTime = (hourFormat12() < 10) ? " ":"";
   sTime += String( hourFormat12() );
@@ -98,9 +92,28 @@ void ScreenSavers::Clock(bool bInit)
   sTime += " ";
   sTime += String(year());
   tft.drawString(sTime, 320, 100);
+
+  // Forecast icon
+  int8_t fcOff = 0;
+  int8_t fcCnt;
+  uint32_t tm = display.m_fc.Date;
+
+  for(fcCnt = 0; fcCnt < FC_CNT && display.m_fc.Data[fcCnt].temp != -127; fcCnt++) // get current time in forecast and valid count
+  {
+    if( tm < now() )
+    {
+      fcOff = fcCnt;
+      tm += display.m_fc.Freq;
+    }
+  }
+  tmElements_t tmE;
+  breakTime(display.m_fc.Date + (fcOff * display.m_fc.Freq), tmE);
+
+//  int8_t icon = display.getIcon(display.m_fc.Data[fcOff].id);
+//  loadImage(display.makeName(icon, tmE.Hour), DISPLAY_WIDTH - 120, DISPLAY_HEIGHT - 96);
 }
 
-void ScreenSavers::cspoint(float &x2, float &y2, float x, float y, float angle, float size)
+void ScreenSavers::cspoint(uint16_t &x2, uint16_t &y2, uint16_t x, uint16_t y, float angle, float size)
 {
   float ang =  M_PI * (180-angle) / 180;
   x2 = x + size * sin(ang);
@@ -112,7 +125,8 @@ void ScreenSavers::Lines(bool bInit)
 {
   static Line *line = (Line *)m_buffer, delta;
   uint16_t color;
-  static int16_t r=40, g=40, b=40;
+  static int16_t rgb[3] = {40,40,40};
+  static int8_t rgbd[3] = {0};
   static uint8_t idx;
 
   if(bInit)
@@ -127,32 +141,34 @@ void ScreenSavers::Lines(bool bInit)
   static int8_t dly = 0;
   if(--dly <= 0)
   {
-    dly = 5; // every 5 runs
-    delta.x1 = constrain(delta.x1 + (int16_t)random(-1,2), -4, 4); // random direction delta
-    delta.x2 = constrain(delta.x2 + (int16_t)random(-1,2), -4, 4);
-    delta.y1 = constrain(delta.y1 + (int16_t)random(-1,2), -4, 4);
-    delta.y2 = constrain(delta.y2 + (int16_t)random(-1,2), -4, 4);
+    dly = 25; // every 25 runs
+    int16_t *pd = (int16_t*)&delta;
+    for(uint8_t i = 0; i < 4; i++)
+      pd[i] = constrain(pd[i] + (int16_t)random(-1,2), -4, 4); // random direction delta
+
+    for(uint8_t i = 0; i < 3; i++)
+    {
+      rgbd[i] += (int8_t)random(-1, 2);
+      rgbd[i] = (int8_t)constrain(rgbd[i], -3, 6);
+    }
   }
 
   uint8_t next = (idx + 1) % LINES;
-  tft.drawLine(line[next].x1, line[next].y1, line[next].x2, line[next].y2, 0);
+  tft.drawLine(line[next].x1, line[next].y1, line[next].x2, line[next].y2, TFT_BLACK);
 
   // add delta to positions
-  line[next].x1 = constrain(line[idx].x1 + delta.x1, 0, tft.width()-1); // keep it on the screen
+  line[next].x1 = constrain(line[idx].x1 + delta.x1, 0, DISPLAY_WIDTH-1); // keep it on the screen
   line[next].x2 = constrain(line[idx].x2 + delta.x2, 0, DISPLAY_WIDTH-1);
   line[next].y1 = constrain(line[idx].y1 + delta.y1, 0, DISPLAY_HEIGHT-1);
   line[next].y2 = constrain(line[idx].y2 + delta.y2, 0, DISPLAY_HEIGHT-1);
 
-  r += (int16_t)random(-1, 2);
-  if(r > 255) r = 255;
-  else if(r < 1) r = 1;
-  g += (int16_t)random(-1, 2);
-  if(g > 255) g = 255;
-  else if(g < 1) g = 1;
-  b += (int16_t)random(-1, 2);
-  if(b > 255) b = 255;
-  else if(b < 1) b = 1;
-  color = tft.color565(r, g, b);
+  for(uint8_t i = 0; i < 3; i++)
+  {
+    rgb[i] += rgbd[i];
+    rgb[i] = (int16_t)constrain(rgb[i], 1, 255);
+  }
+
+  color = tft.color565(rgb[0], rgb[1], rgb[2]);
 
   // Draw new line
   tft.drawLine(line[next].x1, line[next].y1, line[next].x2, line[next].y2, color);
@@ -290,29 +306,31 @@ void ScreenSavers::Cube(bool bInit)
 {
   /***********************************************************************************************************************************/
   // line segments to draw a cube. basically p0 to p1. p1 to p2. p2 to p3 so on.
+
   static const Line3d object[] = {
     // Front Face.
-    {-50, -50,  50,  50, -50,  50},
-    { 50, -50,  50,  50,  50,  50},
-    { 50,  50,  50, -50,  50,  50},
-    {-50,  50,  50, -50, -50,  50},
+    {-50, -50,  50,   50, -50,  50},
+    { 50, -50,  50,   50,  50,  50},
+    { 50,  50,  50,  -50,  50,  50},
+    {-50,  50,  50,  -50, -50,  50},
   
     //back face.
-    {-50, -50, -50,  50, -50, -50},
-    { 50, -50, -50,  50,  50, -50},
-    { 50,  50, -50, -50,  50, -50},
-    {-50,  50, -50, -50, -50, -50},
+    {-50, -50, -50,   50, -50, -50},
+    { 50, -50, -50,   50,  50, -50},
+    { 50,  50, -50,  -50,  50, -50},
+    {-50,  50, -50,  -50, -50, -50},
   
     // now the 4 edge lines.
-    {-50, -50, 50, -50, -50, -50},
-    { 50, -50, 50,  50, -50, -50},
-    {-50,  50, 50, -50,  50, -50},
-    { 50,  50, 50,  50,  50, -50},
+    {-50, -50, 50,  -50, -50, -50},
+    { 50, -50, 50,   50, -50, -50},
+    {-50,  50, 50,  -50,  50, -50},
+    { 50,  50, 50,   50,  50, -50},
   };
-  uint8_t LinestoRender = 12; // lines in the object
 
-  static Line2d *Render = (Line2d *)m_buffer;
-  static Line2d *ORender = (Line2d *)m_buffer + (sizeof(Line2d) * LINES3DREND);
+  uint8_t LinestoRender = 12;
+
+  static Line2d *Render = (Line2d*)m_buffer;
+  static Line2d *ORender = (Line2d*)(m_buffer + sizeof(Line2d) * LINES3DREND);
 
   if(bInit)
   {
