@@ -4,6 +4,8 @@
 
 extern void WsSend(String s); // for debug, open chrome console
 
+//#define LOCAL // Use if you have a local copy of the page
+
 OpenWeather::OpenWeather()
 {
   m_ac.onConnect([](void* obj, AsyncClient* c) { (static_cast<OpenWeather*>(obj))->_onConnect(c); }, this);
@@ -19,8 +21,14 @@ void OpenWeather::start(forecastData *pfd, bool bCelcius, char *pCityID)
   m_bCelcius = bCelcius;
   strcpy(m_cityID, pCityID);
   m_status = FCS_Busy;
+#ifdef LOCAL
+IPAddress ipFcServer(192,168,31,100);    // local forecast server and port
+  if(!m_ac.connect(ipFcServer, 80))
+    m_status = FCS_ConnectError;
+#else
   if(!m_ac.connect("api.openweathermap.org", 80))
     m_status = FCS_ConnectError;
+#endif
 }
 
 int OpenWeather::checkStatus()
@@ -35,6 +43,14 @@ int OpenWeather::checkStatus()
 
 void OpenWeather::_onConnect(AsyncClient* client)
 {
+#ifdef LOCAL
+  String path = "GET /Forecast.json HTTP/1.1\n"
+    "Host: ";
+  path += "192,168,31,100";
+  path += "\n"
+    "Connection: close\n"
+    "Accept: */*\n\n";
+#else
   String path = "GET /data/2.5/forecast?id=";
   path += m_cityID;
   path += "&appid=";
@@ -50,7 +66,7 @@ void OpenWeather::_onConnect(AsyncClient* client)
   path += "\n"
     "Connection: close\n"
     "Accept: */*\n\n";
-
+#endif
   m_ac.add(path.c_str(), path.length());
   m_pBuffer = new char[OWBUF_SIZE];
   if(m_pBuffer) m_pBuffer[0] = 0;
@@ -120,6 +136,7 @@ void OpenWeather::_onDisconnect(AsyncClient* client)
     NULL
   };
 
+if(p[0] != '{') // local copy as no headers
   while(p[4]) // skip all the header lines
   {
     if(p[0] == '\r' && p[1] == '\n' && p[2] == '\r' && p[3] == '\n')
@@ -239,7 +256,7 @@ void OpenWeather::callback(int8_t iEvent, uint8_t iName, int32_t iValue, char *p
           m_pfd->Data[m_fcIdx].temp = (atof(psValue)*10);
           break;
         case 5: // humidity
-          m_pfd->Data[m_fcIdx].humidity = (atof(psValue)*10);
+          m_pfd->Data[m_fcIdx].humidity = (atoi(psValue)*10);
           break;
       }
       break;
@@ -247,12 +264,13 @@ void OpenWeather::callback(int8_t iEvent, uint8_t iName, int32_t iValue, char *p
       switch(iName)
       {
         case 0: // id 804
+          m_pfd->Data[m_fcIdx].id = atoi(psValue);
           break;
         case 1: // main "Clouds"
           break;
         case 2: // description "Overcast clouds"
           break;
-        case 3: // icon 04d
+        case 3: // icon 04d (id has more values)
           break;
       }
       break;
