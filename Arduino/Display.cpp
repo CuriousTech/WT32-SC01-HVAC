@@ -1076,9 +1076,9 @@ void Display::forecastPage()
       sIcon = makeName(icon, h);
 
       if(x >= 90)
-        loadImage(sIcon, x - 80, DISPLAY_HEIGHT - 96);
+        loadImage(sIcon, x - 80, DISPLAY_HEIGHT - 92);
       else // left side partial image
-        loadImage(sIcon, 10, DISPLAY_HEIGHT - 96, 90 - x, 0, x - 10, 80);
+        loadImage(sIcon, 10, DISPLAY_HEIGHT - 92, 90 - x, 0, x - 10, 80);
 
       lastDayX = x;
 
@@ -1089,9 +1089,9 @@ void Display::forecastPage()
   }
 
   // get that last partial day
-  x = lastDayX + ((FC_Width / hrs + FC_Left) * 2);
-  
-  if(x < DISPLAY_WIDTH + 60 && low != 1500)
+  x = lastDayX + (FC_Width * 24 / hrs);
+
+  if(x < DISPLAY_WIDTH + 40 && low != 1500)
   {
     if(x < DISPLAY_WIDTH - 10)
       tft.drawFloat((float)high / 10, 1, x - 20, FC_Top+FC_Height + 8);
@@ -1101,13 +1101,13 @@ void Display::forecastPage()
 
     if(x <= DISPLAY_WIDTH-90)
     {
-      loadImage(sIcon, x - 80, DISPLAY_HEIGHT - 96);
+      loadImage(sIcon, x - 80, DISPLAY_HEIGHT - 92);
     }
     else // right side partial image
     {
       x -= 80;
       int16_t w = min(DISPLAY_WIDTH - 10 - x, 80);
-      loadImage(sIcon, x, DISPLAY_HEIGHT - 96, 0, 0, w, 80);
+      loadImage(sIcon, x, DISPLAY_HEIGHT - 92, 0, 0, w, 80);
     }
   }
 
