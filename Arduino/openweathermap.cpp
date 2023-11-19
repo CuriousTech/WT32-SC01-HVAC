@@ -55,7 +55,7 @@ void OpenWeather::_onConnect(AsyncClient* client)
   path += m_cityID;
   path += "&appid=";
   path += APPID;   // Account
-  path += "&uints=";
+  path += "&units=";
   if(m_bCelcius)
     path += "celcius";
   else
