@@ -2,6 +2,9 @@
 #include <TimeLib.h>
 #include "digitalFont.h"
 #include "display.h"
+#include "forecast.h"
+
+extern Forecast FC;
 
 extern void WsSend(String s);
 
@@ -94,23 +97,18 @@ void ScreenSavers::Clock(bool bInit)
   tft.drawString(sTime, 320, 100);
 
   // Forecast icon
-  int8_t fcOff = 0;
+  int8_t fcOff;
   int8_t fcCnt;
-  uint32_t tm = display.m_fc.Date;
+  uint32_t tm;
 
-  for(fcCnt = 0; fcCnt < FC_CNT && display.m_fc.Data[fcCnt].temp != -127; fcCnt++) // get current time in forecast and valid count
-  {
-    if( tm < now() )
-    {
-      fcOff = fcCnt;
-      tm += display.m_fc.Freq;
-    }
-  }
+  if(!FC.getCurrentIndex(fcOff, fcCnt, tm))
+    return;
+
   tmElements_t tmE;
-  breakTime(display.m_fc.Date + (fcOff * display.m_fc.Freq), tmE);
+  breakTime(FC.m_fc.Date + (fcOff * FC.m_fc.Freq), tmE);
 
-//  int8_t icon = display.getIcon(display.m_fc.Data[fcOff].id);
-//  loadImage(display.makeName(icon, tmE.Hour), DISPLAY_WIDTH - 120, DISPLAY_HEIGHT - 96);
+//  int8_t icon = FC.getIcon(FC.m_fc.Data[fcOff].id);
+//  loadImage(localFC.makeName(icon, tmE.Hour), DISPLAY_WIDTH - 120, DISPLAY_HEIGHT - 96);
 }
 
 void ScreenSavers::cspoint(uint16_t &x2, uint16_t &y2, uint16_t x, uint16_t y, float angle, float size)
