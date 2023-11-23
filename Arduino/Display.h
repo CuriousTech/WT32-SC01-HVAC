@@ -97,7 +97,6 @@ struct ImageCtrl
   int16_t h;
 };
 
-
 class Display
 {
 public:
@@ -127,7 +126,6 @@ private:
   void updateRSSI(void);
   void drawTime(void);
   void drawOutTemp(void);
-  void forecastPage(void);
   void addGraphPoints(void);
   void historyPage(void);
   void drawPointsTarget(uint16_t color);
@@ -135,7 +133,6 @@ private:
   void drawPointsTemp(void);
   uint16_t stateColor(gflags v);
   void outlineAllButtons(void);
-  int  tween(int16_t t1, int16_t t2, int m, int r);
 
   uint16_t m_backlightTimer = 90; // backlight timers, seconds
   uint8_t m_bright; // current brightness;
@@ -145,7 +142,7 @@ private:
   uint16_t m_pointsIdx = 0;
   uint16_t m_temp_counter = 2*60;
   uint8_t m_btnMode = 0;
-  uint8_t m_btnDelay = 40;
+  uint8_t m_btnDelay = 40; // for up/down repeat
   int m_tempLow; // used for chart
   int m_tempHigh; // ""
   uint8_t m_currPage = 0;
@@ -173,14 +170,10 @@ private:
   };
 public:
   uint32_t m_lastPDate = 0;
-  forecastData m_fc;
   uint8_t m_adjustMode = 0; // which of 4 temps to adjust with rotary encoder/buttons
   bool    m_bLink;         // link adjust mode
-  bool    m_bUpdateFcst = true;
-  bool    m_bUpdateFcstIdle = true;
-  bool    m_bFcstUpdated = false;
   uint8_t m_brightness;
-  uint8_t m_maxBrightness = 100;
+  uint8_t m_maxBrightness = 90;
 };
 
 extern Display display;
