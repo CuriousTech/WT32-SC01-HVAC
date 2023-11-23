@@ -12,10 +12,13 @@ Music mus;
 #include <TFT_eSPI.h> // TFT_espi library
 TFT_eSPI tft = TFT_eSPI();
 #include "digitalFont.h"
+#include "forecast.h"
 
 // FT6206, FT6336U - touchscreen library                  // modified -> Wire.begin(18, 19)
 #include "Adafruit_FT6206.h"
 Adafruit_FT6206 ts = Adafruit_FT6206();
+
+extern Forecast FC;
 
 ScreenSavers ss;
 
@@ -79,9 +82,6 @@ void Display::init(void)
 {
   setBrightness(0, 0);                // black out while display is noise 
 
-  for(int i = 0; i < FC_CNT; i++)
-   m_fc.Data[i].temp = -127;
-  m_fc.Date = 0;
   memset(m_points, 0, sizeof(m_points));
   pinMode(39, INPUT); // touch int
 
@@ -92,6 +92,7 @@ void Display::init(void)
 
   FileSys.begin();
   mus.init();
+  FC.init( (ee.tz+hvac.m_DST)*3600 );
   screen(true);
 }
 
@@ -127,9 +128,9 @@ bool Display::screen(bool bOn)
       historyPage();
       break;
     default: // from thermostat
-      forecastPage();
+      if(FC.forecastPage())
+        m_currPage = Page_Forecast;
       break;
-      
   }
   bOldOn = bOn;
   return true;
@@ -288,7 +289,8 @@ void Display::buttonCmd(uint8_t btn)
       historyPage();
       break;
     case Btn_OutTemp:
-      forecastPage();
+      if(FC.forecastPage())
+        m_currPage = Page_Forecast;
       break;
     case Btn_Lock: // lock
       if(!ee.b.bLock)
@@ -308,128 +310,51 @@ void Display::oneSec()
   updateTemps();    // 
   updateNotification(false);
   updateRSSI();     //
+  if(m_currPage == Page_Forecast)
+  FC.forecastAnimate();
   if( m_backlightTimer ) // the dimmer thing
   {
     if(--m_backlightTimer == 0)
         screen(false);
   }
+
+  static uint8_t dly = 1;
+  if(--dly == 0)
+  {
+    dly = 60; // uppdate it every minute
+    drawOutTemp();
+  }
+
   static uint8_t lastState;
   static bool lastFan;
   if(--m_temp_counter <= 0 || hvac.getState() != lastState || hvac.getFanRunning() != lastFan)
   {
-    drawOutTemp();
     addGraphPoints();
     lastState = hvac.getState();
     lastFan = hvac.getFanRunning();
   }
 
-  if(m_currPage == Page_Thermostat && m_bFcstUpdated)
+  if(m_currPage == Page_Thermostat && FC.m_bFcstUpdated)
   {
-    m_bFcstUpdated = false;
+    FC.m_bFcstUpdated = false;
     drawOutTemp();
   }
 }
 
 void Display::drawOutTemp()
 {
-  if(m_fc.Date == 0) // not read yet or time not set
-  {
-    if(m_bUpdateFcstIdle)
-      m_bUpdateFcst = true;
-    return;
-  }
+  FC.getMinMax(hvac.m_outMin, hvac.m_outMax, 0, ee.fcRange);
 
-  int8_t fcOff = 0;
-  int8_t fcCnt = 0;
-  uint32_t tm = m_fc.Date;
+  int outTempShift;
+  int outTempReal = FC.getCurrentTemp(outTempShift, ee.fcOffset[hvac.m_modeShadow == Mode_Heat] );
 
-  for(fcCnt = 0; fcCnt < FC_CNT && m_fc.Data[fcCnt].temp != -127; fcCnt++) // get current time in forecast and valid count
-  {
-    if( tm < now() )
-    {
-      fcOff = fcCnt;
-      tm += m_fc.Freq;
-    }
-  }
-
-  if(fcCnt >= FC_CNT || m_fc.Data[fcOff].temp == -127 ) // outdated
-  {
-    if(m_bUpdateFcstIdle)
-      m_bUpdateFcst = true;
-    return;
-  }
-
-  int rng = fcCnt;
-  if(rng > ee.fcRange) rng = ee.fcRange;
-
-  // Update min/max
-  int16_t tmin = m_fc.Data[0].temp;
-  int16_t tmax = m_fc.Data[0].temp;
-
-  // Get min/max of current forecast
-  for(int i = 1; i < rng && i < FC_CNT; i++)
-  {
-    int16_t t = m_fc.Data[i].temp;
-    if(tmin > t) tmin = t;
-    if(tmax < t) tmax = t;
-  }
-
-  if(tmin == tmax) tmax++;   // div by 0 check
-
-  hvac.m_outMin = tmin; // set for hvac
-  hvac.m_outMax = tmax;
-
-  int iH = 0;
-  int m = minute();
-  uint32_t tmNow = now() - ((ee.tz+hvac.m_DST)*3600);
-  uint32_t fcTm = m_fc.Date;
-
-  if( tmNow >= fcTm)
-  {
-    for(iH = 0; tmNow > fcTm && m_fc.Data[iH].temp != -127 && iH < FC_CNT - 1; iH++)
-      fcTm += m_fc.Freq;
- 
-    if(iH)
-    {
-      iH--; // set iH to current 3 hour frame
-      fcTm -= m_fc.Freq;
-    }
-    m = (tmNow - fcTm) / 60;  // offset = minutes past forecast
-    if(m > m_fc.Freq/60) m = minute();
-  }
-
-  int r = m_fc.Freq / 60; // usually 3 hour range (180 m)
-  int outTempReal = tween(m_fc.Data[iH].temp, m_fc.Data[iH+1].temp, m, r);
-  int outTempShift = outTempReal;
-  int fcOffset = ee.fcOffset[hvac.m_modeShadow == Mode_Heat];
-
-  m += fcOffset % 60;
-  if(m < 0) m += 60;
-  if(m >= r)
-  {
-    iH++;
-    m -= r;
-  }
-  if(fcOffset <= r) while(fcOffset <= r && iH)
-  {
-    iH--;
-    fcOffset += r;
-  }
-  while(fcOffset >= r)
-  {
-    iH++;
-    fcOffset -= r;
-  }
-
-  outTempShift = tween(m_fc.Data[iH].temp, m_fc.Data[iH+1].temp, m, r);
-
-  tft.setTextColor( rgb16(0, 63, 31), TFT_BLACK );
-  tft.setFreeFont(&digitaldreamSkew_28ptFont);
   // Summer/winter curve.  Summer is delayed 3 hours
   hvac.updateOutdoorTemp( outTempShift );
 
   if(m_currPage == Page_Thermostat)
   {
+    tft.setTextColor( rgb16(0, 63, 31), TFT_BLACK );
+    tft.setFreeFont(&digitaldreamSkew_28ptFont);
     tft.drawFloat((float)outTempReal/10, 1, m_btn[Btn_OutTemp].x, m_btn[Btn_OutTemp].y );
 
     static bool bInit = false; // make first time display update fast
@@ -854,291 +779,6 @@ void Display::updateRSSI()
   {
     tft.fillRect( x + i*dist, y - i*dist, dist-2, i*dist, (sigStrength > i * sect) ? rgb16(0, 63,31) : rgb16(5, 10, 5) );
   }
-}
-
-struct iconConv
-{
-  uint16_t id;
-  uint8_t icon;
-};
-
-static const iconConv ic[55] = {
-  {200,11}, // Thunderstorm  thunderstorm with light rain   11d
-  {201,11}, // Thunderstorm  thunderstorm with rain   11d
-  {202,11}, // Thunderstorm  thunderstorm with heavy rain   11d
-  {210,11}, // Thunderstorm  light thunderstorm   11d
-  {211,11}, // Thunderstorm  thunderstorm   11d
-  {212,11}, // Thunderstorm  heavy thunderstorm   11d
-  {221,11}, // Thunderstorm  ragged thunderstorm  11d
-  {230,11}, // Thunderstorm  thunderstorm with light drizzle  11d
-  {231,11}, // Thunderstorm  thunderstorm with drizzle  11d
-  {232,11}, // Thunderstorm  thunderstorm with heavy drizzle  11d
-  {300,9}, // Drizzle light intensity drizzle  09d
-  {301,9}, // Drizzle drizzle  09d
-  {302,9}, // Drizzle heavy intensity drizzle  09d
-  {310,9}, // Drizzle light intensity drizzle rain   09d
-  {311,9}, // Drizzle drizzle rain   09d
-  {312,9}, // Drizzle heavy intensity drizzle rain   09d
-  {313,9}, // Drizzle shower rain and drizzle  09d
-  {314,9}, // Drizzle heavy shower rain and drizzle  09d
-  {321,9}, // Drizzle shower drizzle   09d
-  {500,10}, // Rain  light rain   10d
-  {501,10}, // Rain  moderate rain  10d
-  {502,10}, // Rain  heavy intensity rain   10d
-  {503,10}, // Rain  very heavy rain  10d
-  {504,10}, // Rain  extreme rain   10d
-  {511,13}, // Rain  freezing rain  13d
-  {520,9}, // Rain  light intensity shower rain  09d
-  {521,9}, // Rain  shower rain  09d
-  {522,9}, // Rain  heavy intensity shower rain  09d
-  {531,9}, // Rain  ragged shower rain   09d
-  {600,13}, // Snow  light snow   13d
-  {601,13}, // Snow  snow   13d
-  {602,13}, // Snow  heavy snow   13d
-  {611,13}, // Snow  sleet  13d
-  {612,13}, // Snow  light shower sleet   13d
-  {613,13}, // Snow  shower sleet   13d
-  {615,13}, // Snow  light rain and snow  13d
-  {616,13}, // Snow  rain and snow  13d
-  {620,13}, // Snow  light shower snow  13d
-  {621,13}, // Snow  shower snow  13d
-  {622,13}, // Snow  heavy shower snow  13d
-  {701,50}, // Mist  mist   50d
-  {711,50}, // Smoke smoke  50d
-  {721,50}, // Haze  haze   50d
-  {731,50}, // Dust  sand/dust whirls   50d
-  {741,50}, // Fog fog  50d
-  {751,50}, // Sand  sand   50d
-  {761,50}, // Dust  dust   50d
-  {762,50}, // Ash volcanic ash   50d
-  {771,50}, // Squall  squalls  50d
-  {781,50}, // Tornado tornado  50d
-  {800,1}, // Clear clear sky  01d
-  {801,2}, // Clouds  few clouds: 11-25%   02d
-  {802,3}, // Clouds  scattered clouds: 25-50%   03d
-  {803,4}, // Clouds  broken clouds: 51-84%  04d
-  {804,4}, // Clouds  overcast clouds: 85-100%   04d
-};
-
-#define FC_Left     37
-#define FC_Top      34
-#define FC_Width   430
-#define FC_Height  143
-
-String Display::makeName(uint8_t icon, uint8_t h)
-{
-  static String sName;
-  sName = "/";
-  if(icon < 10) sName += "0";
-  sName += icon;
-  if(icon == 3 || icon == 4) // don't have 'n' for these
-    sName += 'd';
-  else
-    sName += (h > 5 && h < 20) ? "d" : "n";
-  sName += ".png";
-  return sName;
-}
-
-void Display::forecastPage()
-{
-  if(m_fc.Date == 0) // no data yet
-  {
-    if(m_bUpdateFcstIdle)
-      m_bUpdateFcst = true;
-    return;
-  }
-
-  m_currPage = Page_Forecast;
-  setBrightness(0, m_maxBrightness);
-  loadImage("/bgForecast.png", 0, 0); // load the background image
-
-  int8_t fcOff = 0;
-  int8_t fcDispOff = 0;
-  int8_t fcCnt = 0;
-  uint32_t tm = m_fc.Date;
-
-  for(fcCnt = 0; fcCnt < FC_CNT && m_fc.Data[fcCnt].temp != -127; fcCnt++) // get current time in forecast and valid count
-  {
-    if( tm < now() )
-    {
-      fcOff = fcCnt;
-      tm += m_fc.Freq;
-    }
-  }
-
-  if(fcCnt >= FC_CNT || m_fc.Data[fcOff].temp == -127 ) // outdated
-  {
-    if(m_bUpdateFcstIdle)
-      m_bUpdateFcst = true;
-    return;
-  }
-
-  if(fcOff > 8) // more than a of day history
-  {
-    fcDispOff = fcOff - 8; // shift to a day max
-  }
-
-  // Update min/max
-  int16_t tmin = m_fc.Data[fcDispOff].temp;
-  int16_t tmax = tmin;
-
-  int hrng = fcCnt;
-  if(hrng > fcDispOff + ee.fcDisplay)
-    hrng = fcDispOff + ee.fcDisplay; // shorten to user display range
-
-  // Get min/max of current forecast for range
-  for(int i = fcDispOff + 1; i < hrng && i < FC_CNT; i++)
-  {
-    int16_t t = m_fc.Data[i].temp;
-    if(tmin > t) tmin = t;
-    if(tmax < t) tmax = t;
-  }
-
-  if(tmin == tmax) tmax++;   // div by 0 check
-
-  int16_t y = FC_Top+1;
-  int16_t incy = (FC_Height-20) / 2;
-  int16_t dec = (tmax - tmin) / 2;
-  int16_t t = tmax;
-
-  // temp scale
-  tft.setFreeFont(&FreeSans9pt7b);
-  tft.setTextColor(rgb16(0, 63, 31)); // cyan text
-  for(int i = 0; i < 3; i++)
-  {
-    tft.drawNumber(t/10, 8, y + 4);
-    y += incy;
-    t -= dec;
-  }
-
-  int hrs = hrng * m_fc.Freq / 3600; // normally ~180 hours
-  uint16_t day_x = 0, lastDayX = 0;
-
-  if(hrs <= 0) // divide by 0
-    return;
-
-  tft.setTextDatum(TC_DATUM); // center day on noon
-
-  tmElements_t tmE;
-  breakTime(m_fc.Date + (fcDispOff * m_fc.Freq), tmE);
-
-  uint8_t day = tmE.Wday - 1;              // current day
-
-  int16_t low = 1500, high = -1500;
-  uint16_t i2 = fcDispOff;
-  uint8_t icon = 1;
-  String sIcon;
-  int x, h = tmE.Hour;
-
-  for(int i = 0; i < hrs; i++, h++)
-  {
-    uint16_t t = m_fc.Data[i2].temp;
-    uint16_t id = m_fc.Data[i2].id;
-
-    for(int j = 0; ic[j].id; j++)
-    {
-      if(id == ic[j].id)
-      {
-        if(ic[j].icon > icon) // pick highest
-          icon = ic[j].icon;
-        break;
-      }
-    }
-
-    if((i % (m_fc.Freq / 3600)) == 0) // 3 hours
-      i2++;
-
-    if( high <= t) high = t;// highest
-    if( low >= t)  low = t; // lowest
-
-    x = i * FC_Width / hrs + FC_Left;
-    h %= 24;
-    if(h == 12)
-    {
-      tft.drawLine(x, FC_Top, x, FC_Top+FC_Height, rgb16(7, 14, 7) ); // dark gray
-      if(day_x < FC_Left + FC_Width - 100) // skip last day if too far right
-      {
-        tft.drawString( dayShortStr(day+1), day_x = x, 10);
-      }
-    }
-    else if(h==0) // new day (draw line)
-    {
-      tft.drawLine(x, FC_Top+1, x, FC_Top+FC_Height-2, rgb16(14, 28, 14) ); // (light gray)
-      if(++day > 6) day = 0;
-
-      if(low != 1500) // show peaks
-      {
-        tft.drawFloat((float)high / 10, 1, x - 20, FC_Top+FC_Height + 8);
-        if(x > 110) // first one shouldn't go too far left
-          tft.drawFloat((float)low / 10, 1, x - 44, FC_Top+FC_Height + 8 + 21);
-      }
-
-      sIcon = makeName(icon, h);
-
-      if(x >= 90)
-        loadImage(sIcon, x - 80, DISPLAY_HEIGHT - 92);
-      else // left side partial image
-        loadImage(sIcon, 10, DISPLAY_HEIGHT - 92, 90 - x, 0, x - 10, 80);
-
-      lastDayX = x;
-
-      icon = 1; // clear ffor next day
-      low = 1500;
-      high = -1500;
-    }
-  }
-
-  // get that last partial day
-  x = lastDayX + (FC_Width * 24 / hrs);
-
-  if(x < DISPLAY_WIDTH + 40 && low != 1500)
-  {
-    if(x < DISPLAY_WIDTH - 10)
-      tft.drawFloat((float)high / 10, 1, x - 20, FC_Top+FC_Height + 8);
-    tft.drawFloat((float)low / 10, 1, x - 44, FC_Top+FC_Height + 8 + 21);
-
-    sIcon = makeName(icon, h);
-
-    if(x <= DISPLAY_WIDTH-90)
-    {
-      loadImage(sIcon, x - 80, DISPLAY_HEIGHT - 92);
-    }
-    else // right side partial image
-    {
-      x -= 80;
-      int16_t w = min(DISPLAY_WIDTH - 10 - x, 80);
-      loadImage(sIcon, x, DISPLAY_HEIGHT - 92, 0, 0, w, 80);
-    }
-  }
-
-  tft.setTextDatum(TL_DATUM);
-
-  uint16_t x2, y2, rh2;
-
-  for(uint16_t i = fcDispOff; i < hrng && m_fc.Data[i].temp != -127; i++) // should be 41 data points
-  {
-    uint16_t t = m_fc.Data[i].temp;
-    uint16_t y1 = FC_Top+FC_Height - 1 - (t - tmin) * (FC_Height-2) / (tmax-tmin);
-    uint16_t x1 = i * FC_Width / hrng + FC_Left;
-    int rhY = (FC_Top + FC_Height) - (FC_Height * m_fc.Data[i].humidity / 1000);
-
-    if(i)
-    {
-      tft.drawLine(x2, rh2, x1, rhY, rgb16(0, 30, 0) ); // rh (green)
-      tft.drawLine(x2, y2, x1, y1, (i== fcOff) ? rgb16(20, 0, 8) : rgb16(31, 0, 0) ); // red (current purple)
-    }
-    x2 = x1;
-    y2 = y1;
-    rh2 = rhY;
-  }
-}
-
-// get value at current minute between hours
-int Display::tween(int16_t t1, int16_t t2, int m, int r)
-{
-  if(r == 0) r = 1; // div by zero check
-  float t = (float)(t2 - t1) * (m * 100 / r) / 100;
-  return (int)(t + (float)t1);
 }
 
 void Display::addGraphPoints()
