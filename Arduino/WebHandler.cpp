@@ -31,7 +31,7 @@ const char *hostName = RMTNAMEFULL;
 WebSocketsClient wsc;
 bool bWscConnected;
 #else
-const char *hostName = "HVAC4";
+const char *hostName = "HVAC";
 IPAddress ipFcServer(192,168,31,100);    // local forecast server and port
 int nFcPort = 80;
 Forecast FC;
