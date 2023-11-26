@@ -217,7 +217,7 @@ void Forecast::processCDT()
 
   while(m_fcIdx < FC_CNT-1 && *p)
   {
-    uint32_t tm = atoi(p) - m_tzOffset; // convert UTC to local time
+    uint32_t tm = atoi(p); // this should be local time
     if(tm > 1700516696) // skip the headers
     {
       if(!m_bFirst)
@@ -321,18 +321,20 @@ void Forecast::callback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psVa
           }
           break;
         case 4: // city
-/*            "id": 3163858,
-              "name": "Zocca",
-              "coord": {
-                "lat": 44.34,
-                "lon": 10.99
-              },
-              "country": "IT",
-              "population": 4593,
-              "timezone": 7200,
-              "sunrise": 1661834187,
-              "sunset": 1661882248
-*/
+          {
+            static const char *jsonCity[] = {
+              "id", // 0  3163858,
+              "timezone", // 1 7200,
+              "sunrise", // 2 1661834187,
+              "sunset", // 3 1661882248
+//              "name", //  "Zocca",
+//              "coord", //  {"lat": 44.34, "lon": 10.99}
+//              "country", // "IT",
+//              "population", // 4593,
+              NULL
+            };
+            processJson(psValue, 4, jsonCity);
+          }
           break;
       }
       break;
@@ -405,6 +407,19 @@ void Forecast::callback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psVa
         case 2: // description "Overcast clouds"
           break;
         case 3: // icon 04d (id has more values)
+          break;
+      }
+      break;
+    case 4: // city
+      switch(iName)
+      {
+        case 0: // id
+          break;
+        case 1: // timezone
+          break;
+        case 2: // sunrise
+          break;
+        case 3: // sunset
           break;
       }
       break;
@@ -540,17 +555,17 @@ static const iconLookup ic[] = {
   {521,9,TFT_BLUE}, // Rain  shower rain  09d
   {522,9,TFT_BLUE}, // Rain  heavy intensity shower rain  09d
   {531,9,TFT_BLUE}, // Rain  ragged shower rain   09d
-  {600,13,TFT_WHITE}, // Snow  light snow   13d
-  {601,13,TFT_WHITE}, // Snow  snow   13d
+  {600,12,TFT_WHITE}, // Snow  light snow   13d
+  {601,12,TFT_WHITE}, // Snow  snow   13d
   {602,13,TFT_WHITE}, // Snow  heavy snow   13d
-  {611,13,TFT_WHITE}, // Snow  sleet  13d
-  {612,13,TFT_WHITE}, // Snow  light shower sleet   13d
-  {613,13,TFT_WHITE}, // Snow  shower sleet   13d
-  {615,13,TFT_WHITE}, // Snow  light rain and snow  13d
-  {616,13,TFT_WHITE}, // Snow  rain and snow  13d
-  {620,13,TFT_WHITE}, // Snow  light shower snow  13d
-  {621,13,TFT_WHITE}, // Snow  shower snow  13d
-  {622,13,TFT_WHITE}, // Snow  heavy shower snow  13d
+  {611,12,TFT_WHITE}, // Snow  sleet  13d
+  {612,12,TFT_WHITE}, // Snow  light shower sleet   13d
+  {613,12,TFT_WHITE}, // Snow  shower sleet   13d
+  {615,12,TFT_WHITE}, // Snow  light rain and snow  13d
+  {616,12,TFT_WHITE}, // Snow  rain and snow  13d
+  {620,12,TFT_WHITE}, // Snow  light shower snow  13d
+  {621,12,TFT_WHITE}, // Snow  shower snow  13d
+  {622,12,TFT_WHITE}, // Snow  heavy shower snow  13d
   {701,50,TFT_LIGHTGREY}, // Mist  mist   50d
   {711,50,TFT_DARKGREY}, // Smoke smoke  50d
   {721,50,TFT_LIGHTGREY}, // Haze  haze   50d
@@ -580,7 +595,7 @@ String Forecast::makeName(uint8_t icon, uint8_t h)
   sName = "/";
   if(icon < 10) sName += "0";
   sName += icon;
-  if(icon == 3 || icon == 4) // don't have 'n' for these
+  if(icon == 3 || icon == 4 ||icon == 5 || icon == 13) // don't have 'n' for these
     sName += 'd';
   else
     sName += (h > 5 && h < 20) ? "d" : "n";
@@ -605,28 +620,31 @@ bool Forecast::forecastPage()
   if(!getCurrentIndex(fcOff, fcCnt, tm))
     return false;
 
-  if(fcOff > 8) // more than a of day history
-  {
-    fcDispOff = fcOff - 8; // shift to a day max. maybe even to start of day?
-  }
+  tmElements_t tmE;
+  breakTime(m_fc.Date + m_tzOffset + (fcOff * m_fc.Freq), tmE); // get current hour
 
-  // Update min/max
-  int16_t tmin;
-  int16_t tmax;
+  if(fcOff >= (tmE.Hour / 3) )
+    fcDispOff = fcOff - (tmE.Hour / 3); // shift back to start of day
+  else
+    fcDispOff = fcOff; // else just shift the first day
+
+  breakTime(m_fc.Date + m_tzOffset + (fcDispOff * m_fc.Freq), tmE);  // get current hour after adjusting for display offset
 
   int8_t hrng = fcCnt;
   if(hrng > fcDispOff + ee.fcDisplay)
     hrng = fcDispOff + ee.fcDisplay; // shorten to user display range
 
+  // Update min/max
+  int16_t tmin;
+  int16_t tmax;
   getMinMax(tmin, tmax, fcDispOff, hrng);
 
-  int16_t y = FC_Top+1;
-  int16_t incy = (FC_Height-20) / 2;
-  int16_t dec = (tmax - tmin) / 2;
+  int16_t y = FC_Top + 5;
+  int16_t incy = (FC_Height-20) / 3;
+  int16_t dec = (tmax - tmin) / 3;
   int16_t t = tmax;
 
   int hrs = hrng * m_fc.Freq / 3600; // normally ~180 hours
-  uint16_t day_x = 0, lastDayX = 0;
 
   if(hrs <= 0) // divide by 0
     return false;
@@ -637,36 +655,39 @@ bool Forecast::forecastPage()
   // temp scale
   tft.setFreeFont(&FreeSans9pt7b);
   tft.setTextColor(rgb16(0, 63, 31)); // cyan text
-  for(int i = 0; i < 3; i++)
+  for(int i = 0; i < 4; i++)
   {
-    tft.drawNumber(t/10, 8, y + 4);
+    tft.drawNumber(t/10, 8, y);
     y += incy;
     t -= dec;
   }
 
+  y = FC_Height / 3 + FC_Top;
+  tft.drawLine(FC_Left, y, FC_Left+FC_Width, y, rgb16(7, 14, 7) ); // dark gray
+  y += FC_Height / 3;
+  tft.drawLine(FC_Left, y, FC_Left+FC_Width, y, rgb16(7, 14, 7) ); // dark gray
+
   tft.setTextDatum(TC_DATUM); // center day on noon
 
-  tmElements_t tmE;
-  breakTime(m_fc.Date + (fcDispOff * m_fc.Freq), tmE);
-
-  uint8_t day = tmE.Wday - 1;              // current DOW
+  uint8_t wkday = tmE.Wday - 1;              // current DOW
 
   int16_t low = 1500, high = -1500;
-  uint16_t i2 = fcDispOff; // index ino forecast
-  String sIcon;
+  uint16_t i2 = fcDispOff; // index into forecast
   uint16_t x;
-  uint8_t h = tmE.Hour; // starting hour 
+  uint8_t h = tmE.Hour; // starting hour
   uint8_t iDay = 0; // icon position day
+  uint16_t lastDayX = 0;
 
   memset(m_fcIcon, 0, sizeof(m_fcIcon));
 
-  for(int i = 0; i <= hrs; i++, h++)
+  for(int i = 0; i <= hrs; i++)
   {
     uint8_t iconIdx;
- 
+
     if((i % (m_fc.Freq / 3600)) == 0) // 3 hours
     {
       uint16_t id = m_fc.Data[i2].id;
+
       if(id)
       {
         for(iconIdx = 0; ic[iconIdx].id; iconIdx++)
@@ -674,68 +695,77 @@ bool Forecast::forecastPage()
             break;
 
         if(ic[iconIdx].color && x >= FC_Left && x < DISPLAY_WIDTH - 20)
-           tft.fillRect(x, FC_Top+FC_Height, 10, 5, ic[iconIdx].color); // show color bar (10 wide for 3 hour)
+          tft.fillRect(x, FC_Top+FC_Height, 10, 5, ic[iconIdx].color); // show color bar (10 wide for 3 hour)
 
-        m_fcIcon[iDay].icon[m_fcIcon[iDay].idx++] = ic[iconIdx].icon; // fix, assuming 3 hour
+        m_fcIcon[iDay].icon[h / 3] = ic[iconIdx].icon; // fix, assuming 3 hour
       }
 
       uint16_t t = m_fc.Data[i2].temp;
-      if( high <= t) high = t;// highest
-      if( low >= t)  low = t; // lowest
+      if(t != -1000)
+      {
+        if( high <= t) high = t;// highest
+        if( low >= t)  low = t; // lowest
+      }
       i2++;
     }
 
     x = i * FC_Width / hrs + FC_Left;
 
-    h %= 24;
     if(h == 12)
     {
       tft.drawLine(x, FC_Top, x, FC_Top+FC_Height, rgb16(7, 14, 7) ); // dark gray
-      if(day_x < FC_Left + FC_Width - 100) // skip last day if too far right
+      if(x < FC_Left + FC_Width - 30) // skip last day if too far right
       {
-        tft.drawString( dayShortStr(day+1), day_x = x, 10);
+        tft.drawString( dayShortStr(wkday+1), x, 10);
       }
     }
     else if(h==0) // new day (draw line)
     {
       tft.drawLine(x, FC_Top+1, x, FC_Top+FC_Height-2, rgb16(14, 28, 14) ); // (light gray)
-      if(++day > 6) day = 0;
 
       if(low != 1500) // show peaks
       {
-        tft.drawFloat((float)high / 10, 1, x - 20, FC_Top+FC_Height + 8);
-        if(x > 110) // first one shouldn't go too far left
-          tft.drawFloat((float)low / 10, 1, x - 54, FC_Top+FC_Height + 8 + 21);
+        if(x > 60)
+          tft.drawFloat((float)high / 10, 1, x - 20, FC_Top+FC_Height + 10);
+        if(x > 100) // first one shouldn't go too far left
+          tft.drawFloat((float)low / 10, 1, x - 54, FC_Top+FC_Height + 10 + 21);
       }
 
-      iconAni *pIcon = &m_fcIcon[iDay];
-      pIcon->pos = x;
-      pIcon->idx = 4;
-      if(pIcon->icon[4] == 0)
-        pIcon->idx = 0;
-      drawIcon(pIcon->pos, pIcon->icon[pIcon->idx], h); // show noon icon first
-      pIcon->idx = 0;
+      iconAni *pIcon = &m_fcIcon[iDay - 1];
+      pIcon->x = x;
+      uint8_t h1 = 23;
+      while(h1 > 15 && pIcon->icon[h1/3]) // find first valid in prev day down to noon
+        h1 -= 3;
+      drawIcon(iDay - 1, h1, 0); // show noon icon first if valid
 
       lastDayX = x;
 
-      low = 1500;
+      low = 1500; // reset temp range
       high = -1500;
+    }
+
+    if(++h >= 24) // next day
+    {
+      h = 0;
       iDay++;
+      if(++wkday > 6) wkday = 0;
     }
   }
 
   // get that last partial day
   x = lastDayX + (FC_Width * 24 / hrs);
 
-  if(x < DISPLAY_WIDTH + 40 && low != 1500)
+  if(x < DISPLAY_WIDTH + 30 && low != 1500)
   {
-    if(x < DISPLAY_WIDTH - 10)
-      tft.drawFloat((float)high / 10, 1, x - 20, FC_Top+FC_Height + 8);
-    tft.drawFloat((float)low / 10, 1, x - 54, FC_Top+FC_Height + 8 + 21);
+    if(x < DISPLAY_WIDTH - 10 && high != -1000)
+      tft.drawFloat((float)high / 10, 1, x - 20, FC_Top+FC_Height + 10);
+    tft.drawFloat((float)low / 10, 1, x - 54, FC_Top+FC_Height + 10 + 21);
 
-    iconAni *pIcon = &m_fcIcon[iDay];
-    pIcon->pos = x;
-    drawIcon(pIcon->pos, pIcon->icon[0], h);
+    m_fcIcon[iDay].x = x;
+    int8_t h1 = 0;
+    while(h1 <= 10 && m_fcIcon[iDay].icon[h1/3]) // find last valid in last day, up to noon
+      h1 += 3;
+    drawIcon(iDay, h1, 0);
   }
 
   tft.setTextDatum(TL_DATUM);
@@ -749,7 +779,7 @@ bool Forecast::forecastPage()
     uint16_t x1 = i * FC_Width / hrng + FC_Left;
     int rhY = (FC_Top + FC_Height) - (FC_Height * m_fc.Data[i].humidity / 1000);
 
-    if(i)
+    if(i != fcDispOff)
     {
       tft.drawLine(x2, rh2, x1, rhY, rgb16(0, 30, 0) ); // rh (green)
       tft.drawLine(x2, y2, x1, y1, (i== fcOff) ? rgb16(20, 0, 8) : rgb16(31, 0, 0) ); // red (current purple)
@@ -758,6 +788,8 @@ bool Forecast::forecastPage()
     y2 = y1;
     rh2 = rhY;
   }
+
+  m_iconIdx = 0; // starting pos of icons
   return true;
 }
 
@@ -833,31 +865,34 @@ void Forecast::forecastAnimate()
   for(uint8_t d = 0; d < 7; d++) // go through the days
   {
     iconAni *pIcon = &m_fcIcon[d];
-    if(pIcon->pos == 0)
+    if(pIcon->x == 0)
       continue;
 
-    uint8_t idx = pIcon->idx;
-    uint8_t h = idx * 3;
-    if(pIcon->icon[pIcon->idx])
-      drawIcon(pIcon->pos, pIcon->icon[pIcon->idx], h);
-  
-    uint16_t x = pIcon->pos;
+    drawIcon(d, m_iconIdx * 3, 0);
+
+    uint16_t x = pIcon->x;
     uint8_t w = 80;
   
-    if(x < 90) x = 90, w = 90 - pIcon->pos;
+    if(x < 90) x = 90, w = 90 - pIcon->x;
     else if(x > DISPLAY_WIDTH-90) w = min(x - (DISPLAY_WIDTH - 90), 80);
 
-    tft.fillRect(x - 80, DISPLAY_HEIGHT - 14, min(w, (uint8_t)(pIcon->idx*10)), 2, TFT_BLUE); // progress bar
-  
-    if(++pIcon->idx >= 8)
-      pIcon->idx = 0;
+    tft.fillRect(x - 80, DISPLAY_HEIGHT - 14, min(w, (uint8_t)(m_iconIdx * 10)), 2, TFT_BLUE); // progress bar
   }
+
+  if(++m_iconIdx >= 8)
+      m_iconIdx = 0;
 }
 
-void Forecast::drawIcon(uint16_t x, uint8_t icon, uint8_t h)
+void Forecast::drawIcon(uint8_t d, uint8_t h, uint16_t x)
 {
+  iconAni *pIcon = &m_fcIcon[d];
+  if(x == 0) // not forced
+    x = pIcon->x;
+
+  uint8_t icon = pIcon->icon[h/3];
+
   if(icon == 0)
-   return;
+    return;
 
   String sIcon = makeName(icon, h);
 
