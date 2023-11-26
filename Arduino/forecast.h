@@ -36,8 +36,7 @@ enum FCS_Status
 struct iconAni
 {
   uint8_t icon[8]; // icons per day
-  uint16_t pos; // weather icon positions
-  uint8_t idx; // current icon
+  uint16_t x; // weather icon positions
 };
 
 class Forecast
@@ -54,6 +53,7 @@ public:
   void forecastAnimate(void);
   void getMinMax(int16_t& tmin, int16_t& tmax, int8_t offset, int8_t range);
   int16_t getCurrentTemp(int& shiftedTemp, uint8_t shiftMins);
+  void drawIcon(uint8_t d, uint8_t h, uint16_t x);
 
 private:
   void _onConnect(AsyncClient* client);
@@ -66,7 +66,6 @@ private:
   char *skipwhite(char *p);
   void callback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue);
   String makeName(uint8_t icon, uint8_t h);
-  void drawIcon(uint16_t x, uint8_t icon, uint8_t h);
   int tween(int16_t t1, int16_t t2, int m, int r);
 
   IPAddress m_serverIP;
@@ -85,6 +84,7 @@ private:
   int8_t m_type;
   iconAni m_fcIcon[7];
   int16_t m_tzOffset;
+  uint8_t m_iconIdx;
 public:
   forecastData m_fc;
   bool    m_bUpdateFcst = true;
