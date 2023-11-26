@@ -45,7 +45,10 @@ void ScreenSavers::run()
 void ScreenSavers::Clock(bool bInit)
 {
   if(bInit)
+  {
     display.loadImage("/bgClock.png", 0, 0);
+    FC.drawIcon(0, hour(), DISPLAY_WIDTH - 50); // 0 = current day, current hour, right edge pos
+  }
 
   static uint8_t sec;
   if(sec == second())
@@ -95,20 +98,6 @@ void ScreenSavers::Clock(bool bInit)
   sTime += " ";
   sTime += String(year());
   tft.drawString(sTime, 320, 100);
-
-  // Forecast icon
-  int8_t fcOff;
-  int8_t fcCnt;
-  uint32_t tm;
-
-  if(!FC.getCurrentIndex(fcOff, fcCnt, tm))
-    return;
-
-  tmElements_t tmE;
-  breakTime(FC.m_fc.Date + (fcOff * FC.m_fc.Freq), tmE);
-
-//  int8_t icon = FC.getIcon(FC.m_fc.Data[fcOff].id);
-//  loadImage(localFC.makeName(icon, tmE.Hour), DISPLAY_WIDTH - 120, DISPLAY_HEIGHT - 96);
 }
 
 void ScreenSavers::cspoint(uint16_t &x2, uint16_t &y2, uint16_t x, uint16_t y, float angle, float size)
