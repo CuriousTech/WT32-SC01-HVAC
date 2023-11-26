@@ -51,8 +51,8 @@ $(document).ready(function()
 {
  myStorage1 = localStorage.getItem('myStoredText1')
  if(myStorage1  != null) myToken=myStorage1
-// ws=new WebSocket("ws://"+window.location.host+"/ws")
- ws=new WebSocket("ws://192.168.31.110/ws")
+ ws=new WebSocket("ws://"+window.location.host+"/ws")
+// ws=new WebSocket("ws://192.168.31.110/ws")
  ws.onopen=function(evt){ws.send('{"sum":0}')}
  ws.onclose=function(evt){alert("Connection closed.")}
  ws.onmessage = function(evt){
@@ -584,8 +584,8 @@ function drawFC(){
 	doBorder(graph2)
 
 	c.lineWidth=1
-	min=150
-	max=-30
+	min=1500
+	max=-300
 	for(i=0;i<fc.length;i++)
 	{
 		if(min>fc[i]/10) min=fc[i]/10
@@ -708,8 +708,8 @@ function getTT(i,th)
 {
  if(schedMode==0)
  {
-	min2=150
-	max2=-30
+	min2=1500
+	max2=-300
 	strt1=i-fcr
 	if(strt1<0) strt1=0
 	for(j=strt1;j<i+fcr;j++)
