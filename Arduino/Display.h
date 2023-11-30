@@ -106,12 +106,11 @@ public:
   void init(void);
   void oneSec(void);
   bool screen(bool bOn);
-  void setBrightness(uint8_t immediate, uint8_t deferred);
   void service(void);
+  void goDark(void);
   void loadImage(String Name, uint16_t x, uint16_t y);
   void loadImage(String Name, uint16_t x, uint16_t y, uint16_t srcX, uint16_t srcY, uint16_t w, uint16_t h);
   void updateTemps(void);
-  void Note(char *cNote);
   void updateNotification(bool bRef);
   bool getGrapthPoints(gPoint *pt, int n);
   int  minPointVal(int n, int &max);
@@ -134,8 +133,8 @@ private:
   uint16_t stateColor(gflags v);
   void outlineAllButtons(void);
 
-  uint16_t m_backlightTimer = 90; // backlight timers, seconds
-  uint8_t m_bright; // current brightness;
+  uint16_t m_backlightTimer = DISPLAY_TIMEOUT; // backlight timer, seconds
+  uint8_t m_bright; // current brightness
   uint8_t m_lockDelay;
 #define GPTS 640 // 480 px width - (10+10) padding
   gPoint m_points[GPTS];
@@ -172,8 +171,8 @@ public:
   uint32_t m_lastPDate = 0;
   uint8_t m_adjustMode = 0; // which of 4 temps to adjust with rotary encoder/buttons
   bool    m_bLink;         // link adjust mode
-  uint8_t m_brightness;
-  uint8_t m_maxBrightness = 90;
+  uint8_t m_brightness = 120; // initial brightness
+  uint8_t m_maxBrightness = 120;
 };
 
 extern Display display;
