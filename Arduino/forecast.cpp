@@ -381,7 +381,8 @@ void Forecast::callback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psVa
             };
             processJson(psValue, 3, jsonList);
           }
-          if(m_fcIdx < m_fcCnt) m_fcIdx++;
+          if(m_fcIdx < FC_CNT - 1)
+            m_fcIdx++;
           break;
       }
       break;
@@ -630,9 +631,9 @@ bool Forecast::forecastPage()
 
   breakTime(m_fc.Date + m_tzOffset + (fcDispOff * m_fc.Freq), tmE);  // get current hour after adjusting for display offset
 
-  int8_t hrng = fcCnt;
-  if(hrng > fcDispOff + ee.fcDisplay)
-    hrng = fcDispOff + ee.fcDisplay; // shorten to user display range
+  int8_t hrng = fcCnt - fcDispOff;
+  if(hrng > ee.fcDisplay)
+    hrng = ee.fcDisplay; // shorten to user display range
 
   // Update min/max
   int16_t tmin;
@@ -649,7 +650,7 @@ bool Forecast::forecastPage()
   if(hrs <= 0) // divide by 0
     return false;
 
-  display.setBrightness(0, display.m_maxBrightness);
+  display.goDark();
   display.loadImage("/bgForecast.png", 0, 0); // load the background image
 
   // temp scale
@@ -680,7 +681,7 @@ bool Forecast::forecastPage()
 
   memset(m_fcIcon, 0, sizeof(m_fcIcon));
 
-  for(int i = 0; i <= hrs; i++)
+  for(int i = 0; i < hrs; i++)
   {
     uint8_t iconIdx;
 
@@ -711,23 +712,23 @@ bool Forecast::forecastPage()
 
     x = i * FC_Width / hrs + FC_Left;
 
-    if(h == 12)
+    if(h == 12) // noon line and weekday
     {
       tft.drawLine(x, FC_Top, x, FC_Top+FC_Height, rgb16(7, 14, 7) ); // dark gray
-      if(x < FC_Left + FC_Width - 30) // skip last day if too far right
+      if(x < FC_Left + FC_Width - 26) // skip last day if too far right
       {
         tft.drawString( dayShortStr(wkday+1), x, 10);
       }
     }
-    else if(h==0) // new day (draw line)
+    else if(h == 0) // new day (draw line, prev day peaks, and prev icon)
     {
       tft.drawLine(x, FC_Top+1, x, FC_Top+FC_Height-2, rgb16(14, 28, 14) ); // (light gray)
 
       if(low != 1500) // show peaks
       {
-        if(x > 60)
+        if(x > FC_Left + 23)
           tft.drawFloat((float)high / 10, 1, x - 20, FC_Top+FC_Height + 10);
-        if(x > 100) // first one shouldn't go too far left
+        if(x >FC_Left + 63) // first one shouldn't go too far left
           tft.drawFloat((float)low / 10, 1, x - 54, FC_Top+FC_Height + 10 + 21);
       }
 
@@ -776,7 +777,7 @@ bool Forecast::forecastPage()
   {
     uint16_t t = m_fc.Data[i].temp;
     uint16_t y1 = FC_Top+FC_Height - 1 - (t - tmin) * (FC_Height-2) / (tmax-tmin);
-    uint16_t x1 = i * FC_Width / hrng + FC_Left;
+    uint16_t x1 = (i-fcDispOff) * FC_Width / hrng + FC_Left;
     int rhY = (FC_Top + FC_Height) - (FC_Height * m_fc.Data[i].humidity / 1000);
 
     if(i != fcDispOff)
