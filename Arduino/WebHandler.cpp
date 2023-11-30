@@ -34,8 +34,9 @@ bool bWscConnected;
 const char *hostName = "HVAC";
 IPAddress ipFcServer(192,168,31,100);    // local forecast server and port
 int nFcPort = 80;
-Forecast FC;
 #endif
+
+Forecast FC;
 
 //-----------------
 AsyncWebServer server( serverPort );
@@ -94,7 +95,6 @@ extern const char *cmdList[];
 #endif
 
 const char *jsonListSettings[] = { "cmd", "m", "am", "hm", "fm", "ot", "ht", "c0", "c1", "h0", "h1", "im", "cn", "cx", "ct", "tu", "ov", "rhm", "rh0", "rh1", NULL };
-const char *jsonListAlert[] = { "cmd", "text", NULL };
 
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len)
 {  //Handle WebSocket event
@@ -173,11 +173,8 @@ void startServer()
     s += "WsConnected "; s += bWscConnected; s += "<br>";
     IPAddress ip(ee.hostIp);
     s += "HVAC IP "; s += ip.toString(); s += "<br>";
-    s += "FcstIdle "; s += FC.m_bUpdateFcstIdle; s += "<br>";
-    s += "UpdateFcst "; s += FC.m_bUpdateFcst; s += "<br>";
 
     s += "Now: "; s += now(); s += "<br>";
-    s += "FcDate: "; s += FC.m_fc.loadDate; s += "<br>";
 
     s += "it: "; s += hvac.m_inTemp; s += "<br>";
     s += "tempi: "; s += hvac.m_localTemp; s += "<br>";
@@ -317,6 +314,7 @@ void findHVAC() // find the HVAC on iot domain
       ee.hostIp[1] = MDNS.IP(i)[1];
       ee.hostIp[2] = MDNS.IP(i)[2];
       ee.hostIp[3] = MDNS.IP(i)[3];
+      hvac.m_notif = Note_HVACFound;
       break;
     }
   }
@@ -326,7 +324,9 @@ void findHVAC() // find the HVAC on iot domain
 void handleServer()
 {
 
-#ifndef REMOTE
+#ifdef REMOTE
+  wsc.loop();
+#else
   static int n;
   if(++n >= 10)
   {
@@ -334,6 +334,7 @@ void handleServer()
     n = 0;
   }
 #endif
+
 #ifdef OTA_ENABLE
 // Handle OTA server.
   ArduinoOTA.handle();
@@ -460,6 +461,7 @@ bool secondsServer() // called once per second
   {
     jsonString js("alert");
     js.Var("text", "Forecast failed");
+    hvac.m_notif = Note_Forecast;
     WsSend(js.Close());
   }
 
@@ -483,7 +485,7 @@ void parseParams(AsyncWebServerRequest *request)
     switch( p->name().charAt(0) )
     {
       case 'f': // get forecast
-          display.m_bUpdateFcst = true;
+          FC.m_bUpdateFcst = true;
           break;
       case 'H': // host  (from browser type: hTtp://thisip/?H=hostip)
           {
@@ -560,8 +562,7 @@ void parseParams(AsyncWebServerRequest *request)
     }
     else if(p->name() == "led")
     {
-      display.m_maxBrightness = constrain(s.toInt(), 5, 255);
-      display.setBrightness(display.m_brightness, display.m_maxBrightness );
+      display.m_maxBrightness = constrain(s.toInt(), 10, 255);
     }
     else
     {
@@ -768,11 +769,6 @@ void remoteCallback(int16_t iName, int iValue, char *psValue)
         remoteParse.setList(jsonListState);
         cmd = 2;
       }
-      else if(!strcmp(psValue, "alert"))
-      {
-        remoteParse.setList(jsonListAlert);
-        cmd = 3;
-      }
       else
       {
         remoteParse.setList(cmdList);
@@ -789,9 +785,6 @@ void remoteCallback(int16_t iName, int iValue, char *psValue)
       break;
     case 2: // state
       hvac.updateVar(iName - 1, iValue);
-      break;
-    case 3: // alert
-      display.Note(psValue);
       break;
   }
 
@@ -879,9 +872,6 @@ void remoteCallback(int16_t iName, int iValue, char *psValue)
           hvac.setVar("rmtrh", iValue, psValue, WsClientIP);
           break;
       }
-      break;
-    case 3: // alert
-      display.Note(psValue);
       break;
   }
 
