@@ -80,7 +80,7 @@ int32_t pngSeek(PNGFILE *page, int32_t position) {
 
 void Display::init(void)
 {
-  setBrightness(0, 0);                // black out while display is noise 
+  goDark();                // black out while display is noise 
 
   memset(m_points, 0, sizeof(m_points));
   pinMode(39, INPUT); // touch int
@@ -113,7 +113,7 @@ bool Display::screen(bool bOn)
     if( bOn == bOldOn )
       return false; // no change occurred
     m_currPage = Page_Thermostat;
-    setBrightness(0, m_maxBrightness);
+    goDark();
     loadImage("/bg.png", 0, 0);
     refreshAll();
   }
@@ -121,7 +121,7 @@ bool Display::screen(bool bOn)
   {
     case Page_Forecast:
       m_currPage = Page_ScreenSaver;
-      setBrightness(0, m_maxBrightness);
+      goDark();
       ss.select( random(0, SS_Count) );
       break;
     case Page_ScreenSaver:
@@ -152,6 +152,8 @@ void Display::service(void)
 
   if (digitalRead(39) == LOW)// touch I/O causes SHT40 errors. SHT40 really not recommended. Use AM2320 or AM2322.
   {
+    m_brightness = m_maxBrightness; // increase brightness for any touch
+
     touchms = millis();
     if(millis() - lastms < 100) // filter the pulses, also repeat speed
       return;
@@ -221,7 +223,6 @@ void Display::buttonCmd(uint8_t btn)
   if( m_backlightTimer == 0) // if dimmed, undim and ignore click
   {
     m_backlightTimer = DISPLAY_TIMEOUT;
-    setBrightness(m_brightness, m_maxBrightness);
     return;
   }
 
@@ -277,7 +278,7 @@ void Display::buttonCmd(uint8_t btn)
       break;
     case Btn_Time: // time
       m_currPage = Page_ScreenSaver;
-      setBrightness(0, m_maxBrightness);
+      goDark();
       ss.select( SS_Clock );
       break;
     case Btn_TargetTemp:
@@ -315,7 +316,10 @@ void Display::oneSec()
   if( m_backlightTimer ) // the dimmer thing
   {
     if(--m_backlightTimer == 0)
-        screen(false);
+    {
+      m_brightness = m_maxBrightness / 2; // dim level
+      screen(false);
+    }
   }
 
   static uint8_t dly = 1;
@@ -621,28 +625,28 @@ void Display::drawTime()
   bRefresh = false;
 }
 
-void Display::Note(char *cNote)
-{
-  screen(true);
-  tft.fillRect(m_btn[Btn_Note].x, m_btn[Btn_Note].y, m_btn[Btn_Note].w, m_btn[Btn_Note].h, rgb16(0,3,4));
-  tft.setTextColor(rgb16(31, 5, 10), rgb16(0,3,4));
-  tft.setFreeFont(&FreeSans12pt7b);
-  tft.drawString(cNote, m_btn[Btn_Note].x+2, m_btn[Btn_Note].y+6);
-  jsonString js("alert");
-  js.Var("text", cNote);
-  WsSend(js.Close());
-}
-
 // update the notification text box
 void Display::updateNotification(bool bRef)
 {
+  static uint8_t note_last = Note_None; // Needs a clear after startup
+  static uint16_t nTimer = 0;
+
   if(m_currPage)
     return;
-  static uint8_t note_last = Note_None; // Needs a clear after startup
   if(!bRef && note_last == hvac.m_notif) // nothing changed
-    return;
-  note_last = hvac.m_notif;
+  {
+    if(nTimer)
+    {
+      if(--nTimer)
+        return;
+      hvac.m_notif = Note_None; // auto-clear notif
+    }
+    else
+      return;
+  }
 
+  note_last = hvac.m_notif;
+  nTimer = 0;
   String s = "";
   switch(hvac.m_notif)
   {
@@ -650,6 +654,7 @@ void Display::updateNotification(bool bRef)
       break;
     case Note_CycleLimit:
       s = "Cycle Limit";
+      nTimer = 60;
       break;
     case Note_Filter:
       s = "Replace Filter";
@@ -662,15 +667,19 @@ void Display::updateNotification(bool bRef)
       break;
     case Note_Connecting:
       s = "Connecting";
+      nTimer = 60;
       break;
     case Note_Connected:
       s = "Connected";
+      nTimer = 30;
       break;
     case Note_RemoteOff:
       s = "Remote Off";
+      nTimer = 30;
       break;
     case Note_RemoteOn:
       s = "Remote On";
+      nTimer = 30;
       break;
     case Note_EspTouch:
       s = "Use EspTouch App";
@@ -678,7 +687,10 @@ void Display::updateNotification(bool bRef)
     case Note_Sensor:
       s = "Sensor Falied";
       break;
-  }
+    case Note_HVACFound:
+      s = "HVAC Found";
+      break;
+}
   tft.fillRect(m_btn[Btn_Note].x, m_btn[Btn_Note].y, m_btn[Btn_Note].w, m_btn[Btn_Note].h, rgb16(0,3,4));
   tft.setTextColor(rgb16(31, 5, 10), rgb16(0,3,4));
   tft.setFreeFont(&FreeSans12pt7b);
@@ -700,11 +712,10 @@ void Display::updateNotification(bool bRef)
   }
 }
 
-// Set screen brightness(first level, second level)
-void Display::setBrightness(uint8_t immediate, uint8_t deferred)
+// turn off LED backlight and set level to fade to (to hide drawing new screen)
+void Display::goDark()
 {
-  m_bright = immediate;
-  m_brightness = deferred;
+  m_bright = 0;
   analogWrite(TFT_BL, m_bright);
 }
 
@@ -819,7 +830,7 @@ void Display::addGraphPoints()
 void Display::historyPage()
 {
   m_currPage = Page_Graph; // chart thing
-  setBrightness(0, m_maxBrightness);
+  goDark();
   loadImage("/bgBlank.png", 0, 0);
   
   int minTh, maxTh, maxTemp;
@@ -874,7 +885,7 @@ void Display::drawPointsTarget(uint16_t color)
 {
   int i = m_pointsIdx - 1;
   if(i < 0) i = GPTS - 1;
-  int x, x2, y, y2, tOld;
+  int x, x2, tOld;
   const int h = DISPLAY_HEIGHT - 20;
 
   if(m_tempHigh == m_tempLow) // divide by zero check
@@ -882,25 +893,25 @@ void Display::drawPointsTarget(uint16_t color)
 
   x2 = DISPLAY_WIDTH-RPAD;
   tOld = m_points[i].t.target;
+  int16_t yH, yL;
 
   for(int x = DISPLAY_WIDTH-RPAD; x >= 10; x--)
   {
     if(m_points[i].t.u == 0)
     {
       if(x2 != DISPLAY_WIDTH-RPAD) // draw last bit if valid
-        tft.fillRect(x, DISPLAY_HEIGHT - 10 - y, x2 - x, y2 - y, color);
+        tft.fillRect(x, DISPLAY_HEIGHT - 10 - yH, x2 - x, yH - yL, color);
       return;
     }
-    y2 = constrain( (m_points[i].t.target - m_tempLow) * h / (m_tempHigh - m_tempLow), 0, h); // scale to 0~300
-    y = constrain( (m_points[i].t.target + ee.cycleThresh[(hvac.m_modeShadow == Mode_Heat) ? 1:0] - m_tempLow) * h
-      / (m_tempHigh - m_tempLow), 0, h );
+    yL = (m_points[i].t.target - m_tempLow) * h / (m_tempHigh - m_tempLow); // scale to 0~300
+    yH = (m_points[i].t.target + ee.cycleThresh[(hvac.m_modeShadow == Mode_Heat) ? 1:0] - m_tempLow) * h / (m_tempHigh - m_tempLow);
 
     int lastI = i;
     if(--i < 0)
       i = GPTS-1;
     if( (tOld != m_points[i].t.target && x != DISPLAY_WIDTH-RPAD) || x == 10)
     {
-      tft.fillRect(x, DISPLAY_HEIGHT - 10 - y, x2 - x, y2 - y, color);
+      tft.fillRect(x, DISPLAY_HEIGHT - 10 - yH, x2 - x, yH - yL, color);
       tOld = m_points[lastI].t.target;
       x2 = x;
     }
