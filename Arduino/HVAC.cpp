@@ -95,10 +95,14 @@ uint8_t HVAC::getHumidifierMode()
 void HVAC::setHumidifierMode(uint8_t m)
 {
   ee.b.humidMode = m % (HM_Auto2 + 1);
+#ifdef REMOTE
+  sendCmd("humidmode", ee.b.humidMode); // todo: check
+#else
   if(ee.b.humidMode == HM_Off)
     humidSwitch(false);
   else if( getFanRunning() && (ee.b.humidMode == HM_Fan || ee.b.humidMode == HM_Run) )
     humidSwitch(true);
+#endif
 }
 
 uint8_t HVAC::getMode()
@@ -155,7 +159,7 @@ void HVAC::updateVar(int iName, int iValue)// host values (sent to remote)
       m_targetTemp = iValue;
       break;
     case 6: // fm
-      ee.filterMinutes = iValue;
+      m_filterMinutes = iValue;
       break;
     case 7: // outTemp
       break;
@@ -522,7 +526,7 @@ void HVAC::tempCheck()
   {
     if(m_Sensor[i].IP)
     {
-      if(now() > 1650303682 && now() - m_Sensor[i].tm >= 90) // disregard expired sensor data if now() is valid
+      if(now() > 1700643600 && now() - m_Sensor[i].tm >= 90) // disregard expired sensor data if now() is valid
       {
         if( m_Sensor[i].f.f.Warn == 0)
         {
