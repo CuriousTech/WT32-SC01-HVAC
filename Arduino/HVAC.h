@@ -57,6 +57,7 @@ enum Notif
   Note_Filter,
   Note_EspTouch,
   Note_Sensor,
+  Note_HVACFound,
 };
 
 enum HeatMode
