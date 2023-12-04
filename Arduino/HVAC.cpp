@@ -1779,6 +1779,7 @@ void HVAC::loadStats()
 
 void HVAC::saveStats()
 {
+#ifndef REMOTE
   uint16_t sum;
 
   m_SecsDay[31][0] = m_filterMinutes; // store the filter timer with data that will change at the same frequency
@@ -1804,6 +1805,7 @@ void HVAC::saveStats()
     F.write((byte*) &m_SecsMon, sizeof(m_SecsMon));
     F.close();
   }
+#endif
 }
 
 void HVAC::setSettings(int iName, int iValue)// remote settings
