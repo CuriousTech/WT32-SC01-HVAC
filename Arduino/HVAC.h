@@ -1,9 +1,10 @@
 #ifndef HVAC_H
 #define HVAC_H
 
-// Uncomment to compile for remote
+// Uncomment to build remote
 //#define REMOTE
 
+#define HOSTNAME "HVAC" // Main unit name, remote will search for this
 #define RMTNAME 0x31544d52 // 1TMR reversed sensor ID
 #define RMTNAMEFULL "HVACRemote1"
 
