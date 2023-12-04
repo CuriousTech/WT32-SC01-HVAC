@@ -24,9 +24,6 @@ void ScreenSavers::select(int n)
     case SS_Boing:
         Boing(true);
         break;
-    case SS_Cube:
-        Cube(true);
-        break;
   }
 }
 
@@ -37,7 +34,6 @@ void ScreenSavers::run()
       case SS_Clock: Clock(false); break;
       case SS_Lines: Lines(false); break;
       case SS_Boing: Boing(false); break;
-      case SS_Cube: Cube(false); break;
     }
 }
 
@@ -106,7 +102,6 @@ void ScreenSavers::cspoint(uint16_t &x2, uint16_t &y2, uint16_t x, uint16_t y, f
   x2 = x + size * sin(ang);
   y2 = y + size * cos(ang);  
 }
-
 
 void ScreenSavers::Lines(bool bInit)
 {
@@ -284,204 +279,5 @@ void ScreenSavers::Boing(bool bInit)
 
     // Draw at new positions
     tft.drawCircle(ball[i].x, ball[i].y, rad, ball[i].color );
-  }
-}
-
-// 3D polygon code yanked from https://github.com/seaniefs/WT32-SC01-Exp
-
-void ScreenSavers::Cube(bool bInit)
-{
-  /***********************************************************************************************************************************/
-  // line segments to draw a cube. basically p0 to p1. p1 to p2. p2 to p3 so on.
-
-  static const Line3d object[] = {
-    // Front Face.
-    {-50, -50,  50,   50, -50,  50},
-    { 50, -50,  50,   50,  50,  50},
-    { 50,  50,  50,  -50,  50,  50},
-    {-50,  50,  50,  -50, -50,  50},
-  
-    //back face.
-    {-50, -50, -50,   50, -50, -50},
-    { 50, -50, -50,   50,  50, -50},
-    { 50,  50, -50,  -50,  50, -50},
-    {-50,  50, -50,  -50, -50, -50},
-  
-    // now the 4 edge lines.
-    {-50, -50, 50,  -50, -50, -50},
-    { 50, -50, 50,   50, -50, -50},
-    {-50,  50, 50,  -50,  50, -50},
-    { 50,  50, 50,   50,  50, -50},
-  };
-
-  uint8_t LinestoRender = 12;
-
-  static Line2d *Render = (Line2d*)m_buffer;
-  static Line2d *ORender = (Line2d*)(m_buffer + sizeof(Line2d) * LINES3DREND);
-
-  if(bInit)
-  {
-    tft.fillScreen(TFT_BLACK);
-    Xpos = tft.width() / 2; // Position the center of the 3d conversion space into the center of the TFT screen.
-    Ypos = tft.height() / 2;
-    Zpos = 550; // Z offset in 3D space (smaller = closer and bigger rendering)
-    memset(m_buffer, 0, sizeof(m_buffer));
-    return;
-  }
-
-  static uint8_t skipper = 4;
-  if(--skipper)
-      return;
-  skipper = 4;
-
-  static int8_t Zinc = -2, Xinc = -1, Yinc = -1, XanInc = 1, YanInc = 1;
-
-  // Rotate around x and y axes in 1 degree increments
-  Xan += XanInc;
-  Yan += YanInc;
-
-  Yan = Yan % 360;
-  Xan = Xan % 360; // prevents overflow.
-
-  SetVars(); //sets up the global vars to do the 3D conversion.
-
-  // Zoom in and out on Z axis within limits
-  // the cube intersects with the screen for values < 160
-  Zpos += Zinc;
-  if (Zpos > 700 && Zinc > 0) Zinc = -(Zinc + random(-1, 4));     // Switch to zoom in
-  else if (Zpos < 230 && Zinc < 0 ) Zinc = -(Zinc + random(-1, 4)); // Switch to zoom out
-  Zinc = constrain(Zinc, -4, 8);
-
-  Xpos += Xinc;
-  if(Xpos >= tft.width() - 40 && Xinc > 0 )
-    Xinc = -(constrain(Xinc + random(-1, 4 ), 1, 12) );
-  else if(Xpos <= 40 && Xinc <= 0)
-  {
-    Xinc = -(Xinc + random(1, 3 ));
-    XanInc = random(-2, 4);
-  }
-  Ypos += Yinc;
-  if(Ypos >= tft.height() - 40 && Yinc > 0)
-    Yinc = -(constrain(Yinc + random(-1, 4), 1, 12) );
-  else if(Ypos <= 40 && Yinc <= 0){
-    Yinc = -(Yinc + random(1, 4));
-    YanInc = random(-2, 4);
-  }
-  if(Xinc == 0) Xinc = random(-1, 3);
-  if(Yinc == 0) Yinc = random(-1, 3);
-  if(Zinc == 0) Zinc = random(-1, 3);
-
-  for (int i = 0; i < LinestoRender ; i++)
-  {
-    ORender[i] = Render[i]; // stores the old line segment so we can erase it later.
-    Transform(&Render[i], object[i]); // converts the 3d line segments to 2d.
-  }
-
-  // render all the lines after erasing the old ones.
-  for (int i = 0; i < LinestoRender; i++ )
-  {
-    tft.drawLine(ORender[i].p0.x, ORender[i].p0.y, ORender[i].p1.x, ORender[i].p1.y, TFT_BLACK); // erase the old lines.
-  }
-
-  uint8_t r = 7, g = 63, b = 19;
-  for (int i = 0; i < LinestoRender; i++ )
-  {
-    uint16_t color = rgb16(r, g, b);
-    tft.drawLine(Render[i].p0.x, Render[i].p0.y, Render[i].p1.x, Render[i].p1.y, color);
-    g -= 2;
-    b ++;
-  }
-}
-
-/***********************************************************************************************************************************/
-// Sets the global vars for the 3d transform. Any points sent through "process" will be transformed using these figures.
-// only needs to be called if Xan or Yan are changed.
-void ScreenSavers::SetVars()
-{
-  const float fact = 180 / 3.14159259;
-  float Xan2, Yan2, Zan2;
-  float s1, s2, s3, c1, c2, c3;
-
-  Xan2 = Xan / fact; // convert degrees to radians.
-  Yan2 = Yan / fact;
-
-  // Zan is assumed to be zero
-
-  s1 = sin(Yan2);
-  s2 = sin(Xan2);
-
-  c1 = cos(Yan2);
-  c2 = cos(Xan2);
-
-  xx = c1;
-  xy = 0;
-  xz = -s1;
-
-  yx = (s1 * s2);
-  yy = c2;
-  yz = (c1 * s2);
-
-  zx = (s1 * c2);
-  zy = -s2;
-  zz = (c1 * c2);
-}
-
-/***********************************************************************************************************************************/
-// processes x1,y1,z1 and returns rx1,ry1 transformed by the variables set in SetVars()
-// fairly heavy on floating point here.
-// uses a bunch of global vars. Could be rewritten with a struct but not worth the effort.
-void ScreenSavers::Transform(struct Line2d *ret, struct Line3d vec)
-{
-  float zvt1;
-  int xv1, yv1, zv1;
-
-  float zvt2;
-  int xv2, yv2, zv2;
-
-  int rx1, ry1;
-  int rx2, ry2;
-
-  int x1 = vec.p0.x;
-  int y1 = vec.p0.y;
-  int z1 = vec.p0.z;
-
-  int x2 = vec.p1.x;
-  int y2 = vec.p1.y;
-  int z2 = vec.p1.z;
-
-  bool Ok = false; // defaults to not OK
-
-  xv1 = (x1 * xx) + (y1 * xy) + (z1 * xz);
-  yv1 = (x1 * yx) + (y1 * yy) + (z1 * yz);
-  zv1 = (x1 * zx) + (y1 * zy) + (z1 * zz);
-
-  zvt1 = zv1 - Zpos;
-
-  if ( zvt1 < -5) {
-    rx1 = 256 * (xv1 / zvt1) + Xpos;
-    ry1 = 256 * (yv1 / zvt1) + Ypos;
-    Ok = true; // ok we are alright for point 1.
-  }
-
-  xv2 = (x2 * xx) + (y2 * xy) + (z2 * xz);
-  yv2 = (x2 * yx) + (y2 * yy) + (z2 * yz);
-  zv2 = (x2 * zx) + (y2 * zy) + (z2 * zz);
-
-  zvt2 = zv2 - Zpos;
-
-  if ( zvt2 < -5) {
-    rx2 = 256 * (xv2 / zvt2) + Xpos;
-    ry2 = 256 * (yv2 / zvt2) + Ypos;
-  } else
-  {
-    Ok = false;
-  }
-
-  if (Ok) {
-    ret->p0.x = rx1;
-    ret->p0.y = ry1;
-
-    ret->p1.x = rx2;
-    ret->p1.y = ry2;
   }
 }
