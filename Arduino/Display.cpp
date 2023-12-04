@@ -317,7 +317,7 @@ void Display::oneSec()
   {
     if(--m_backlightTimer == 0)
     {
-      m_brightness = m_maxBrightness / 2; // dim level
+      m_brightness = m_maxBrightness / 3; // dim level
       screen(false);
     }
   }
@@ -688,9 +688,10 @@ void Display::updateNotification(bool bRef)
       s = "Sensor Falied";
       break;
     case Note_HVACFound:
+      nTimer = 60;
       s = "HVAC Found";
       break;
-}
+  }
   tft.fillRect(m_btn[Btn_Note].x, m_btn[Btn_Note].y, m_btn[Btn_Note].w, m_btn[Btn_Note].h, rgb16(0,3,4));
   tft.setTextColor(rgb16(31, 5, 10), rgb16(0,3,4));
   tft.setFreeFont(&FreeSans12pt7b);
