@@ -773,14 +773,16 @@ bool Forecast::forecastPage()
 
   uint16_t x2, y2, rh2;
 
-  for(uint16_t i = fcDispOff; i < hrng && m_fc.Data[i].temp != -1000; i++) // should be 41 data points
-  {
-    uint16_t t = m_fc.Data[i].temp;
-    uint16_t y1 = FC_Top+FC_Height - 1 - (t - tmin) * (FC_Height-2) / (tmax-tmin);
-    uint16_t x1 = (i-fcDispOff) * FC_Width / hrng + FC_Left;
-    int rhY = (FC_Top + FC_Height) - (FC_Height * m_fc.Data[i].humidity / 1000);
+  uint16_t i;
 
-    if(i != fcDispOff)
+  for(i = 0; i < hrng; i++) // should be 41 data points
+  {
+    uint16_t t = m_fc.Data[i + fcDispOff].temp;
+    uint16_t y1 = FC_Top+FC_Height - 1 - (t - tmin) * (FC_Height-2) / (tmax-tmin);
+    uint16_t x1 = i * FC_Width / hrng + FC_Left;
+    int rhY = (FC_Top + FC_Height) - (FC_Height * m_fc.Data[i + fcDispOff].humidity / 1000);
+
+    if(i) // 1st run just saves pos
     {
       tft.drawLine(x2, rh2, x1, rhY, rgb16(0, 30, 0) ); // rh (green)
       tft.drawLine(x2, y2, x1, y1, (i== fcOff) ? rgb16(20, 0, 8) : rgb16(31, 0, 0) ); // red (current purple)
