@@ -223,6 +223,7 @@ void Forecast::processCDT()
       if(!m_bFirst)
       {
         m_bFirst = true;
+        m_fcCnt = 56; // 7d @ 3h. This is the older weather.gov data
         m_fcIdx = makeroom(tm);
         if(m_fc.Date == 0)
           m_fc.Date = tm;
@@ -802,7 +803,7 @@ void Forecast::getMinMax(int16_t& tmin, int16_t& tmax, int8_t offset, int8_t ran
   tmax = tmin = m_fc.Data[offset].temp;
 
   // Get min/max of current forecast
-  for(int8_t i = offset + 1; i < range && m_fc.Data[i].temp != -1000 && i < FC_CNT; i++)
+  for(int8_t i = offset + 1; i < offset + range && m_fc.Data[i].temp != -1000 && i < FC_CNT; i++)
   {
     int16_t t = m_fc.Data[i].temp;
     if(tmin > t) tmin = t;
