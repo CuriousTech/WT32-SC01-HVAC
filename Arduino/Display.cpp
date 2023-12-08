@@ -152,6 +152,7 @@ void Display::service(void)
 
   if (digitalRead(39) == LOW)// touch I/O causes SHT40 errors. SHT40 really not recommended. Use AM2320 or AM2322.
   {
+    bool bSkip = (m_brightness < m_maxBrightness);
     m_brightness = m_maxBrightness; // increase brightness for any touch
 
     touchms = millis();
@@ -165,7 +166,11 @@ void Display::service(void)
 
     if(bPress == false) // only need 1 touch
     {
-      if(m_currPage) // not on thermostat
+      if(bSkip) // just brigthten, ignore input
+      {
+        m_backlightTimer = DISPLAY_TIMEOUT;
+      }
+      else if(m_currPage) // not on thermostat
       {
         screen(true); // switch back to thermostat screen
       }
@@ -220,14 +225,6 @@ void Display::service(void)
 
 void Display::buttonCmd(uint8_t btn)
 {
-  if( m_backlightTimer == 0) // if dimmed, undim and ignore click
-  {
-    m_backlightTimer = DISPLAY_TIMEOUT;
-    return;
-  }
-
-  m_backlightTimer = DISPLAY_TIMEOUT; // update the auto backlight timer
-
   switch(btn)
   {
     case Btn_SetTempH:
@@ -663,7 +660,7 @@ void Display::updateNotification(bool bRef)
       s = "Forecast Error"; // max chars 14 with this font
       break;
     case Note_Network:
-      s = "Network Error";
+      s = "HVAC Not Connected";
       break;
     case Note_Connecting:
       s = "Connecting";
@@ -690,6 +687,9 @@ void Display::updateNotification(bool bRef)
     case Note_HVACFound:
       nTimer = 60;
       s = "HVAC Found";
+      break;
+    case Note_HVACNotFound:
+      s = "HVAC Not Found";
       break;
   }
   tft.fillRect(m_btn[Btn_Note].x, m_btn[Btn_Note].y, m_btn[Btn_Note].w, m_btn[Btn_Note].h, rgb16(0,3,4));
