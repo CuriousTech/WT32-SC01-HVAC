@@ -188,7 +188,7 @@ void startServer()
     request->send( 200, "text/html", s );
   });
 
-  // For quick commands. Also used by remotes
+  // For quick commands. Remotes have a seperate command list
   server.on ( "/s", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
     parseParams(request);
     String s = "OK\r\n\r\n";
@@ -207,22 +207,18 @@ void startServer()
 #ifndef REMOTE
   // Main page
   server.on ( "/iot", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){ // Hidden instead of / due to being externally accessible. Use your own here.
-    parseParams(request);
     request->send(SPIFFS, "/index.html");
   });
   server.on ( "/settings", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
-    parseParams(request);
     request->send(SPIFFS, "/settings.html");
   });
   server.on ( "/chart.html", HTTP_GET, [](AsyncWebServerRequest *request){
-    parseParams(request);
     request->send(SPIFFS, "/chart.html");
   });
 
   server.on("/styles.css", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(SPIFFS, "/styles.css");
   });
-#endif // !REMOTE
 
   server.on( "/wifi", HTTP_GET|HTTP_POST, [](AsyncWebServerRequest *request) // used by other iot devices
   {
@@ -234,6 +230,7 @@ void startServer()
     js.Var("rh", hvac.m_rh );
     request->send(200, "text/plain", js.Close());
   });
+#endif // !REMOTE
   server.on("/favicon.ico", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(SPIFFS, "/favicon.ico");
   });
@@ -300,6 +297,8 @@ void findHVAC() // find the HVAC on iot domain
       break;
     }
   }
+  if(hvac.m_notif != Note_HVACFound)
+    hvac.m_notif = Note_HVACNotFound;
 }
 #endif
 
@@ -457,7 +456,7 @@ void parseParams(AsyncWebServerRequest *request)
       case 'f': // get forecast
           FC.m_bUpdateFcst = true;
           break;
-      case 'H': // host  (from browser type: hTtp://thisip/?H=hostip)
+      case 'H': // host  (from browser type: hTtp://thisip/s?H=hostip)
           {
             IPAddress ip;
             ip.fromString(s);
@@ -466,6 +465,7 @@ void parseParams(AsyncWebServerRequest *request)
             ee.hostIp[2] = ip[2];
             ee.hostIp[3] = ip[3];
             startListener(); // reset the URI
+            ee.update();
           }
           break;
       case 'R': // remote
@@ -873,7 +873,7 @@ static void clientEventHandler(void* handle, const char* na, int ID, void* ptr)
       bWscConnected = true;
       FC.m_bUpdateFcst = true; // Get the forecast faster
       FC.m_bUpdateFcstIdle = true;
-      if(hvac.m_notif == Note_Network) // remove net disconnect error
+      if(hvac.m_notif == Note_Network || hvac.m_notif == Note_HVACNotFound) // remove net disconnect error
         hvac.m_notif = Note_None;
       break;
     case WEBSOCKET_EVENT_DISCONNECTED:
