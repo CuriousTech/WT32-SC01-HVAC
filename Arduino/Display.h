@@ -136,6 +136,7 @@ private:
   uint16_t m_backlightTimer = DISPLAY_TIMEOUT; // backlight timer, seconds
   uint8_t m_bright; // current brightness
   uint8_t m_lockDelay;
+  uint8_t m_displayLocal; // local temp/rh display mode/timer
 #define GPTS 640 // 480 px width - (10+10) padding
   gPoint m_points[GPTS];
   uint16_t m_pointsIdx = 0;
@@ -149,8 +150,8 @@ private:
     {Btn_Dow, 30, 8, 50, 20},
     {Btn_Time, 106, 8, 182, 20},
     {Btn_OutTemp, DISPLAY_WIDTH-126, 24, 103, 41},
-    {Btn_InTemp, 23, 52, 174, 64},
-    {Btn_Rh, 203, 52, 100, 40},
+    {Btn_InTemp, 25, 52, 174, 64},
+    {Btn_Rh, 201, 52, 100, 40},
     {Btn_TargetTemp, DISPLAY_WIDTH-184, 124, 105, 41},
     {Btn_SetTempH, DISPLAY_WIDTH-185, 185, 105, 43},
     {Btn_SetTempL, DISPLAY_WIDTH-185, 250, 105, 43},
