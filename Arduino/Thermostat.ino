@@ -36,7 +36,6 @@ SOFTWARE.
 #include "RunningMedian.h"
 
 // Uncomment only one of these
-//#include <SHT40.h> // //Move Libraries/SHT40 to Arduino/libraries
 //#include <DHT.h>  // http://www.github.com/markruys/arduino-DHT
 //#include <DallasTemperature.h> //DallasTemperature from library mamanger
 #include <AM2320.h> // https://github.com/CuriousTech/ESP-HVAC/blob/master/Libraries/AM2320/AM2320.h
@@ -54,9 +53,6 @@ HVAC hvac;
 
 RunningMedian<int16_t,25> tempMedian; //median of 25 samples
 
-#ifdef SHT40_H
-SHT40 sht;
-#endif
 #ifdef dht_h
 DHT dht;
 #endif
@@ -89,9 +85,6 @@ void setup()
   hvac.init();
   startServer();
 
-#ifdef SHT40_H
-  sht.init(4);
-#endif
 #ifdef dht_h
   dht.setup(UNSET, DHT::DHT22);
 #endif
@@ -139,33 +132,10 @@ void loop()
     ds18reqlastreq = ds18lastreq;
   }
 #endif
-
-#ifdef SHT40_H
-  static uint8_t shtCount = 10;
-
-  if(sht.service())
-  {
-    tempMedian.add((ee.b.bCelcius ? sht.getTemperatureC():sht.getTemperatureF()) * 10);
-    float temp;
-    if (tempMedian.getAverage(2, temp) == tempMedian.OK) {
-      hvac.updateIndoorTemp( temp, sht.getRh() * 10 );
-    }
-    shtCount = 10;
-  }
-#endif
   
   if(sec_save != second()) // only do stuff once per second
   {
     sec_save = second();
-#ifdef SHT40_H
-    if(--shtCount == 0)
-    {
-      shtCount = 10;
-      if( digitalRead(AMPWR) )
-        hvac.m_notif = Note_Sensor;
-      digitalWrite(AMPWR, !digitalRead(AMPWR)); // Toggle power to SHT40
-    }
-#endif
     if(secondsServer()) // once per second stuff, returns true once on connect
       uTime.start();
     display.oneSec();
@@ -189,6 +159,12 @@ void loop()
           hvac.updateIndoorTemp( temp, dht.getHumidity() * 10);
         }
       }
+      else
+      {
+        hvac.m_notif = Note_Sensor;
+        display.updateNotification(true); // be annoying
+      }
+
       read_delay = 5; // update every 5 seconds
     }
 #endif
@@ -219,7 +195,10 @@ void loop()
         if(errCnt < 5)
           errCnt++;
         else
+        {
           hvac.m_notif = Note_Sensor;
+          display.updateNotification(true); // be annoying
+        }
       }
       read_delay = 5; // update every 5 seconds
     }
@@ -258,5 +237,5 @@ void loop()
       }
     }
   }
-  delay(2); // mostly to slow down Display::lines()
+  delay(2);
 }
