@@ -50,6 +50,7 @@ enum Notif
   Note_None,
   Note_Connecting,
   Note_Connected,
+  Note_HVAC_connected,
   Note_RemoteOff,
   Note_RemoteOn,
   Note_CycleLimit,
@@ -59,6 +60,7 @@ enum Notif
   Note_EspTouch,
   Note_Sensor,
   Note_HVACFound,
+  Note_Updating,
 };
 
 enum HeatMode
