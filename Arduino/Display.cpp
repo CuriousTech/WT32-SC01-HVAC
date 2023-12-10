@@ -19,12 +19,10 @@ TFT_eSPI tft = TFT_eSPI();
 Adafruit_FT6206 ts = Adafruit_FT6206();
 
 extern Forecast FC;
-
-ScreenSavers ss;
-
 extern HVAC hvac;
 extern void WsSend(String s);
 
+ScreenSavers ss;
 PNG png;
 
 void pngDraw(PNGDRAW *pDraw)
@@ -155,6 +153,8 @@ void Display::service(void)
     bool bSkip = (m_brightness < m_maxBrightness);
     m_brightness = m_maxBrightness; // increase brightness for any touch
 
+    m_backlightTimer = DISPLAY_TIMEOUT;
+ 
     touchms = millis();
     if(millis() - lastms < 100) // filter the pulses, also repeat speed
       return;
@@ -166,10 +166,7 @@ void Display::service(void)
 
     if(bPress == false) // only need 1 touch
     {
-      if(bSkip) // just brigthten, ignore input
-      {
-        m_backlightTimer = DISPLAY_TIMEOUT;
-      }
+      if(bSkip); // just brigthten, ignore input
       else if(m_currPage) // not on thermostat
       {
         screen(true); // switch back to thermostat screen
@@ -283,8 +280,13 @@ void Display::buttonCmd(uint8_t btn)
       hvac.enableRemote();
       break;
     case Btn_InTemp: // in
-    case Btn_Rh: // rh
       historyPage();
+      break;
+    case Btn_Rh: // rh
+      if(m_displayLocal)
+        m_displayLocal = 0;
+      else
+        m_displayLocal = 10; // might change this
       break;
     case Btn_OutTemp:
       if(FC.forecastPage())
@@ -318,6 +320,9 @@ void Display::oneSec()
       screen(false);
     }
   }
+
+  if(m_displayLocal) // timer for remote temp display
+    m_displayLocal--;
 
   static uint8_t dly = 1;
   if(--dly == 0)
@@ -377,18 +382,23 @@ void Display::updateTemps(void)
     return;
   }
 
-  tft.setTextColor( rgb16(0, 63, 31), TFT_BLACK );
-
   tft.setFreeFont(&digitaldreamSkew_48ptFont);
-  if(last[0] != hvac.m_inTemp)
-    tft.drawFloat((float)(last[0] = hvac.m_inTemp)/10, 1, m_btn[Btn_InTemp].x, m_btn[Btn_InTemp].y );
+
+  int16_t inTemp = (m_displayLocal) ? hvac.m_localTemp : hvac.m_inTemp;
+  int16_t rh = (m_displayLocal) ? hvac.m_localRh : hvac.m_rh;
+
+  tft.setTextColor( (m_displayLocal) ? rgb16(4, 63, 1) : rgb16(0, 63, 31), TFT_BLACK );
+
+  if(last[0] != inTemp)
+    tft.drawFloat((float)(last[0] = inTemp)/10, 1, m_btn[Btn_InTemp].x, m_btn[Btn_InTemp].y );
+
   tft.setFreeFont(&digitaldreamSkew_28ptFont);
   if(last[1] != hvac.m_targetTemp)
     tft.drawFloat((float)(last[1] = hvac.m_targetTemp)/10, 1, m_btn[Btn_TargetTemp].x, m_btn[Btn_TargetTemp].y );
 
-  if(last[2] != hvac.m_rh)
+  if(last[2] != rh)
   {
-    tft.drawFloat((float)(last[2] = hvac.m_rh)/10, 1, m_btn[Btn_Rh].x, m_btn[Btn_Rh].y );
+    tft.drawFloat((float)(last[2] = rh)/10, 1, m_btn[Btn_Rh].x, m_btn[Btn_Rh].y );
     tft.setFreeFont(&FreeSans12pt7b);//&digitaldreamFatNarrow_14ptFont);
     tft.drawString("%", m_btn[Btn_Rh].x + 101, m_btn[Btn_Rh].y );
   }
@@ -520,7 +530,6 @@ void Display::updateModes(bool bForce) // update any displayed settings
   }
 
   loadImage( ( (ee.b.bLock) ? "/lock.png" : "/unlock.png" ), m_btn[Btn_Lock].x, m_btn[Btn_Lock].y);
-
 }
 
 void Display::buttonRepeat()
@@ -664,10 +673,13 @@ void Display::updateNotification(bool bRef)
       break;
     case Note_Connecting:
       s = "Connecting";
-      nTimer = 60;
+      nTimer = 30;
       break;
     case Note_Connected:
       s = "Connected";
+      nTimer = 30;
+      break;
+    case Note_HVAC_connected:
       nTimer = 30;
       break;
     case Note_RemoteOff:
@@ -688,8 +700,10 @@ void Display::updateNotification(bool bRef)
       nTimer = 60;
       s = "HVAC Found";
       break;
-    case Note_HVACNotFound:
-      s = "HVAC Not Found";
+    case Note_Updating:
+      s = "Updating Firmware";
+      m_bright = 20;
+      analogWrite(TFT_BL, m_bright); // dim it a lot. flashing takes power, so this evens it out a bit
       break;
   }
   tft.fillRect(m_btn[Btn_Note].x, m_btn[Btn_Note].y, m_btn[Btn_Note].w, m_btn[Btn_Note].h, rgb16(0,3,4));
