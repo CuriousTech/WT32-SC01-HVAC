@@ -270,6 +270,8 @@ void startServer()
     jsonString js("alert");
     js.Var("text", "OTA Update Started");
     ws.textAll(js.Close());
+    hvac.m_notif = Note_Updating; // Display a thing
+    display.updateNotification(true);
     ws.closeAll();
     SPIFFS.end();
   });
@@ -297,8 +299,6 @@ void findHVAC() // find the HVAC on iot domain
       break;
     }
   }
-  if(hvac.m_notif != Note_HVACFound)
-    hvac.m_notif = Note_HVACNotFound;
 }
 #endif
 
@@ -858,6 +858,7 @@ void WscSend(String s) // remote WebSocket
 static void clientEventHandler(void* handle, const char* na, int ID, void* ptr)
 {
   esp_websocket_event_data_t *pEv = (esp_websocket_event_data_t *)ptr;
+  static bool bFirst = true;
 
   switch(ID)
   {
@@ -873,8 +874,13 @@ static void clientEventHandler(void* handle, const char* na, int ID, void* ptr)
       bWscConnected = true;
       FC.m_bUpdateFcst = true; // Get the forecast faster
       FC.m_bUpdateFcstIdle = true;
-      if(hvac.m_notif == Note_Network || hvac.m_notif == Note_HVACNotFound) // remove net disconnect error
+      if(hvac.m_notif == Note_Network) // remove net disconnect error
         hvac.m_notif = Note_None;
+      if(bFirst)
+      {
+        bFirst = false;
+        hvac.m_notif = Note_HVAC_connected; // helps see things connecting (not really dooing what I want)
+      }
       break;
     case WEBSOCKET_EVENT_DISCONNECTED:
       switch(pEv->op_code)
