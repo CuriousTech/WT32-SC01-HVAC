@@ -66,9 +66,7 @@ void HVAC::disable()
 {
 #ifndef REMOTE
   digitalWrite(P_HEAT, HEAT_OFF);
-  m_bHeatOn = false;
   digitalWrite(P_COOL, COOL_OFF);
-  m_bCoolOn = false;
   digitalWrite(P_HUMID, HUMID_OFF);
   fanSwitch(false);
   m_bHumidRunning = false;
@@ -292,7 +290,15 @@ void HVAC::service()
   if(m_bFanRunning || m_bRunning || m_furnaceFan)  // furance runs fan seperately
   {
     filterInc();
-    m_fanOnTimer++;     // running time counter
+    if( digitalRead(P_HEAT) == HEAT_ON || m_furnaceFan )
+    {
+      static uint8_t odd;
+      odd++;
+      if(odd & 1 )
+        m_fanOnTimer++;     // half timer for heat hack (blower at 1/2 power)
+    }
+    else
+      m_fanOnTimer++;     // running time counter
 
     if(m_furnaceFan)      // fake fan status for furnace fan
       m_furnaceFan--;
@@ -400,37 +406,25 @@ void HVAC::service()
           delay(2000);                //   if no heatpump, remove
         }
         digitalWrite(P_COOL, COOL_ON);
-        m_bCoolOn = true;
         m_bRunning = true;
         break;
       case Mode_Heat:
         if(hm == Heat_NG)  // gas
         {
-          if(m_bCoolOn)
-          {
-            jsonString js("print");
-            js.Var("text", "NG heat start conflict");
-            WsSend(js.Close());
-          }
-          else
-          {
             digitalWrite(P_HEAT, HEAT_ON);
-            m_bHeatOn = true;
-          }
         }
         else
         {
           fanSwitch(true);
-          if( m_bHeatOn == false )
+          if( digitalRead(P_HEAT) != HEAT_ON )
           {
-            if(m_bRevOn)  // set heatpump to heat (if cools, reverse this)
+            if(m_bRevOn)  // set heatpump to heat
             {
               digitalWrite(P_REV, REV_OFF);
               m_bRevOn = false;
               delay(1000);
             }
             digitalWrite(P_COOL, COOL_ON);
-            m_bCoolOn = true;
           }
         }
         m_bRunning = true;
@@ -444,9 +438,7 @@ void HVAC::service()
   {
     m_bStop = false;
     digitalWrite(P_COOL, COOL_OFF);
-    m_bCoolOn = false;
     digitalWrite(P_HEAT, HEAT_OFF);
-    m_bHeatOn = false;
 
     costAdd(m_cycleTimer, mode, hm);
     m_cycleTimer = 0;
@@ -864,11 +856,11 @@ void HVAC::calcTargetTemp(int mode)
       m_bRevOn = false;
     }
   }
-  int16_t L = m_outMin * 10;
-  int16_t H = m_outMax * 10;
+  int16_t L = m_outMin;
+  int16_t H = m_outMax;
 
-  if( H-L == 0 && ee.b.nSchedMode == 0) // divide by 0
-    ee.b.nSchedMode = 1;
+  if( H-L == 0 && ee.b.nSchedMode == SM_Forecast) // divide by 0
+    ee.b.nSchedMode = SM_Flat;
 
   switch(ee.b.nSchedMode)
   {
