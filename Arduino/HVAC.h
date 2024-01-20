@@ -217,8 +217,6 @@ private:
   bool    m_bFanRunning;    // when fan is running
   bool    m_bHumidRunning;
   bool    m_bRevOn;         // shadow for reverse valve (ESP-32 digitalRead may not read latch bit)
-  bool    m_bHeatOn;        // shadow for furnace
-  bool    m_bCoolOn;        // shadow for compressor
   int8_t  m_AutoMode;       // cool, heat
   int8_t  m_setMode;        // preemted mode request
   int8_t  m_setHeat;        // preemt heat mode request
