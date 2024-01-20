@@ -169,11 +169,10 @@ private:
     {Btn_Lock, DISPLAY_WIDTH-60, 80, 24, 25},
   };
 public:
-  uint32_t m_lastPDate = 0;
+  uint32_t m_lastPDate = 0; // last data point added
   uint8_t m_adjustMode = 0; // which of 4 temps to adjust with rotary encoder/buttons
   bool    m_bLink;         // link adjust mode
-  uint8_t m_brightness = 120; // initial brightness
-  uint8_t m_maxBrightness = 120;
+  uint8_t m_brightness = 100; // initial brightness
 };
 
 extern Display display;
