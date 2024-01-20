@@ -255,7 +255,7 @@ void startServer()
 //  ee.hostIp[0] = 192; // force IP of HVAC if needed
 //  ee.hostIp[1] = 168;
 //  ee.hostIp[2] = 31;
-//  ee.hostIp[3] = 46;
+//  ee.hostIp[3] = 110;
 #endif
   remoteParse.setList(cmdList);
 
@@ -532,7 +532,7 @@ void parseParams(AsyncWebServerRequest *request)
     }
     else if(p->name() == "led")
     {
-      display.m_maxBrightness = constrain(s.toInt(), 10, 255);
+      ee.brightLevel[1] = constrain(s.toInt(), 10, 255);
     }
     else
     {
@@ -863,7 +863,6 @@ static void clientEventHandler(void* handle, const char* na, int ID, void* ptr)
   switch(ID)
   {
     case WEBSOCKET_EVENT_ERROR:
-    // not used yet?
       break;
     case WEBSOCKET_EVENT_CONNECTED:
       switch(pEv->op_code)
@@ -879,7 +878,7 @@ static void clientEventHandler(void* handle, const char* na, int ID, void* ptr)
       if(bFirst)
       {
         bFirst = false;
-        hvac.m_notif = Note_HVAC_connected; // helps see things connecting (not really dooing what I want)
+        hvac.m_notif = Note_HVAC_connected; // helps see things connecting
       }
       break;
     case WEBSOCKET_EVENT_DISCONNECTED:
@@ -909,6 +908,8 @@ static void clientEventHandler(void* handle, const char* na, int ID, void* ptr)
         case 10: // ping?
           break;
       }
+      break;
+    default:
       break;
   }
 }
