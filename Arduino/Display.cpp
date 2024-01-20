@@ -150,8 +150,8 @@ void Display::service(void)
 
   if (digitalRead(39) == LOW)// touch I/O causes SHT40 errors. SHT40 really not recommended. Use AM2320 or AM2322.
   {
-    bool bSkip = (m_brightness < m_maxBrightness);
-    m_brightness = m_maxBrightness; // increase brightness for any touch
+    bool bSkip = (m_brightness < ee.brightLevel[1]);
+    m_brightness = ee.brightLevel[1]; // increase brightness for any touch
 
     m_backlightTimer = DISPLAY_TIMEOUT;
  
@@ -316,7 +316,7 @@ void Display::oneSec()
   {
     if(--m_backlightTimer == 0)
     {
-      m_brightness = m_maxBrightness / 3; // dim level
+      m_brightness = ee.brightLevel[0]; // dim level
       screen(false);
     }
   }
@@ -740,7 +740,7 @@ void Display::dimmer()
   if(m_bright == m_brightness)
     return;
 
-  if(m_brightness > m_bright + 1 && m_maxBrightness > 50)
+  if(m_brightness > m_bright + 1 && ee.brightLevel[1] > 50)
     m_bright += 2;
   else if(m_brightness > m_bright)
     m_bright ++;
