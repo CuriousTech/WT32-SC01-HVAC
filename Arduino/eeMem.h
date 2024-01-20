@@ -34,17 +34,17 @@ public:
   char     szSSIDPassword[24] = ""; // and password
   uint16_t coolTemp[2] = {850, 860}; // cool to temp *10 low/high F/C issue
   uint16_t heatTemp[2] = {740, 750}; // heat to temp *10 low/high F/C issue
-  flags_t  b =  {0,0,0,0,0,0,0,0};   // see flags_t
   int8_t   cycleThresh[2] = {28, 8}; // temp range for cycle *10 [cool|heat] F/C issue
+  flags_t  b =  {0,0,0,0,0,0,0,0};   // see flags_t
   uint8_t  eHeatThresh = 33;        // degree threshold to switch to gas    F/C issue
+  int8_t   tz = -5;                 // current timezone
+  int8_t   adj;                     // temp sensor offset adjust by 0.1
   uint16_t cycleMin = 60*4;         // min time to run a cycle in minutes
   uint16_t cycleMax = 60*30;        // max time to run a cycle in minutes
   uint16_t idleMin = 60*8;          // min time to not run in minutes
   uint16_t fanPostDelay[2] = {60*2, 60*2}; // delay to run auto fan after [hp/cool] stops
   uint16_t fanPreTime[2] = {60*1, 60*1}; // fan pre-run before [cool/heat]
   uint16_t overrideTime = 60*10;    // time used for an override in minutes
-  int8_t   tz = -5;                 // current timezone
-  int8_t   adj;                     // temp sensor offset adjust by 0.1
   uint16_t rhLevel[2] = {450, 750}; // rh low/high 45%, 75%
   int8_t   awayDelta[2] = {40, -40}; // temp offset in away mode[cool][heat] by 0.1
   uint16_t awayTime = 60*8;         // time limit for away offset (in minutes)
@@ -54,18 +54,19 @@ public:
   char     password[24] = "password"; // Web interface password
   uint8_t  fcRange = 23;            // number in forecasts (3 hours)
   uint8_t  fcDisplay = 46;          // number in forecasts (3 hours)
+  uint8_t  fanAutoRun = 5;          // 5 minutes on
+  uint8_t  fanWatts = 250;          // Blower motor watts
+  uint8_t  furnaceWatts = 140;// 220;      // 1.84A inducer motor mostly
+  uint8_t  humidWatts = 150;
+  uint8_t  brightLevel[2] = {30, 100}; // brightness {dim, highest}
   uint16_t ppkwh = 147;             // price per KWH in cents * 10000 (0.147)
   uint16_t ccf = 1190;              // nat gas cost per 1000 cubic feet in 10th of cents * 1000 ($1.190)
   uint16_t cfm = 820;               // cubic feet per minute * 1000 of furnace (0.82)         // cubic feet per minute
   uint16_t compressorWatts = 2600;  // compressorWatts
-  uint8_t  fanWatts = 250;          // Blower motor watts
-  uint8_t  furnaceWatts = 220;      // 1.84A inducer motor mostly
-  uint8_t  humidWatts = 150;
-  uint16_t furnacePost = 114;       // furnace internal fan timer
+  uint16_t furnacePost = 110;       // furnace internal fan timer
   uint16_t diffLimit = 300;         // in/out thermal differential limit. Set to 30 deg limit    F/C issue
   int16_t  fcOffset[2] = {-180,0};  // forecast offset adjust in minutes (cool/heat)
   uint16_t fanIdleMax = 60*4;       // fan idle max in minutes
-  uint8_t  fanAutoRun = 5;          // 5 minutes on
   int16_t  sineOffset[2] = {0, 0};  // sine offset adjust (cool/heat)
   uint32_t sensorActive[8];         // sensor IDs for restart
   uint8_t  reserved[320];
