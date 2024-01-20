@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
 <title>HVAC Chart</title>
@@ -45,7 +45,7 @@ var Json
 var a=document.all
 var ws
 added=false
-clrs=['#000','#0f0','rgba(0,0,255)','rgba(255,255,255)','rgba(0,0,50)','#fa0','rgba(0,0,255,0.5)','rgba(255,255,255,0.7)','rgba(0,0,50,0.6)','rgba(55,0,255,0.7)','rgba(255,156,10,0.7)']
+clrs=['rgb(0,0,255)','rgb(255,255,255)','rgb(0,0,50)','#fa0','rgba(0,0,255,0.5)','rgba(255,255,255,0.7)','rgba(0,0,50,0.6)','rgba(55,0,255,0.7)','rgba(255,156,10,0.7)']
 
 $(document).ready(function()
 {
@@ -247,31 +247,22 @@ function draw(){
    }
   }
 
-  sh=4
-  for(i=6;i<arr[0].length;i++)
+  sh=8
+  for(i1=6;i1<arr[0].length;i1++)
   {
 	if(drawMode&sh)
-	   doLines(clrs[i],i)
+	   doLines(clrs[i1-6],i1)
 	sh<<=1
   }
-  c.textAlign="left"
-  y=graph.height()
-  c.fillStyle='#fa0'
-  c.fillText('OUT',2,y-=10)
-  c.fillStyle='#000'
-  c.fillText('TEMP',2,y-=10)
-  c.fillStyle='#0f0'
-  c.fillText('RH',2,y-=10)
-  y-=10
   for(i=0;i<snd.length;i++)
   {
-    c.fillStyle=clrs[i+6]
-    c.fillText(snd[i][4],2,y)
-    y-=10
+    itm=document.getElementById('L'+(i+3))
+    itm.style="color:"+clrs[i]
+    itm.innerText=snd[i][4]
   }
 
   // out temp
-  if(drawMode&32) doLines('#fa0',5)
+  if(drawMode&4) doLines('#ff0',5)
   if(drawMode&2){
   c.strokeStyle = '#0f0'
   c.beginPath()
@@ -330,17 +321,6 @@ function draw(){
 		if(!hit){popup.style.left="-200px"}
 	}
 
-	mousePos={x:0,y:0}
-	if(added==false)
-	{
-		graph[0].addEventListener("mousedown",function(e){
-			mouseX=parseInt(e.clientX-offsetX)
-			mouseY=parseInt(e.clientY-offsetY)
-			drawMode^=1<<((graph[0].height-10-mouseY)/10).toFixed()
-			draw()
-		},false)
-		added=true
-	}
 	function doLines(ss,os)
 	{
 		c.strokeStyle=ss
@@ -354,36 +334,42 @@ function draw(){
 
 function getMaxY(){
 	max=0
-	for(i=0; i<arr.length-1; i++)
+	for(m=0;m<arr.length-1;m++)
 	{
-		if(arr[i][1] > max)
-		  max=arr[i][1]
-		if(arr[i][3]+th>max)
-		  max=arr[i][3]+th
-		if(drawMode&32&&arr[i][5]>max)
-		  max=arr[i][5]
-		for(j=6;j<arr[i].length;j++)
-		  if(drawMode&1<<(j-4)&&arr[i][j]>max)
-			max=arr[i][j]
+		if(arr[m][1] > max)
+		  max=arr[m][1]
+		if(arr[m][3]+th>max)
+		  max=arr[m][3]+th
+		if(drawMode&4&&arr[m][5]>max)
+		  max=arr[m][5]
+		for(j=6;j<arr[m].length;j++)
+		  if(drawMode&1<<(j-3)&&arr[m][j]>max)
+			max=arr[m][j]
 	}
 	return Math.ceil(max)
 }
 
 function getMinY(){
 	min=1500
-	for(i=0; i<arr.length; i++)
+	for(m=0;m<arr.length;m++)
 	{
-		if(arr[i][1]<min)
-		  min=arr[i][1]
-		if(arr[i][3]<min)
-		  min=arr[i][3]
-		if(drawMode&32&&arr[i][5]<min)
-		  min=arr[i][5]
-		for(j=6;j<arr[i].length;j++)
-		  if(drawMode&1<<(j-4)&&arr[i][j]<min)
-			min=arr[i][j]
+		if(arr[m][1]<min)
+		  min=arr[m][1]
+		if(arr[m][3]<min)
+		  min=arr[m][3]
+		if(drawMode&4&&arr[m][5]<min)
+		  min=arr[m][5]
+		for(j=6;j<arr[m].length;j++)
+		  if(drawMode&1<<(j-3)&&arr[m][j]<min)
+			min=arr[m][j]
 	}
 	return Math.floor(min)
+}
+
+function leg(id)
+{
+	drawMode^=1<<id
+	draw()
 }
 
 function getXPixel(val){
@@ -796,10 +782,26 @@ function setShift(n)
 </style>
 </head>
 <body>
+<table width=700><tr>
+<td colspan="12">
 <div id="wrapper">
 <canvas id="graph" width="700" height="400"></canvas>
 <div id="popup"><canvas id="tip" width="90" height="78"></canvas></div>
 </div>
+</td></tr><tr>
+<td><button class="btn" id="L1" onclick="leg(0)">TEMP</button></td>
+<td><button class="btn" id="L2" onclick="leg(1)" style="color:green">RH</button></td>
+<td><button class="btn" id="L0" onclick="leg(2)" style="color:yellow">OUT</button></td>
+<td><button class="btn" id="L3" onclick="leg(3)"></button></td>
+<td><button class="btn" id="L4" onclick="leg(4)"></button></td>
+<td><button class="btn" id="L5" onclick="leg(5)"></button></td>
+<td><button class="btn" id="L6" onclick="leg(6)"></button></td>
+<td><button class="btn" id="L7" onclick="leg(7)"></button></td>
+<td><button class="btn" id="L8" onclick="leg(8)"></button></td>
+<td><button class="btn" id="L9" onclick="leg(9)"></button></td>
+<td><button class="btn" id="L10" onclick="leg(10)"></button></td>
+<td><button class="btn" id="L11" onclick="leg(11)"></button></td>
+</tr></table>
 <div id="wrapper2">
 <canvas id="chart" width="700" height="200"></canvas>
 </div>
