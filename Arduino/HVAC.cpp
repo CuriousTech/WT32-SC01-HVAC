@@ -432,6 +432,7 @@ void HVAC::service()
     }
     if(ee.b.humidMode == HM_Run)
       humidSwitch(true);
+    m_startTemp = m_inTemp;
   }
 
   if(m_bStop && m_bRunning)             // Stop signal occurred
@@ -442,11 +443,12 @@ void HVAC::service()
 
     costAdd(m_cycleTimer, mode, hm);
     m_cycleTimer = 0;
+    m_endTemp = m_inTemp;
 
     if(ee.b.humidMode == HM_Run)      // shut off after heat/cool phase
       humidSwitch(false);
 
-    if(m_bFanRunning && m_FanMode != FM_On ) // Note: furnace manages fan
+    if(m_bFanRunning && m_FanMode != FM_On ) // Note: furnace and compressor manages fan with their own post-timers
     {
       if(ee.fanPostDelay[m_bRevOn])         // leave fan running to circulate air longer
         m_fanPostTimer = ee.fanPostDelay[m_bRevOn]; // P_REV == true if heating
@@ -457,6 +459,13 @@ void HVAC::service()
     if(mode == Mode_Heat && hm)   // count run time as fan time in winter
     {                             // furnace post fan is 120 seconds
       m_furnaceFan = ee.furnacePost;
+      if(m_endTemp < m_startTemp) // not heating
+        m_notif = Note_HeatError;
+    }
+    else
+    {
+      if(m_endTemp >= m_startTemp)// not cooling
+        m_notif = Note_CoolError;
     }
 
     m_bRunning = false;
@@ -1155,6 +1164,8 @@ String HVAC::settingsJson()
   js.Var("tu", ee.b.bCelcius);
   js.Var("lock", ee.b.bLock);
   js.Var("fcs", ee.b.nFcstSource);
+  js.Var("brt0", ee.brightLevel[0]);
+  js.Var("brt1", ee.brightLevel[1]);
 #endif
   js.Var("cal", ee.adj);
   js.Var("ppk", ee.ppkwh);
@@ -1255,6 +1266,8 @@ const char *cmdList[] = { "cmd",
   "sm",
   "fcs",
   "wt",
+  "brt0",
+  "brt1",
   NULL
 };
 
@@ -1625,6 +1638,12 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       break;
     case 53: // wt
       m_Sensor[0].f.f.currWeight = m_Sensor[0].f.f.Weight = constrain(val, 1, 7);
+      break;
+    case 54: // brt0
+      ee.brightLevel[0] = constrain(val, 0, 60);
+      break;
+    case 55: // brt1
+      ee.brightLevel[1] = constrain(val, 50, 255);
       break;
   }
 #endif
