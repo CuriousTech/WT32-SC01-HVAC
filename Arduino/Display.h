@@ -22,6 +22,10 @@ enum BTN
   Btn_TargetTemp,
   Btn_SetTempH,
   Btn_SetTempL,
+  Btn_History,
+  Btn_Unused1,
+  Btn_Unused2,
+  Btn_Forecast,
   Btn_Fan,
   Btn_Mode,
   Btn_HeatMode,
@@ -156,6 +160,11 @@ private:
     {Btn_SetTempH, DISPLAY_WIDTH-185, 185, 105, 43},
     {Btn_SetTempL, DISPLAY_WIDTH-185, 250, 105, 43},
 
+    {Btn_History,   15, 138, 60, 60},
+    {Btn_Unused1,   82, 138, 60, 60},
+    {Btn_Unused2,  149, 138, 60, 60},
+    {Btn_Forecast, 216, 138, 60, 60},
+
     {Btn_Fan,       15, 204, 60, 60},
     {Btn_Mode,      82, 204, 60, 60},
     {Btn_HeatMode, 149, 204, 60, 60},
@@ -173,6 +182,7 @@ public:
   uint8_t m_adjustMode = 0; // which of 4 temps to adjust with rotary encoder/buttons
   bool    m_bLink;         // link adjust mode
   uint8_t m_brightness = 100; // initial brightness
+  bool    m_bShowFC; // Show the forecast when it updates, also updates icons for clock
 };
 
 extern Display display;
