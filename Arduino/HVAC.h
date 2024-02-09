@@ -61,6 +61,8 @@ enum Notif
   Note_Sensor,
   Note_HVACFound,
   Note_Updating,
+  Note_HeatError,
+  Note_CoolError,
 };
 
 enum HeatMode
@@ -177,6 +179,8 @@ public:
   int16_t  m_localTemp;     // this device's temperature *10
   int16_t  m_localRh;
   uint16_t m_targetTemp;    // end temp for cycle
+  uint16_t m_startTemp;    // temp at start of cycle
+  uint16_t m_endTemp;    // temp at end of cycle
   uint16_t m_filterMinutes;
   uint8_t  m_notif;
   bool     m_bRemoteStream; // remote is streaming temp/rh
