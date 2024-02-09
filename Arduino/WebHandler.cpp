@@ -165,7 +165,7 @@ void startServer()
 #ifdef REMOTE // This can change any time. Just used for debug to view vars
     String s = pageR_T;
     s += "RemoteStream "; s += hvac.m_bRemoteStream; s += "<br>";
-    s += "WsConnected "; s += bWscConnected; s += "<br>";
+    s += "WscConnected "; s += bWscConnected; s += "<br>";
     IPAddress ip(ee.hostIp);
     s += "HVAC IP "; s += ip.toString(); s += "<br>";
     s += "Now: "; s += now(); s += "<br>";
@@ -255,7 +255,7 @@ void startServer()
 //  ee.hostIp[0] = 192; // force IP of HVAC if needed
 //  ee.hostIp[1] = 168;
 //  ee.hostIp[2] = 31;
-//  ee.hostIp[3] = 110;
+//  ee.hostIp[3] = 46;
 #endif
   remoteParse.setList(cmdList);
 
@@ -433,7 +433,10 @@ bool secondsServer() // called once per second
     hvac.m_notif = Note_Forecast;
     WsSend(js.Close());
   }
-
+  else if(stat == FCS_Done)
+  {
+    display.m_bShowFC = true;
+  }
 #endif // !REMOTE
   return bConn;
 }
@@ -529,10 +532,6 @@ void parseParams(AsyncWebServerRequest *request)
     else if(p->name() == "restart")
     {
       ESP.restart();
-    }
-    else if(p->name() == "led")
-    {
-      ee.brightLevel[1] = constrain(s.toInt(), 10, 255);
     }
     else
     {
@@ -903,6 +902,7 @@ static void clientEventHandler(void* handle, const char* na, int ID, void* ptr)
             FC.m_fc.loadDate = now();
             FC.m_bUpdateFcstIdle = true;
             FC.m_bFcstUpdated = true;
+            display.m_bShowFC = true;
           }
           break;
         case 10: // ping?
@@ -918,7 +918,7 @@ void startListener()
 {
   IPAddress ip(ee.hostIp);
   static char szHost[32];
-  
+
   strcpy(szHost, ip.toString().c_str());
   config.host = szHost;
   config.uri = "/ws";
