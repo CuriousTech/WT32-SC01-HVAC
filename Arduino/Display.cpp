@@ -117,7 +117,13 @@ bool Display::screen(bool bOn)
   }
   else switch(m_currPage)
   {
-    case Page_Forecast:
+    default: // from thermostat
+      m_currPage = Page_ScreenSaver;
+      goDark();
+      ss.select( random(0, SS_Count) );
+      break;
+// Old page cycle
+/*    case Page_Forecast:
       m_currPage = Page_ScreenSaver;
       goDark();
       ss.select( random(0, SS_Count) );
@@ -129,6 +135,7 @@ bool Display::screen(bool bOn)
       if(FC.forecastPage())
         m_currPage = Page_Forecast;
       break;
+*/
   }
   bOldOn = bOn;
   return true;
@@ -225,27 +232,42 @@ void Display::buttonCmd(uint8_t btn)
   switch(btn)
   {
     case Btn_SetTempH:
+      if(ee.b.bLock) break;
       m_bLink = !m_bLink;
       m_adjustMode = 0;
       updateTemps();
       break;
     case Btn_SetTempL:
+      if(ee.b.bLock) break;
       m_bLink = !m_bLink;
       m_adjustMode = 1;
       updateTemps();
       break;
 
     case Btn_Up: // Up button
+      if(ee.b.bLock) break;
       m_btnMode = 1;
       buttonRepeat();
       m_btnDelay = 7; // first repeat
       break;
     case Btn_Dn: // Down button
+      if(ee.b.bLock) break;
       m_btnMode = 2;
       buttonRepeat();
       m_btnDelay = 7;
       break;
 
+    case Btn_Forecast:
+      if(FC.forecastPage())
+        m_currPage = Page_Forecast;
+      break;
+    case Btn_Unused1:
+      break;
+    case Btn_Unused2:
+      break;
+    case Btn_History:
+      historyPage();
+      break;
     case Btn_Fan:
       if(ee.b.bLock) break;
       hvac.setFan( (hvac.getFan() == FM_On) ? FM_Auto : FM_On ); // Todo: Add 3rd icon
@@ -266,6 +288,7 @@ void Display::buttonCmd(uint8_t btn)
       hvac.setHumidifierMode( hvac.getHumidifierMode() + 1 );
       updateModes(false); // faster feedback
       break;
+
     case Btn_Note:
       if(ee.b.bLock) break;
       hvac.m_notif = Note_None;
@@ -280,8 +303,6 @@ void Display::buttonCmd(uint8_t btn)
       hvac.enableRemote();
       break;
     case Btn_InTemp: // in
-      historyPage();
-      break;
     case Btn_Rh: // rh
       if(m_displayLocal)
         m_displayLocal = 0;
@@ -289,8 +310,6 @@ void Display::buttonCmd(uint8_t btn)
         m_displayLocal = 10; // might change this
       break;
     case Btn_OutTemp:
-      if(FC.forecastPage())
-        m_currPage = Page_Forecast;
       break;
     case Btn_Lock: // lock
       if(!ee.b.bLock)
@@ -344,6 +363,13 @@ void Display::oneSec()
   {
     FC.m_bFcstUpdated = false;
     drawOutTemp();
+  }
+
+  if( m_bShowFC ) // Show FC page when update occurs
+  {
+    m_bShowFC = false;    
+    if(FC.forecastPage())
+      m_currPage = Page_Forecast;
   }
 }
 
@@ -700,6 +726,14 @@ void Display::updateNotification(bool bRef)
       nTimer = 60;
       s = "HVAC Found";
       break;
+    case Note_HeatError:
+      nTimer = 60;
+      s = "Heat Malfunction";
+      break;
+    case Note_CoolError:
+      nTimer = 60;
+      s = "Cool Malfunction";
+      break;
     case Note_Updating:
       s = "Updating Firmware";
       m_bright = 20;
@@ -759,6 +793,11 @@ void Display::refreshAll()
   drawOutTemp();
   loadImage("/up.png", m_btn[Btn_Up].x, m_btn[Btn_Up].y);
   loadImage("/dn.png", m_btn[Btn_Dn].x, m_btn[Btn_Dn].y);
+  loadImage("/weather.png", m_btn[Btn_Forecast].x, m_btn[Btn_Forecast].y);
+  loadImage("/bbtn.png", m_btn[Btn_Unused1].x, m_btn[Btn_Unused1].y);
+  loadImage("/bbtn.png", m_btn[Btn_Unused2].x, m_btn[Btn_Unused2].y);
+  loadImage("/weather.png", m_btn[Btn_Forecast].x, m_btn[Btn_Forecast].y);
+  loadImage("/history.png", m_btn[Btn_History].x, m_btn[Btn_History].y);
 }
 
 void Display::updateRSSI()
