@@ -1,5 +1,5 @@
 # WT32-SC01-HVAC
-HVAC thermostat using WT32-SC01 (not PLUS)  [OSHPark Link](https://oshpark.com/shared_projects/ljZTJh9A) $15.65  
+HVAC thermostat using WT32-SC01 (not PLUS)  OSHPark [Rev1](https://oshpark.com/shared_projects/ljZTJh9A) $15.65  [Rev2](https://oshpark.com/shared_projects/giHlVB41)
   
 This is the 3rd thermostat I've designed, only becuase new hardware makes it better, and tends to remove some limitations.  
 All sensors from [ESP-HVAC](https://github.com/CuriousTech/ESP-HVAC) and older models can be used as remote units by building as REMOTE. This model can be changed to remote with just a temp/humidity sensor on the i2c pins, plus speaker if desired, and use the USB for power.  Also view the ESP-HVAC page for operation instructions.  
