@@ -2,14 +2,11 @@
 #include "Display.h"
 #include "TimeLib.h"
 #include "eeMem.h"
+#include "Media.h"
 #include <TFT_eSPI.h> // TFT_espi library
 extern TFT_eSPI tft;
 
 // OWM Format: https://openweathermap.org/forecast5
-
-extern void WsSend(String s); // for debug, open chrome console
-
-#define LOCAL // Use if you have a local copy of the page
 
 // forecast retrieval
 
@@ -177,7 +174,6 @@ void Forecast::_onDisconnect(AsyncClient* client)
       processOWM(); // json type
       break;
   }
-
   m_fc.Data[m_fcIdx].temp = -1000; // mark past last as invalid
   delete m_pBuffer;
 }
@@ -428,6 +424,21 @@ void Forecast::callback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psVa
   }
 }
 
+// Use this for space saving
+void Forecast::JsonParse(char *p, int8_t event, const char **jsonList, void (*pcb)(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue))
+{
+  m_pCallback = pcb;
+  processJson(p, event, jsonList);
+  m_pCallback = NULL;
+  m_pJsonList = NULL;
+}
+
+// Modify the list while parsing
+void Forecast::setList(const char **jsonList)
+{
+  m_pJsonList = jsonList;
+}
+
 void Forecast::processJson(char *p, int8_t event, const char **jsonList)
 {
   char *pPair[2]; // param:data pair
@@ -496,13 +507,19 @@ void Forecast::processJson(char *p, int8_t event, const char **jsonList)
 
     if(pPair[0][0])
     {
+      if(m_pJsonList) // externally modified (remote mode)
+        jsonList = m_pJsonList;
+
       for(int i = 0; jsonList[i]; i++)
       {
         if(!strcmp(pPair[0], jsonList[i]))
         {
           int32_t n = atol(pPair[1]);
           if(!strcmp(pPair[1], "true")) n = 1; // bool case
-          callback(event, i, n, pPair[1]);
+          if(m_pCallback)
+            m_pCallback(event, i, n, pPair[1]);
+          else
+            callback(event, i, n, pPair[1]);
           break;
         }
       }
@@ -594,8 +611,8 @@ static const iconLookup ic[] = {
 String Forecast::makeName(uint8_t icon, uint8_t h)
 {
   static String sName;
-  sName = "/";
-  if(icon < 10) sName += "0";
+
+  if(icon < 10) sName = "0";
   sName += icon;
   if(icon == 3 || icon == 4 ||icon == 5 || icon == 13) // don't have 'n' for these
     sName += 'd';
@@ -652,7 +669,7 @@ bool Forecast::forecastPage()
     return false;
 
   display.goDark();
-  display.loadImage("/bgForecast.png", 0, 0); // load the background image
+  media.loadImage("bgForecast.png", 0, 0); // load the background image
 
   // temp scale
   tft.setFreeFont(&FreeSans9pt7b);
@@ -904,10 +921,10 @@ void Forecast::drawIcon(uint8_t d, uint8_t h, uint16_t x)
   {
     x -= 80;
     int16_t w = min(DISPLAY_WIDTH - 10 - x, 80);
-    display.loadImage(sIcon, x, DISPLAY_HEIGHT - 92, 0, 0, w, 80);
+    media.loadImage(sIcon, x, DISPLAY_HEIGHT - 92, 0, 0, w, 80);
   }
   else if(x < 90) // left side partial image
-    display.loadImage(sIcon, 10, DISPLAY_HEIGHT - 92, 90 - x, 0, x - 10, 80);
+    media.loadImage(sIcon, 10, DISPLAY_HEIGHT - 92, 90 - x, 0, x - 10, 80);
   else
-    display.loadImage(sIcon, x - 80, DISPLAY_HEIGHT - 92);
+    media.loadImage(sIcon, x - 80, DISPLAY_HEIGHT - 92);
 }
