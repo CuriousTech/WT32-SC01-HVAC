@@ -1,32 +1,35 @@
 #include "eeMem.h"
-#include <EEPROM.h>
-
-eeMem::eeMem()
-{
-}
+#include "Media.h"
 
 bool eeMem::init()
 {
-  EEPROM.begin(EESIZE);
+  if(!INTERNAL_FS.begin(true))
+  {
+    return false;
+  }
 
   uint8_t data[EESIZE];
   uint16_t *pwTemp = (uint16_t *)data;
 
-#ifdef ESP32
-  EEPROM.readBytes(0, &data, EESIZE);
-#else
-  int addr = 0;
-  for(int i = 0; i < EESIZE; i++, addr++)
-    data[i] = EEPROM.read( addr );
-#endif
+  File F = INTERNAL_FS.open("/eemem.bin", "r");
+  if(F)
+  {
+    F.read((byte*)data, EESIZE);
+    F.close();
+  }
+
   if(pwTemp[0] != EESIZE)
+  {
     return true; // revert to defaults if struct size changes
+  }
 
   uint16_t sum = pwTemp[1];
   pwTemp[1] = 0;
   pwTemp[1] = Fletcher16(data, EESIZE );
   if(pwTemp[1] != sum)
+  {
     return true; // revert to defaults if sum fails
+  }
   memcpy(this + offsetof(eeMem, size), data, EESIZE );
   return true;
 }
@@ -35,22 +38,23 @@ bool eeMem::update() // write the settings if changed
 {
   if(!check()) // make sure sum is correct, and if save needed
     return false;
-#ifdef ESP32
-  EEPROM.writeBytes(0, this + offsetof(eeMem, size), EESIZE);
-#else
-  uint16_t addr = 0;
-  uint8_t *pData = (uint8_t *)this + offsetof(eeMem, size);
-  for(int i = 0; i < EESIZE; i++, addr++)
-    EEPROM.write(addr, pData[i] );
-#endif
-  return EEPROM.commit();
+
+  File F;
+
+  if(F = INTERNAL_FS.open("/eemem.bim", "w"))
+  {
+    F.write((byte*) this + offsetof(eeMem, size), EESIZE);
+    F.close();
+    return true;
+  }
+  return false;
 }
 
 bool eeMem::check()
 {
   uint16_t old_sum = ee.sum;
   ee.sum = 0;
-  ee.sum = Fletcher16((uint8_t*)this + offsetof(eeMem, size), EESIZE);
+  ee.sum = getSum();
   return (old_sum == ee.sum) ? false:true;
 }
 
