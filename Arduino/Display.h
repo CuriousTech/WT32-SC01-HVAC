@@ -2,7 +2,6 @@
 #define DISPLAY_H
 
 #include <Arduino.h>
-#include <PNGdec.h>  // From Library Manager
 #include "Forecast.h"
 
 // from 5-6-5 to 16 bit value (max 31, 63, 31)
@@ -23,8 +22,8 @@ enum BTN
   Btn_SetTempH,
   Btn_SetTempL,
   Btn_History,
-  Btn_Unused1,
-  Btn_Unused2,
+  Btn_Override,
+  Btn_Unused,
   Btn_Forecast,
   Btn_Fan,
   Btn_Mode,
@@ -91,16 +90,6 @@ struct gPoint
   gflags bits;
 };
 
-struct ImageCtrl
-{
-  int16_t x;
-  int16_t y;
-  int16_t srcX;
-  int16_t srcY;
-  int16_t w;
-  int16_t h;
-};
-
 class Display
 {
 public:
@@ -112,8 +101,6 @@ public:
   bool screen(bool bOn);
   void service(void);
   void goDark(void);
-  void loadImage(String Name, uint16_t x, uint16_t y);
-  void loadImage(String Name, uint16_t x, uint16_t y, uint16_t srcX, uint16_t srcY, uint16_t w, uint16_t h);
   void updateTemps(void);
   void updateNotification(bool bRef);
   bool getGrapthPoints(gPoint *pt, int n);
@@ -126,6 +113,7 @@ private:
   void updateModes(bool bForce); // update any displayed settings
   void buttonRepeat(void);
   void refreshAll(void);
+  void loadBtnImage(const char *pszName, uint8_t btn);
   void updateRSSI(void);
   void drawTime(void);
   void drawOutTemp(void);
@@ -161,8 +149,8 @@ private:
     {Btn_SetTempL, DISPLAY_WIDTH-185, 250, 105, 43},
 
     {Btn_History,   15, 138, 60, 60},
-    {Btn_Unused1,   82, 138, 60, 60},
-    {Btn_Unused2,  149, 138, 60, 60},
+    {Btn_Override,  82, 138, 60, 60},
+    {Btn_Unused,   149, 138, 60, 60},
     {Btn_Forecast, 216, 138, 60, 60},
 
     {Btn_Fan,       15, 204, 60, 60},
