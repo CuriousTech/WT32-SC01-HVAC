@@ -3,14 +3,15 @@
 #include <ESPAsyncWebServer.h> // https://github.com/me-no-dev/ESPAsyncWebServer
 #include "jsonstring.h"
 #include <TimeLib.h>
-#include <SPIFFS.h>
-#define FileSys SPIFFS   // SPIFFS is needed for AsyncWebServer
 #include "eeMem.h"
 #include "screensavers.h"
 #include "music.h"
 Music mus;
+#include "Media.h"
 #include <TFT_eSPI.h> // TFT_espi library
 TFT_eSPI tft = TFT_eSPI();
+static_assert(USER_SETUP_ID==201, "User setup incorrect in TFT_eSPI");
+
 #include "digitalFont.h"
 #include "forecast.h"
 
@@ -23,58 +24,6 @@ extern HVAC hvac;
 extern void WsSend(String s);
 
 ScreenSavers ss;
-PNG png;
-
-void pngDraw(PNGDRAW *pDraw)
-{
-  ImageCtrl *pPos = (ImageCtrl *)pDraw->pUser;
-
-  if(pPos->srcY)
-  {
-    if(pDraw->y < pPos->srcY) // skip lines above
-      return;
-    if(pPos->srcY + pPos->h >= pDraw->y) // skip lines below
-      return;
-  }
-
-  // Uses shared bufffer (1024 bytes / 512 pixels max)
-  uint16_t *pBuf = (uint16_t *)ss.m_buffer;
-  png.getLineAsRGB565(pDraw, pBuf, PNG_RGB565_BIG_ENDIAN, 0xffffffff);
-
-  uint16_t w = pDraw->iWidth;
-  if(pPos->w) w = pPos->w; // crop to desired width (todo: should maybe do some checking)
-
-  uint16_t y = pPos->y + pDraw->y;
-  if(pPos->srcY) // offset lib incremented y pos to srcY offset
-    y -= pPos->srcY;
-
-  tft.pushImage(pPos->x, y, w, 1, pBuf + pPos->srcX);
-}
-
-File pngfile;
-
-void * pngOpen(const char *filename, int32_t *size) {
-  pngfile = FileSys.open(filename, "r");
-  *size = pngfile.size();
-  return &pngfile;
-}
-
-void pngClose(void *handle) {
-  File pngfile = *((File*)handle);
-  if (pngfile) pngfile.close();
-}
-
-int32_t pngRead(PNGFILE *page, uint8_t *buffer, int32_t length) {
-  if (!pngfile) return 0;
-  page = page; // Avoid warning
-  return pngfile.read(buffer, length);
-}
-
-int32_t pngSeek(PNGFILE *page, int32_t position) {
-  if (!pngfile) return 0;
-  page = page; // Avoid warning
-  return pngfile.seek(position);
-}
 
 void Display::init(void)
 {
@@ -87,8 +36,6 @@ void Display::init(void)
   tft.init();                         // TFT_eSPI
   tft.setRotation(1);                 // set desired rotation
   tft.setTextDatum(TL_DATUM);
-
-  FileSys.begin();
   mus.init();
   FC.init( (ee.tz+hvac.m_DST)*3600 );
   screen(true);
@@ -112,7 +59,7 @@ bool Display::screen(bool bOn)
       return false; // no change occurred
     m_currPage = Page_Thermostat;
     goDark();
-    loadImage("/bg.png", 0, 0);
+    media.loadImage("bg.png", 0, 0);
     refreshAll();
   }
   else switch(m_currPage)
@@ -185,9 +132,7 @@ void Display::service(void)
         {
           if (x >= m_btn[i].x && x <= m_btn[i].x + m_btn[i].w && y >= m_btn[i].y && y <= m_btn[i].y + m_btn[i].h)
           {
-//            Serial.print("btn ");
             currBtn = i;
-//            Serial.println(currBtn);
             buttonCmd(currBtn);
           }
         }
@@ -232,38 +177,27 @@ void Display::buttonCmd(uint8_t btn)
   switch(btn)
   {
     case Btn_SetTempH:
-      if(ee.b.bLock) break;
-      m_bLink = !m_bLink;
-      m_adjustMode = 0;
-      updateTemps();
-      break;
     case Btn_SetTempL:
       if(ee.b.bLock) break;
       m_bLink = !m_bLink;
-      m_adjustMode = 1;
+      m_adjustMode = btn - Btn_SetTempH;
       updateTemps();
       break;
 
-    case Btn_Up: // Up button
+    case Btn_Up: // Up button mode = 1
+    case Btn_Dn: // Down button mode = 2
       if(ee.b.bLock) break;
-      m_btnMode = 1;
+      m_btnMode = btn - Btn_Up + 1;
       buttonRepeat();
       m_btnDelay = 7; // first repeat
-      break;
-    case Btn_Dn: // Down button
-      if(ee.b.bLock) break;
-      m_btnMode = 2;
-      buttonRepeat();
-      m_btnDelay = 7;
-      break;
 
     case Btn_Forecast:
       if(FC.forecastPage())
         m_currPage = Page_Forecast;
       break;
-    case Btn_Unused1:
-      break;
-    case Btn_Unused2:
+    case Btn_Override:
+      if(ee.b.bLock) break;
+      hvac.override(true);
       break;
     case Btn_History:
       historyPage();
@@ -308,8 +242,6 @@ void Display::buttonCmd(uint8_t btn)
         m_displayLocal = 0;
       else
         m_displayLocal = 10; // might change this
-      break;
-    case Btn_OutTemp:
       break;
     case Btn_Lock: // lock
       if(!ee.b.bLock)
@@ -425,7 +357,7 @@ void Display::updateTemps(void)
   if(last[2] != rh)
   {
     tft.drawFloat((float)(last[2] = rh)/10, 1, m_btn[Btn_Rh].x, m_btn[Btn_Rh].y );
-    tft.setFreeFont(&FreeSans12pt7b);//&digitaldreamFatNarrow_14ptFont);
+    tft.setFreeFont(&FreeSans12pt7b);
     tft.drawString("%", m_btn[Btn_Rh].x + 101, m_btn[Btn_Rh].y );
   }
 
@@ -480,13 +412,14 @@ void Display::updateTemps(void)
     int8_t am = m_adjustMode;
     tft.drawRect(m_btn[Btn_SetTempH+am].x, m_btn[Btn_SetTempH+am].y, m_btn[Btn_SetTempH+am].w, m_btn[Btn_SetTempH+am].h, rgb16(0,31,0));
     tft.drawRect(m_btn[Btn_SetTempH+(am^1)].x, m_btn[Btn_SetTempH+(am^1)].y, m_btn[Btn_SetTempH+(am^1)].w, m_btn[Btn_SetTempH+(am^1)].h, (m_bLink) ? rgb16(0,31,0) : TFT_BLACK);
- 
+
   }
 }
 
 void Display::updateModes(bool bForce) // update any displayed settings
 {
   static bool bFan = true; // set these to something other than default to trigger them all
+  static bool bOverride = true;
   static int8_t FanMode = 4;
   static uint8_t nMode = 10;
   static uint8_t nState = 3;
@@ -512,16 +445,16 @@ void Display::updateModes(bool bForce) // update any displayed settings
         idx = 2; // on and running
     }
 
-    const char *pFan[] = {"/fanOff.png", "/fanOn.png", "/fanAutoOn.png",};
-    loadImage(pFan[idx], m_btn[Btn_Fan].x, m_btn[Btn_Fan].y);
+    const char *pFan[] = {"fanOff.png", "fanOn.png", "fanAutoOn.png"};
+    loadBtnImage(pFan[idx], Btn_Fan);
   }
 
   if(nMode != hvac.getSetMode() || nState != hvac.getState())
   {
     nMode = hvac.getSetMode();
 
-    const char *szModes[] = {"/off.png", "/cool.png", "/heat.png", "/auto.png", "/auto.png"};
-    loadImage(szModes[nMode], m_btn[Btn_Mode].x, m_btn[Btn_Mode].y);
+    const char *szModes[] = {"off.png", "cool.png", "heat.png", "auto.png", "auto.png"};
+    loadBtnImage(szModes[nMode], Btn_Mode);
 
     m_bLink = true;
     m_adjustMode = 0;
@@ -529,33 +462,44 @@ void Display::updateModes(bool bForce) // update any displayed settings
 
     nState = hvac.getState();
     if(nState) // draw the ON indicator on the button
-      loadImage("/btnled.png", m_btn[Btn_Mode].x + 1, m_btn[Btn_Mode].y);
-
+      loadBtnImage("btnled.png", Btn_Mode);
   }
 
   if(heatMode != hvac.getHeatMode())
   {
     heatMode = hvac.getHeatMode();
-    const char *szHeatModes[] = {"/hp.png", "/ng.png", "/hauto.png"};
-    loadImage(szHeatModes[heatMode], m_btn[Btn_HeatMode].x, m_btn[Btn_HeatMode].y);
+    const char *szHeatModes[] = {"hp.png", "ng.png", "hauto.png"};
+    loadBtnImage(szHeatModes[heatMode], Btn_HeatMode);
   }
 
   if(humidMode != (hvac.getHumidifierMode() + hvac.getHumidifierRunning()) )
   {
     humidMode = (hvac.getHumidifierMode() + hvac.getHumidifierRunning());
 
-    loadImage("/humid.png", m_btn[Btn_Humid].x, m_btn[Btn_Humid].y);
+    loadBtnImage("humid.png", Btn_Humid);
 
-    const char *szHmode[] = {"", "F", "R", "1", "2", ""};
+    const char szHmode[][2] = {"", "F", "R", "1", "2", ""};
     tft.setFreeFont(&FreeSans9pt7b);
     tft.setTextColor( rgb16(0, 63, 31) );
     tft.drawString((char*)szHmode[hvac.getHumidifierMode()], m_btn[Btn_Humid].x + 27, m_btn[Btn_Humid].y + 28);
 
     if(hvac.getHumidifierRunning())
-      loadImage("/btnled.png", m_btn[Btn_Humid].x + 1, m_btn[Btn_Humid].y);
+      loadBtnImage("btnled.png", Btn_Humid);
   }
 
-  loadImage( ( (ee.b.bLock) ? "/lock.png" : "/unlock.png" ), m_btn[Btn_Lock].x, m_btn[Btn_Lock].y);
+  loadBtnImage( ( (ee.b.bLock) ? "lock.png" : "unlock.png" ), Btn_Lock);
+
+  loadBtnImage( "over.png", Btn_Override);
+  if((hvac.m_overrideTimer ? true:false) != bOverride)
+  {
+    loadBtnImage("btnled.png", Btn_Override);
+    bOverride = (hvac.m_overrideTimer ? true:false);
+  }
+}
+
+void Display::loadBtnImage(const char *pszName, uint8_t btn)
+{
+  media.loadImage(pszName, m_btn[btn].x, m_btn[btn].y);  
 }
 
 void Display::buttonRepeat()
@@ -577,42 +521,6 @@ void Display::buttonRepeat()
     hvac.setTemp(m, t, hilo^1);
   }
   updateTemps();
-}
-
-void Display::loadImage(String Name, uint16_t x, uint16_t y)
-{
-  loadImage(Name, x, y, 0, 0, 0, 0);
-}
-
-void Display::loadImage(String Name, uint16_t x, uint16_t y, uint16_t srcX, uint16_t srcY, uint16_t w, uint16_t h)
-{
-  static ImageCtrl pos;
-  pos.x = x;
-  pos.y = y;
-  pos.srcX = srcX;
-  pos.srcY = srcY;
-  pos.w = w;
-  pos.h = h;
-
-  int16_t rc = png.open(Name.c_str(), pngOpen, pngClose, pngRead, pngSeek, pngDraw);
-
-  if(rc == PNG_SUCCESS)
-  {
-    tft.startWrite();
-//    Serial.printf("image specs: (%d x %d), %d bpp, pixel type: %d\r\n", png.getWidth(), png.getHeight(), png.getBpp(), png.getPixelType());
-//    uint32_t dt = millis();
-    rc = png.decode((void*)&pos, 0);
-    png.close();
-    tft.endWrite();
-    // How long did rendering take...
-//    Serial.print(millis()-dt); Serial.println("ms");
-  }
-  else
-  {
-    Serial.print(Name);
-    Serial.print(" loadImage error: ");
-    Serial.println(rc);
-  }
 }
 
 // time and dow on main page
@@ -702,7 +610,11 @@ void Display::updateNotification(bool bRef)
       nTimer = 30;
       break;
     case Note_Connected:
+#ifdef REMOTE
+      s = "Searching for HVAC";
+#else
       s = "Connected";
+#endif
       nTimer = 30;
       break;
     case Note_HVAC_connected:
@@ -791,13 +703,11 @@ void Display::refreshAll()
   updateTemps();
   updateModes(true);
   drawOutTemp();
-  loadImage("/up.png", m_btn[Btn_Up].x, m_btn[Btn_Up].y);
-  loadImage("/dn.png", m_btn[Btn_Dn].x, m_btn[Btn_Dn].y);
-  loadImage("/weather.png", m_btn[Btn_Forecast].x, m_btn[Btn_Forecast].y);
-  loadImage("/bbtn.png", m_btn[Btn_Unused1].x, m_btn[Btn_Unused1].y);
-  loadImage("/bbtn.png", m_btn[Btn_Unused2].x, m_btn[Btn_Unused2].y);
-  loadImage("/weather.png", m_btn[Btn_Forecast].x, m_btn[Btn_Forecast].y);
-  loadImage("/history.png", m_btn[Btn_History].x, m_btn[Btn_History].y);
+  loadBtnImage("up.png", Btn_Up);
+  loadBtnImage("dn.png", Btn_Dn);
+  loadBtnImage("bbtn.png", Btn_Unused);
+  loadBtnImage("weather.png", Btn_Forecast);
+  loadBtnImage("history.png", Btn_History);
 }
 
 void Display::updateRSSI()
@@ -885,7 +795,7 @@ void Display::historyPage()
 {
   m_currPage = Page_Graph; // chart thing
   goDark();
-  loadImage("/bgBlank.png", 0, 0);
+  media.loadImage("bgBlank.png", 0, 0);
   
   int minTh, maxTh, maxTemp;
 
