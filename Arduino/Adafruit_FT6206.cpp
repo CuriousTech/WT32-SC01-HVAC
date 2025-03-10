@@ -212,7 +212,7 @@ uint8_t Adafruit_FT6206::readRegister8(uint8_t reg) {
   Wire.write((byte)reg);
   Wire.endTransmission();
 
-  Wire.requestFrom((byte)FT62XX_ADDR, (byte)1);
+  Wire.requestFrom((byte)FT62XX_ADDR, (uint8_t)1, (uint8_t)1 );
   x = Wire.read();
 
 #ifdef I2C_DEBUG
@@ -230,7 +230,7 @@ void Adafruit_FT6206::writeRegister8(uint8_t reg, uint8_t val) {
   Wire.beginTransmission(FT62XX_ADDR);
   Wire.write((byte)reg);
   Wire.write((byte)val);
-  Wire.endTransmission();
+  Wire.endTransmission(true);
 }
 
 /**************************************************************************/
