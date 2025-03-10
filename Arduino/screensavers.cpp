@@ -3,6 +3,7 @@
 #include "digitalFont.h"
 #include "display.h"
 #include "forecast.h"
+#include "Media.h"
 
 extern Forecast FC;
 
@@ -42,7 +43,7 @@ void ScreenSavers::Clock(bool bInit)
 {
   if(bInit)
   {
-    display.loadImage("/bgClock.png", 0, 0);
+    media.loadImage("bgClock.png", 0, 0);
     FC.drawIcon(0, hour(), DISPLAY_WIDTH - 50); // 0 = current day, current hour, right edge pos
   }
 
