@@ -15,10 +15,10 @@
 #include "jsonstring.h"
 #include "music.h"
 extern Music mus;
-#include <SPIFFS.h>
+#include "Media.h"
 
 #ifdef REMOTE
-#include <ESPAsyncWebServer.h> // https://github.com/me-no-dev/ESPAsyncWebServer
+#include <ESPAsyncWebServer.h> // https://github.com/ESP32Async/ESPAsyncWebServer
 #include "WebHandler.h"
 
 extern void WscSend(String s); // remote WebSocket
@@ -272,6 +272,7 @@ void HVAC::service()
 
   if(!bValidData) // hasn't gotten data from host yet
     return;
+
   static uint16_t old[4];
   if(m_remoteTimer) // let user change values for some time before sending
   {
@@ -1172,6 +1173,9 @@ String HVAC::settingsJson()
   js.Var("ccf", ee.ccf);
   js.Var("cfm", ee.cfm);
   js.Var("dl",  ee.diffLimit);
+  js.Var("diskfree",  media.freeSpace() );
+  js.Var("sdavail", 0 );
+  js.Var("currfs", "SPIFFS");
   return js.Close();
 }
 
@@ -1205,7 +1209,6 @@ String HVAC::getPushData()
   return js.Close();
 }
 
-#ifndef REMOTE
 const char *cmdList[] = { "cmd",
   "key",
   "data",
@@ -1268,6 +1271,9 @@ const char *cmdList[] = { "cmd",
   "wt",
   "brt0",
   "brt1",
+  "cd",
+  "delf",
+  "createdir", // 59
   NULL
 };
 
@@ -1283,6 +1289,7 @@ int HVAC::CmdIdx(String s )
   return iCmd - 5;
 }
 
+#ifndef REMOTE
 // Sort for sensor array when sensor added
 int snsComp(const void *a, const void*b)
 {
@@ -1302,18 +1309,18 @@ int snsComp(const void *a, const void*b)
 // WebSocket or GET/POST set params as "fanmode=1" or "fanmode":1
 void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
 {
-#ifndef REMOTE
   static uint8_t snsIdx; // current sensor in use
 
   int c = CmdIdx( sCmd );
   if(ee.b.bLock && c!= 51)
     return;
-  
+
   int i;
   uint8_t oldFlags;
 
   switch( c )
   {
+#ifndef REMOTE
     case 0:     // fanmode
       setFan( val );
       break;
@@ -1364,16 +1371,7 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       ee.eHeatThresh = constrain(val, (ee.b.bCelcius ? 2:5), (ee.b.bCelcius ? 28:50) ); // Limit 5 to 50 degrees F
       break;
     case 15:    // override
-      if(val == 0)    // cancel
-      {
-        m_ovrTemp = 0;
-        m_overrideTimer = 0;
-      }
-      else
-      {
-        m_ovrTemp = constrain(val, (ee.b.bCelcius ? -50:-99),(ee.b.bCelcius ? 50:99) ); // Limit to +/-9.9 degrees F
-        m_overrideTimer = ee.overrideTime;
-      }
+      override(val);
       m_bRecheck = true;
       break;
     case 16:    // overridetime
@@ -1515,13 +1513,6 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
         }
         else if(*p != 'F' && *p != 'C')
         {
-          String s = "";
-          s += (char *)&m_Sensor[snsIdx].ID;
-          s += " has no temp unit: ";
-          s += psValue;
-          jsonString js("print");
-          js.Var("text", s);
-          WsSend(js.Close());
           deactivateSensor(snsIdx);
           break;
         }
@@ -1645,6 +1636,35 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
     case 55: // brt1
       ee.brightLevel[1] = constrain(val, 50, 255);
       break;
+#endif
+    case 56: // cd
+      media.setPath(psValue);
+      break;
+    case 57: // delf
+      media.deleteFile(psValue);
+      WsSend(settingsJson()); // update disk free
+      break;
+    case 58: // createdir
+      media.createDir(psValue);
+      WsSend(settingsJson()); // update disk free
+      break;
+  }
+}
+
+void HVAC::override(int val)
+{
+#ifdef REMOTE
+  sendCmd("over", ee.overrideTime);
+#else
+  if(val == 0)
+  {
+    m_ovrTemp = 0;
+    m_overrideTimer = 0;
+  }
+  else
+  {
+    m_ovrTemp = constrain(val, (ee.b.bCelcius ? -50:-99),(ee.b.bCelcius ? 50:99) ); // Limit to +/-9.9 degrees F
+    m_overrideTimer = ee.overrideTime;
   }
 #endif
 }
@@ -1766,11 +1786,12 @@ void HVAC::monthTotal(int m, int dys)
 
 void HVAC::loadStats()
 {
+#ifndef REMOTE
   String sFile = "/daystats";
   sFile += year();
   sFile += ".dat";
-  
-  File F = SPIFFS.open(sFile, "r");
+
+  File F = INTERNAL_FS.open(sFile, "r");
   if(F)
   {
     F.read((byte*) &m_SecsDay, sizeof(m_SecsDay));
@@ -1779,13 +1800,14 @@ void HVAC::loadStats()
   }
   m_daySum = ee.Fletcher16( (uint8_t*)&m_SecsDay, sizeof(m_SecsDay) );
 
-  F = SPIFFS.open("/monthstats.dat", "r");
+  F = INTERNAL_FS.open("/monthstats.dat", "r");
   if(F)
   {
     F.read((byte*) &m_SecsMon, sizeof(m_SecsMon));
     F.close();
   }
   m_monSum = ee.Fletcher16( (uint8_t*)&m_SecsMon, sizeof(m_SecsMon) );
+#endif
 }
 
 void HVAC::saveStats()
@@ -1803,7 +1825,7 @@ void HVAC::saveStats()
   if(sum != m_daySum)
   {
     m_daySum = sum;
-    File F = SPIFFS.open(sFile, "w");
+    File F = INTERNAL_FS.open(sFile, "w");
     F.write((byte*) &m_SecsDay, sizeof(m_SecsDay));
     F.close();
   }
@@ -1812,7 +1834,7 @@ void HVAC::saveStats()
   if(sum != m_monSum)
   {
     m_monSum = sum;
-    File F = SPIFFS.open("/monthstats.dat", "w");
+    File F = INTERNAL_FS.open("/monthstats.dat", "w");
     F.write((byte*) &m_SecsMon, sizeof(m_SecsMon));
     F.close();
   }
