@@ -11,6 +11,7 @@ const int melody_dingdong[] = {
   NOTE_B4, 8, NOTE_G4, 4
 };
 
+/*
 const int melody_pacman[] = {
   // Pacman
   // Score available at https://musescore.com/user/85429/scores/107109
@@ -165,6 +166,7 @@ int melody_startrek[] = {
   NOTE_D5, 2,
   
 };
+*/
 
 void Music::init()
 {
@@ -214,6 +216,7 @@ bool Music::play(int song)
   int notes;
   const int *pSong;
 
+/*
   switch(song)
   {
     case 0:
@@ -272,6 +275,7 @@ bool Music::play(int song)
     // we only play the note for 90% of the duration, leaving 10% as a pause
     add(pSong[thisNote], noteDuration * 0.9);
   }
+  */
   return true;
 }
 
