@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <head>
@@ -17,7 +17,7 @@ var myToken=localStorage.getItem('myStoredText1')
 function startEvents()
 {
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.31.125/ws")
+//ws=new WebSocket("ws://192.168.31.24/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 
@@ -233,7 +233,7 @@ function t2s(v)
 <td id="fanCell"><div id="fan">FAN OFF</div></td>
 <td align="right"><input type="button" value="AUTO" name="fAuto" onClick="{setfan(0)}"></td>
 <td width="40"><input type="button" value=" ON " name="fOn" onClick="{setfan(1)}"></td>
-<td width=300><input type="button" value="CYCLE" name="fCyc" onClick="{setMode(4)}"> &nbsp; <input type="submit" value="SETTINGS" onClick="window.location='/settings';"></td>
+<td width=300><input type="button" value="CYCLE" name="fCyc" onClick="{setMode(4)}"> &nbsp; <input type="submit" value="SETTINGS" onClick="window.location='/settings.html';"></td>
 </tr>
 <tr>
 <td id="runCell"><div id="run">Cooling</div></td>
@@ -243,7 +243,7 @@ function t2s(v)
 </td>
 </tr>
 <tr>
-<td>&nbsp;</td><td></td><td></td><td></td>
+<td></td><td></td><td colspan="2" align="right"><input type="submit" value="FILE MANAGER" onClick="window.location='/fm.html';"> &nbsp; </td>
 </tr>
 <tr>
 <td>COOL HI</td><td><input type=text size=3 id="coolh" onChange="{setVars()}"></td><td><input type="button" value="+1" onClick="{incCool(1)}"></td><td></td>
