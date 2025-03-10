@@ -38,7 +38,7 @@ class ScreenSavers
 {
 #define LINES 50
 #define BALLS 8
-#define BUFFER_SIZE 1024 // Caution: Also used by image loader (512 pixel width max)
+#define BUFFER_SIZE 1024
 
 static_assert(sizeof(Ball) * BALLS < BUFFER_SIZE, "m_buffer size too small");
 static_assert(sizeof(Line) * LINES < BUFFER_SIZE, "m_buffer size too small");
