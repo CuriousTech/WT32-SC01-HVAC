@@ -45,8 +45,10 @@ public:
   Forecast(void);
   void init(int16_t tzOff);
 
+  void JsonParse(char *p, int8_t event, const char **jsonList, void (*pcb)(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue));
   void start(IPAddress serverIP, uint16_t port, bool bCelcius, int8_t type);
   void start(char *pCityID, bool bCelcius); // Openweathermmap start
+  void setList(const char **jsonList);
   int checkStatus();
   bool getCurrentIndex(int8_t& fcOff, int8_t& fcCnt, uint32_t& tm); // index into stored data at current timeframme
   bool forecastPage(void);
@@ -64,10 +66,12 @@ private:
   void processJson(char *p, int8_t event, const char **jsonList);
   int makeroom(uint32_t newTm);
   char *skipwhite(char *p);
+  void (*m_pCallback)(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue);
   void callback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue);
   String makeName(uint8_t icon, uint8_t h);
   int tween(int16_t t1, int16_t t2, int m, int r);
 
+  const char **m_pJsonList = NULL;
   IPAddress m_serverIP;
   AsyncClient m_ac;
   char m_cityID[8];
