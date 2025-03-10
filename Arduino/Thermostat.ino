@@ -22,10 +22,11 @@ SOFTWARE.
 */
 
 // Build with Arduino IDE 1.8.57.0
-//  ESP32: (2.0.13) ESP32 Dev Module, CPU Freq 80MHz (for power reduction), QIO, Default 4MB with spiffs
+//  ESP32: (2.0.14) ESP32 Dev Module, CPU Freq 80MHz (for power reduction), QIO, Default 4MB with spiffs (ESP32 partitions SPIFFS easiest)
+//  In TFT_eSPI/User_Setup_Select.h use #include <User_Setups/Setup201_WT32_SC01.h>
 // For remote unit, uncomment #define REMOTE in HVAC.h
 
-#include <ESPAsyncWebServer.h> // https://github.com/me-no-dev/ESPAsyncWebServer
+#include <ESPAsyncWebServer.h> // https://github.com/ESP32Async/ESPAsyncWebServer
 #include <TimeLib.h> // http://www.pjrc.com/teensy/td_libs_Time.html
 #include <UdpTime.h> // https://github.com/CuriousTech/ESP07_WiFiGarageDoor/tree/master/libraries/UdpTime
 #include "HVAC.h"
@@ -34,6 +35,7 @@ SOFTWARE.
 #include <Wire.h>
 #include "eeMem.h"
 #include "RunningMedian.h"
+#include "Media.h"
 
 // Uncomment only one of these
 //#include <DHT.h>  // http://www.github.com/markruys/arduino-DHT
@@ -50,6 +52,7 @@ Display display;
 eeMem ee;
 
 HVAC hvac;
+Media media;
 
 RunningMedian<int16_t,25> tempMedian; //median of 25 samples
 
@@ -76,11 +79,12 @@ extern void WsSend(String s);
 
 void setup()
 {
-  pinMode(AMPWR, OUTPUT);
-  digitalWrite(AMPWR, HIGH);
   Serial.begin(115200);  // Just for debug
   Serial.println("starting");
+
   ee.init();
+  pinMode(AMPWR, OUTPUT);
+  digitalWrite(AMPWR, HIGH);
   display.init();
   hvac.init();
   startServer();
@@ -178,7 +182,9 @@ void loop()
       float temp;
       float rh;
       if(digitalRead(AMPWR) == LOW)
+      {
         digitalWrite(AMPWR, HIGH); // Power the AM2320
+      }
       else if(am.measure(temp, rh))
       {
         if(!ee.b.bCelcius)
@@ -213,6 +219,7 @@ void loop()
         hour_save = hour();
         if(hour_save == 2)
           uTime.start(); // update time daily at DST change
+#ifndef REMOTE
         if(hour_save == 0 && year() > 2020)
         {
           if(lastDay != -1)
@@ -234,6 +241,7 @@ void loop()
         ee.update();
         if((hour_save & 1) == 0) // every other hour
           hvac.saveStats();
+#endif
       }
     }
   }
