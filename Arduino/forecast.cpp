@@ -3,6 +3,7 @@
 #include "TimeLib.h"
 #include "eeMem.h"
 #include "Media.h"
+
 #include <TFT_eSPI.h> // TFT_espi library
 extern TFT_eSPI tft;
 
@@ -16,7 +17,7 @@ Forecast::Forecast()
   m_ac.onDisconnect([](void* obj, AsyncClient* c) { (static_cast<Forecast*>(obj))->_onDisconnect(c); }, this);
   m_ac.onData([](void* obj, AsyncClient* c, void* data, size_t len) { (static_cast<Forecast*>(obj))->_onData(c, static_cast<char*>(data), len); }, this);
 
-  for(int i = 0; i < FC_CNT; i++)
+  for(int i = 0; i < FC_CNT + 2; i++)
    m_fc.Data[i].temp = -1000;
   m_fc.Date = 0;
 }
@@ -31,6 +32,7 @@ void Forecast::start(IPAddress serverIP, uint16_t port, bool bCelcius, int8_t ty
 {
   if(m_ac.connected() || m_ac.connecting())
     return;
+
   m_status = FCS_Busy;
   m_bCelcius = bCelcius;
   m_serverIP = serverIP;
@@ -106,8 +108,9 @@ void Forecast::_onConnect(AsyncClient* client)
       "Connection: close\n"
       "Accept: */*\n\n";
   }
+
   m_ac.add(path.c_str(), path.length());
-  m_pBuffer = new char[OWBUF_SIZE];
+  m_pBuffer = new char[OWBUF_SIZE + 2];
   if(m_pBuffer) m_pBuffer[0] = 0;
   else m_status = FCS_MemoryError;
   m_bufIdx = 0;
@@ -130,20 +133,23 @@ int Forecast::makeroom(uint32_t newTm)
     return 0;
   uint32_t tm2 = m_fc.Date;
   int fcIdx;
-  for(fcIdx = 0; fcIdx < FC_CNT-4 && m_fc.Data[fcIdx].temp != -1000; fcIdx++)
+  for(fcIdx = 0; fcIdx < FC_CNT-4 && m_fc.Data[fcIdx].temp != -1000; fcIdx++) // find current active entry
   {
     if(tm2 >= newTm)
       break;
     tm2 += m_fc.Freq;
   }
+
   if(fcIdx > (FC_CNT - m_fcCnt - 1)) // not enough room left
   {
-    int n = fcIdx - (FC_CNT - 56);
+    int n = 2; // shift 6 hours back
     uint8_t *p = (uint8_t*)m_fc.Data;
-    memcpy(p, p + (n*sizeof(forecastItem)), FC_CNT - (n*sizeof(forecastItem)) ); // make room
+
+    memcpy(p, p + (n * sizeof(forecastItem)), (FC_CNT - n) * sizeof(forecastItem) ); // make room
     m_fc.Date += m_fc.Freq * n;
     fcIdx -= n;
   }
+
   return fcIdx;
 }
 
