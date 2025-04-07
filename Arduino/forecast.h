@@ -6,7 +6,7 @@
 
 #define APPID "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx" // OpenWeathermap APP ID
 
-#define FC_CNT 74 // Max forecast items
+#define FC_CNT 72 // Max forecast items
 
 struct forecastItem
 {
@@ -20,7 +20,7 @@ struct forecastData
   uint32_t Date;
   uint32_t loadDate;
   uint16_t Freq;
-  forecastItem Data[FC_CNT];
+  forecastItem Data[FC_CNT + 2];
 };
 
 enum FCS_Status
