@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
 <title>HVAC Chart</title>
@@ -20,7 +20,7 @@ background-clip: padding-box;
  background-color: #a0a0a0;
  padding: 1px;
  font-size: 12px;
- min-width: 50px;
+ min-width: 40px;
  border: none;
 }
 .dropdown-content{
@@ -45,6 +45,8 @@ var Json
 var a=document.all
 var ws
 added=false
+var dispYear
+var dispMon
 clrs=['rgb(0,0,255)','rgb(255,255,255)','rgb(0,0,50)','#fa0','rgba(0,0,255,0.5)','rgba(255,255,255,0.7)','rgba(0,0,50,0.6)','rgba(55,0,255,0.7)','rgba(255,156,10,0.7)']
 
 $(document).ready(function()
@@ -52,7 +54,10 @@ $(document).ready(function()
  myStorage1 = localStorage.getItem('myStoredText1')
  if(myStorage1  != null) myToken=myStorage1
  ws=new WebSocket("ws://"+window.location.host+"/ws")
-// ws=new WebSocket("ws://192.168.31.110/ws")
+// ws=new WebSocket("ws://192.168.31.24/ws")
+ date=new Date()
+ dispYear=date.getFullYear()
+ dispMon=date.getMonth()+1
  ws.onopen=function(evt){ws.send('{"sum":0}')}
  ws.onclose=function(evt){alert("Connection closed.")}
  ws.onmessage = function(evt){
@@ -147,6 +152,14 @@ $(document).ready(function()
 		case 'draw':
 			draw()
 			break
+		case 'files':
+		    Json.list.sort(function(a1, b1) {
+		      n=a1[0].toLowerCase().localeCompare(b1[0].toLowerCase())
+		      if(a1[2]) n-=10
+		      if(b1[2]) n+=10
+		      return n
+		    });
+		    files=Json.list
 	}
  }
  setInterval(function(){
@@ -155,13 +168,27 @@ $(document).ready(function()
   ws.send('{data:'+s+'}'); },60000)
 });
 
+function nav(n)
+{
+  nMon=dispMon+n
+  nYaer=dispYear
+  if(nMon>12){nMon-=12;nYear++}
+  if(nMon<=0){nMon+=12;nYear--}
+  val=(nYear<<4)+nMon
+  name = 'statsday'+nYear+'.'+nMon+'.dat'
+  if(files.some(row => row.includes(name ))){
+    ws.send('{"sum":'+val+'}')
+    dispYear=nYear
+    dispMon=nMon
+  }
+}
+
 function draw(){
   graph = $('#graph')
   c=graph[0].getContext('2d')
 
   tipCanvas=document.getElementById("tip")
   tipCtx=tipCanvas.getContext("2d")
-  tipDiv=document.getElementById("popup")
 
   c.fillStyle='black'
   c.strokeStyle='black'
@@ -251,7 +278,10 @@ function draw(){
   for(i1=6;i1<arr[0].length;i1++)
   {
 	if(drawMode&sh)
+	{
 	   doLines(clrs[i1-6],i1)
+	   console.log(i1)
+    }
 	sh<<=1
   }
   for(i=0;i<snd.length;i++)
@@ -417,7 +447,6 @@ function draw_bars()
 
 	tipCanvas=document.getElementById("tip")
 	tipCtx=tipCanvas.getContext("2d")
-	tipDiv=document.getElementById("popup")
 
 	ctx=c.getContext("2d")
 	ht=c.height/2
@@ -430,6 +459,8 @@ function draw_bars()
 	draw_scale(dys,c.width-4,ht,2,1,date.getDate()-1)
 	ctx.lineWidth=14
 	draw_scale(mns,c.width-4,ht-2,ht+2,1,date.getMonth())
+
+	a.year.innerHTML=dispYear+'.'+dispMon
 
 	// request mousemove events
 	graph.mousemove(function(e){handleMouseMove(e);})
@@ -783,27 +814,30 @@ function setShift(n)
 </head>
 <body>
 <table width=700><tr>
-<td colspan="12">
+<td colspan="15">
 <div id="wrapper">
 <canvas id="graph" width="700" height="400"></canvas>
 <div id="popup"><canvas id="tip" width="90" height="78"></canvas></div>
 </div>
 </td></tr><tr>
-<td><button class="btn" id="L1" onclick="leg(0)">TEMP</button></td>
-<td><button class="btn" id="L2" onclick="leg(1)" style="color:green">RH</button></td>
-<td><button class="btn" id="L0" onclick="leg(2)" style="color:yellow">OUT</button></td>
-<td><button class="btn" id="L3" onclick="leg(3)"></button></td>
-<td><button class="btn" id="L4" onclick="leg(4)"></button></td>
-<td><button class="btn" id="L5" onclick="leg(5)"></button></td>
-<td><button class="btn" id="L6" onclick="leg(6)"></button></td>
-<td><button class="btn" id="L7" onclick="leg(7)"></button></td>
-<td><button class="btn" id="L8" onclick="leg(8)"></button></td>
-<td><button class="btn" id="L9" onclick="leg(9)"></button></td>
-<td><button class="btn" id="L10" onclick="leg(10)"></button></td>
-<td><button class="btn" id="L11" onclick="leg(11)"></button></td>
+<td><button class="btn" id="L1" onclick="leg(0)"/>TEMP</td>
+<td><button class="btn" id="L2" onclick="leg(1)" style="color:green"/>RH</td>
+<td><button class="btn" id="L0" onclick="leg(2)" style="color:yellow"/>OUT</td>
+<td><button class="btn" id="L3" onclick="leg(3)"/></td>
+<td><button class="btn" id="L4" onclick="leg(4)"/></td>
+<td><button class="btn" id="L5" onclick="leg(5)"/></td>
+<td><button class="btn" id="L6" onclick="leg(6)"/></td>
+<td><button class="btn" id="L7" onclick="leg(7)"/></td>
+<td><button class="btn" id="L8" onclick="leg(8)"/></td>
+<td><button class="btn" id="L9" onclick="leg(9)"/></td>
+<td><button class="btn" id="L10" onclick="leg(10)"/></td>
+<td><button class="btn" id="L11" onclick="leg(11)"/></td>
+<td><button class="btn" id="left" onclick="nav(-1)"/><</td>
+<td><button class="btn" id="year"/></td>
+<td><button class="btn" id="right" onclick="nav(1)"/>></td>
 </tr></table>
 <div id="wrapper2">
-<canvas id="chart" width="700" height="200"></canvas>
+<canvas id="chart" width="700" height="200"/>
 </div>
 <table width=700><tr>
 <td>SHIFT:<input type=text size=1 id="fco" onchange="setShift(+this.value)">&nbsp; RANGE:<input type=text size=1 id="fcr" onchange="{fcr=+this.value;drawFC()}">
@@ -814,9 +848,9 @@ function setShift(n)
 <div class="dropdown">
   <button class="dropbtn">MODE:</button>
   <div class="dropdown-content">
-  <button class="btn" id="s0" onclick="setSched(0)">FORECAST</button>
-  <button class="btn" id="s1" onclick="setSched(1)">SINE</button>
-  <button class="btn" id="s2" onclick="setSched(2)">FLAT</button>
+  <button class="btn" id="s0" onclick="setSched(0)"/>FORECAST
+  <button class="btn" id="s1" onclick="setSched(1)"/>SINE
+  <button class="btn" id="s2" onclick="setSched(2)"/>FLAT
   </div>
 </div>
 </td>
