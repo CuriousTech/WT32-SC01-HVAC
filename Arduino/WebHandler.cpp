@@ -163,6 +163,7 @@ void startServer()
 #ifndef REMOTE
 
   server.on ( "/", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
+    // no 404, just an empty response
   });
 
   // For quick commands. Remotes have a seperate command list
@@ -177,16 +178,16 @@ void startServer()
     request->send ( 200, "text/html", s );
   });
 
-//  server.on ( "/json", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
-//    request->send ( 200, "text/json",  hvac.settingsJson());
-//  });
-
   // Main page  Hidden instead of / due to being externally accessible. Use your own here.
   server.on ( "/iot", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
     request->send(INTERNAL_FS, "/index.html");
   });
 
 #endif
+  server.on("/heap", HTTP_GET, [](AsyncWebServerRequest * request) { // just for checking
+    request->send(200, "text/plain", String(ESP.getFreeHeap()));
+  });
+
   server.on ( "/fm.html", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send ( 200, "text/html",  fileman);
   });
@@ -213,7 +214,7 @@ void startServer()
 //  ee.hostIp[0] = 192; // force IP of HVAC if needed
 //  ee.hostIp[1] = 168;
 //  ee.hostIp[2] = 31;
-//  ee.hostIp[3] = 47;
+//  ee.hostIp[3] = 110;
 #endif
 
 #ifdef OTA_ENABLE
@@ -279,6 +280,13 @@ void handleServer()
 void WsSend(String s) // mostly for debug
 {
   ws.textAll(s);
+}
+
+void wsPrint(String s)
+{
+  jsonString js("print");
+  js.Var("text", s);
+  ws.textAll(js.Close());
 }
 
 bool secondsServer() // called once per second
@@ -676,19 +684,57 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
         if(iValue) appendDump(iValue);
         else historyDump(true);
       }
-      else if(iName == 3) // 3 = summary
+      else if(iName == 3) // 3 = sum
       {
         String out = String("{\"cmd\":\"sum\",\"mon\":[");
+
+        uint32_t (*pSecsMon)[3] = hvac.m_SecsMon;
+        uint16_t (*pSecsDay)[3] = hvac.m_SecsDay;
+
+        uint16_t tempSecsDay[32][3];
+        uint32_t tempSecsMon[12][3];
+
+        uint8_t mon = iValue & 0xF;
+        uint16_t yr = (iValue >> 4) & 0xFFF;
+
+        if(mon != month()) // month is 1-12, so 0 can be used as current
+        {
+          String sName = "/statsday"; // decode requested file
+          sName += yr;
+          sName += ".";
+          sName += mon;
+          sName += ".dat";
+
+          File F;
+          if(F = INTERNAL_FS.open(sName) )
+          {
+            F.read((byte*) &tempSecsDay, sizeof(tempSecsDay)); // read the requested file
+            F.close();
+            pSecsDay = tempSecsDay;
+          }
+          if(yr != year()) // not currrent year
+          {
+            sName = "/statsmonth";
+            sName += yr;
+            sName += ".dat";
+            if(F = INTERNAL_FS.open(sName) )
+            {
+              F.read((byte*) &tempSecsMon, sizeof(tempSecsMon)); // read the requested file
+              F.close();
+              pSecsMon = tempSecsMon;
+            }
+          }
+        }
 
         for(int i = 0; i < 12; i++)
         {
           if(i) out += ",";
           out += "[";
-          out += hvac.m_SecsMon[i][0];
+          out += pSecsMon[i][0];
           out += ",";
-          out += hvac.m_SecsMon[i][1];
+          out += pSecsMon[i][1];
           out += ",";
-          out += hvac.m_SecsMon[i][2];
+          out += pSecsMon[i][2];
           out += "]";
         }
         out += "],\"day\":[";
@@ -696,11 +742,11 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
         {
           if(i) out += ",";
           out += "[";
-          out += hvac.m_SecsDay[i][0];
+          out += pSecsDay[i][0];
           out += ",";
-          out += hvac.m_SecsDay[i][1];
+          out += pSecsDay[i][1];
           out += ",";
-          out += hvac.m_SecsDay[i][2];
+          out += pSecsDay[i][2];
           out += "]";
         }
         out += "],";
