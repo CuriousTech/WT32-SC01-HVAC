@@ -62,27 +62,11 @@ bool Display::screen(bool bOn)
     media.loadImage("bg.png", 0, 0);
     refreshAll();
   }
-  else switch(m_currPage)
+  else
   {
-    default: // from thermostat
-      m_currPage = Page_ScreenSaver;
-      goDark();
-      ss.select( random(0, SS_Count) );
-      break;
-// Old page cycle
-/*    case Page_Forecast:
-      m_currPage = Page_ScreenSaver;
-      goDark();
-      ss.select( random(0, SS_Count) );
-      break;
-    case Page_ScreenSaver:
-      historyPage();
-      break;
-    default: // from thermostat
-      if(FC.forecastPage())
-        m_currPage = Page_Forecast;
-      break;
-*/
+    m_currPage = Page_ScreenSaver;
+    goDark();
+    ss.select( random(0, SS_Count) );
   }
   bOldOn = bOn;
   return true;
@@ -638,9 +622,13 @@ void Display::updateNotification(bool bRef)
       nTimer = 60;
       s = "HVAC Found";
       break;
-    case Note_HeatError:
+    case Note_HPHeatError:
       nTimer = 60;
-      s = "Heat Malfunction";
+      s = "HP Malfunction";
+      break;
+    case Note_NGHeatError:
+      nTimer = 60;
+      s = "NG Malfunction";
       break;
     case Note_CoolError:
       nTimer = 60;
@@ -686,8 +674,8 @@ void Display::dimmer()
   if(m_bright == m_brightness)
     return;
 
-  if(m_brightness > m_bright + 1 && ee.brightLevel[1] > 50)
-    m_bright += 2;
+  if(m_brightness > m_bright + 2 && ee.brightLevel[1] > 50)
+    m_bright += 3;
   else if(m_brightness > m_bright)
     m_bright ++;
   else
