@@ -457,11 +457,19 @@ void HVAC::service()
         fanSwitch(false);
     }
   
-    if(mode == Mode_Heat && hm)   // count run time as fan time in winter
-    {                             // furnace post fan is 120 seconds
-      m_furnaceFan = ee.furnacePost;
-      if(m_endTemp < m_startTemp) // not heating
-        m_notif = Note_HeatError;
+    if(mode == Mode_Heat)
+    {
+      if(hm)
+      {
+        m_furnaceFan = ee.furnacePost;    // count run time as fan time in winter
+        if(m_endTemp < m_startTemp) // not heating HP
+          m_notif = Note_HPHeatError;
+      }
+      else
+      {
+        if(m_endTemp < m_startTemp) // not heating NG
+          m_notif = Note_NGHeatError;
+      }
     }
     else
     {
@@ -1787,11 +1795,25 @@ void HVAC::monthTotal(int m, int dys)
 void HVAC::loadStats()
 {
 #ifndef REMOTE
-  String sFile = "/daystats";
-  sFile += year();
-  sFile += ".dat";
 
-  File F = INTERNAL_FS.open(sFile, "r");
+  String sFileDay = "/statsday";
+  sFileDay += year();
+  sFileDay += ".";
+  sFileDay += month();
+  sFileDay += ".dat";
+
+// remove after use, migration code
+  String sFileDayOld = "/daystats2024.dat";
+  sFileDayOld += year();
+  sFileDayOld += ".dat";
+
+  if(INTERNAL_FS.exists(sFileDayOld) ) // change old name to new
+  {
+    INTERNAL_FS.rename(sFileDayOld, sFileDay);
+  }
+//
+
+  File F = INTERNAL_FS.open(sFileDay, "r");
   if(F)
   {
     F.read((byte*) &m_SecsDay, sizeof(m_SecsDay));
@@ -1800,7 +1822,16 @@ void HVAC::loadStats()
   }
   m_daySum = ee.Fletcher16( (uint8_t*)&m_SecsDay, sizeof(m_SecsDay) );
 
-  F = INTERNAL_FS.open("/monthstats.dat", "r");
+  String sFileMon = "/statsmonth";
+  sFileMon += year();
+  sFileMon += ".dat";
+
+  if(INTERNAL_FS.exists("/monthstats.dat") ) // change old name to new
+  {
+    INTERNAL_FS.rename("/monthstats.dat", sFileMon);
+  }
+
+  F = INTERNAL_FS.open(sFileMon, "r");
   if(F)
   {
     F.read((byte*) &m_SecsMon, sizeof(m_SecsMon));
@@ -1815,26 +1846,33 @@ void HVAC::saveStats()
 #ifndef REMOTE
   uint16_t sum;
 
+  if( year() < 2020)
+    return;
+
   m_SecsDay[31][0] = m_filterMinutes; // store the filter timer with data that will change at the same frequency
 
-  String sFile = "/daystats"; // add year since this is the most often written data
-  sFile += year();
-  sFile += ".dat";
+  String sFileDay = "/daystats"; // add year since this is the most often written data
+  sFileDay += year();
+  sFileDay += ".dat";
 
   sum = ee.Fletcher16( (uint8_t*) &m_SecsDay, sizeof(m_SecsDay) );
   if(sum != m_daySum)
   {
     m_daySum = sum;
-    File F = INTERNAL_FS.open(sFile, "w");
+    File F = INTERNAL_FS.open(sFileDay, "w");
     F.write((byte*) &m_SecsDay, sizeof(m_SecsDay));
     F.close();
   }
+
+  String sFileMon = "/statsmonth";
+  sFileMon += year();
+  sFileMon += ".dat";
 
   sum = ee.Fletcher16( (uint8_t*)&m_SecsMon, sizeof(m_SecsMon) );
   if(sum != m_monSum)
   {
     m_monSum = sum;
-    File F = INTERNAL_FS.open("/monthstats.dat", "w");
+    File F = INTERNAL_FS.open(sFileMon, "w");
     F.write((byte*) &m_SecsMon, sizeof(m_SecsMon));
     F.close();
   }
