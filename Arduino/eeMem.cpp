@@ -1,6 +1,8 @@
 #include "eeMem.h"
 #include "Media.h"
 
+const char szSettings[] = "/settings.bin";
+
 bool eeMem::init()
 {
   if(!INTERNAL_FS.begin(true))
@@ -11,7 +13,12 @@ bool eeMem::init()
   uint8_t data[EESIZE];
   uint16_t *pwTemp = (uint16_t *)data;
 
-  File F = INTERNAL_FS.open("/eemem.bin", "r");
+  if(INTERNAL_FS.exists("/eemem.bin") ) // old name
+  {
+    INTERNAL_FS.rename("/eemem.bin", szSettings);
+  }
+
+  File F = INTERNAL_FS.open(szSettings, "r");
   if(F)
   {
     F.read((byte*)data, EESIZE);
@@ -41,7 +48,7 @@ bool eeMem::update() // write the settings if changed
 
   File F;
 
-  if(F = INTERNAL_FS.open("/eemem.bim", "w"))
+  if(F = INTERNAL_FS.open(szSettings, "w"))
   {
     F.write((byte*) this + offsetof(eeMem, size), EESIZE);
     F.close();
