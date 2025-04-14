@@ -697,7 +697,7 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
         uint8_t mon = iValue & 0xF;
         uint16_t yr = (iValue >> 4) & 0xFFF;
 
-        if(mon != month()) // month is 1-12, so 0 can be used as current
+        if(mon && mon != month()) // month is 1-12, so 0 can be used as current
         {
           String sName = "/statsday"; // decode requested file
           sName += yr;
@@ -708,7 +708,7 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
           File F;
           if(F = INTERNAL_FS.open(sName) )
           {
-            F.read((byte*) &tempSecsDay, sizeof(tempSecsDay)); // read the requested file
+            F.read((byte*)&tempSecsDay, sizeof(tempSecsDay)); // read the requested file
             F.close();
             pSecsDay = tempSecsDay;
           }
@@ -719,7 +719,7 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
             sName += ".dat";
             if(F = INTERNAL_FS.open(sName) )
             {
-              F.read((byte*) &tempSecsMon, sizeof(tempSecsMon)); // read the requested file
+              F.read((byte*)&tempSecsMon, sizeof(tempSecsMon)); // read the requested file
               F.close();
               pSecsMon = tempSecsMon;
             }
