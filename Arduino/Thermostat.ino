@@ -235,6 +235,7 @@ void loop()
           {
             int m = (month() + 10) % 12; // last month: Dec = 10, Jan = 11, Feb = 0
             hvac.monthTotal(m, -1);
+            memset(hvac.m_SecsDay, 0, sizeof(hvac.m_SecsDay)); // clear for new month
           }
         }
 
