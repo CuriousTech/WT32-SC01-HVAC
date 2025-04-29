@@ -211,10 +211,10 @@ void startServer()
   server.begin();
 
 #ifdef REMOTE
-//  ee.hostIp[0] = 192; // force IP of HVAC if needed
-//  ee.hostIp[1] = 168;
-//  ee.hostIp[2] = 31;
-//  ee.hostIp[3] = 110;
+  ee.hostIp[0] = 192; // force IP of HVAC if needed
+  ee.hostIp[1] = 168;
+  ee.hostIp[2] = 31;
+  ee.hostIp[3] = 110;
 #endif
 
 #ifdef OTA_ENABLE
