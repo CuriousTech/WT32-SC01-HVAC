@@ -1281,7 +1281,8 @@ const char *cmdList[] = { "cmd",
   "brt1",
   "cd",
   "delf",
-  "createdir", // 59
+  "createdir", // 58
+  "clearhist",
   NULL
 };
 
@@ -1656,6 +1657,10 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       media.createDir(psValue);
       WsSend(settingsJson()); // update disk free
       break;
+    case 59: // clearhist
+      memset(m_SecsDay, 0, sizeof(m_SecsDay));
+      memset(m_SecsMon, 0, sizeof(m_SecsMon));
+      break;
   }
 }
 
@@ -1802,17 +1807,6 @@ void HVAC::loadStats()
   sFileDay += month();
   sFileDay += ".dat";
 
-// remove after use, migration code
-  String sFileDayOld = "/daystats2024.dat";
-  sFileDayOld += year();
-  sFileDayOld += ".dat";
-
-  if(INTERNAL_FS.exists(sFileDayOld) ) // change old name to new
-  {
-    INTERNAL_FS.rename(sFileDayOld, sFileDay);
-  }
-//
-
   File F = INTERNAL_FS.open(sFileDay, "r");
   if(F)
   {
@@ -1825,11 +1819,6 @@ void HVAC::loadStats()
   String sFileMon = "/statsmonth";
   sFileMon += year();
   sFileMon += ".dat";
-
-  if(INTERNAL_FS.exists("/monthstats.dat") ) // change old name to new
-  {
-    INTERNAL_FS.rename("/monthstats.dat", sFileMon);
-  }
 
   F = INTERNAL_FS.open(sFileMon, "r");
   if(F)
@@ -1851,8 +1840,10 @@ void HVAC::saveStats()
 
   m_SecsDay[31][0] = m_filterMinutes; // store the filter timer with data that will change at the same frequency
 
-  String sFileDay = "/daystats"; // add year since this is the most often written data
+  String sFileDay = "/statsday";
   sFileDay += year();
+  sFileDay += ".";
+  sFileDay += month();
   sFileDay += ".dat";
 
   sum = ee.Fletcher16( (uint8_t*) &m_SecsDay, sizeof(m_SecsDay) );
