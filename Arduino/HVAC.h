@@ -61,7 +61,8 @@ enum Notif
   Note_Sensor,
   Note_HVACFound,
   Note_Updating,
-  Note_HeatError,
+  Note_HPHeatError,
+  Note_NGHeatError,
   Note_CoolError,
 };
 
