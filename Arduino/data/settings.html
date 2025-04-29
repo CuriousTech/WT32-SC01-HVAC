@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <head>
@@ -17,7 +17,7 @@ var ws
 function startEvents()
 {
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.31.125/ws")
+//ws=new WebSocket("ws://192.168.31.110/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 
@@ -164,6 +164,7 @@ function t2s(v)
  localStorage.setItem('myStoredText1', a.myToken.value)
  alert(a.myToken.value+' Has been stored')
 }">
+ <input type="button" value="Restart" onClick="{setVar('restart',0)}" />
 </td>
 </tr>
 </table>
