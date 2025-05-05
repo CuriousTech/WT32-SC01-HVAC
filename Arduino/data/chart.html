@@ -54,11 +54,11 @@ $(document).ready(function()
  myStorage1 = localStorage.getItem('myStoredText1')
  if(myStorage1  != null) myToken=myStorage1
  ws=new WebSocket("ws://"+window.location.host+"/ws")
-// ws=new WebSocket("ws://192.168.31.24/ws")
+// ws=new WebSocket("ws://192.168.31.110/ws")
  date=new Date()
  dispYear=date.getFullYear()
  dispMon=date.getMonth()+1
- ws.onopen=function(evt){ws.send('{"sum":0}')}
+ ws.onopen=function(evt){ws.send('{"data":0}')}
  ws.onclose=function(evt){alert("Connection closed.")}
  ws.onmessage = function(evt){
 	console.log(evt.data)
@@ -101,7 +101,6 @@ $(document).ready(function()
 		case 'print':
 			break
 		case 'sum':
-			ws.send('{data:0}')
 			dys=Json.day
 			mns=Json.mon
 			fc=Json.fc
@@ -131,6 +130,7 @@ $(document).ready(function()
 			arr=new Array()
 			break
 		case 'data':
+			ws.send('{sum:0}')
 			for(i=0;i<Json.d.length;i++){
 				n=Json.d[i][0]			// time, temp, rh, thrsh, st, ot,s0,s1,s2...
 				Json.d[i][0]=tb*1000
