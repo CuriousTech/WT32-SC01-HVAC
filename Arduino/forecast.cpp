@@ -146,8 +146,8 @@ int Forecast::makeroom(uint32_t newTm)
     uint8_t *p = (uint8_t*)m_fc.Data;
 
     memcpy(p, p + (n * sizeof(forecastItem)), (FC_CNT - n) * sizeof(forecastItem) ); // make room
-    m_fc.Date += m_fc.Freq * n;
-    fcIdx -= n;
+    m_fc.Date += m_fc.Freq * n; // increase the base date by the shift
+    fcIdx -= n; // decrement the first new entry
   }
 
   return fcIdx;
@@ -159,11 +159,13 @@ void Forecast::_onDisconnect(AsyncClient* client)
 
   char *p = m_pBuffer;
   m_status = FCS_Done;
-  if(p == NULL)
+  if(m_pBuffer == NULL)
     return;
+
   if(m_bufIdx == 0)
   {
     delete m_pBuffer;
+    m_pBuffer = NULL;
     return;
   }
 
@@ -182,6 +184,7 @@ void Forecast::_onDisconnect(AsyncClient* client)
   }
   m_fc.Data[m_fcIdx].temp = -1000; // mark past last as invalid
   delete m_pBuffer;
+  m_pBuffer = NULL;
 }
 
 void Forecast::processOWM()
