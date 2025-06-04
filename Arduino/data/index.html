@@ -62,7 +62,6 @@ ws.onmessage=function(evt){
 	a.run.innerHTML=states[+Json.s]
 	hon=+Json.h
 	a.hm.innerHTML=hon?"HUMIDIFIER ON":"HUMIDIFIER OFF"
-	a.hmCell.setAttribute('class',hon?'style5':'style1')
 	setAtt()
  }
  else if(Json.cmd=='alert')
@@ -81,6 +80,7 @@ function setfan(n)
 {
 if(n<3) fanMode=n
 setVar('fanmode',n)
+fan=fanMode?1:0
 setAtt()
 }
 
