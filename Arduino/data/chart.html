@@ -31,7 +31,7 @@ background-clip: padding-box;
  z-index: 1;
 }
 .dropdown:hover .dropdown-content{display: block;}
-body{background:silver;width:700px;display:block;text-align:center;font-family: Arial, Helvetica, sans-serif;}}
+body{background:silver;width:700px;display:block;text-align:center;font-family: Arial, Helvetica, sans-serif;}
 </style>
 <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.6.1/jquery.min.js" type="text/javascript" charset="utf-8"></script>
 <script type="text/javascript">
@@ -278,10 +278,7 @@ function draw(){
   for(i1=6;i1<arr[0].length;i1++)
   {
 	if(drawMode&sh)
-	{
 	   doLines(clrs[i1-6],i1)
-	   console.log(i1)
-    }
 	sh<<=1
   }
   for(i=0;i<snd.length;i++)
@@ -535,7 +532,7 @@ function draw_scale(ar,w,h,o,p,ct)
 		ctx.strokeStyle="#FFF"
 		ctx.fillText(i+p,x-lw*2,o+h-7)
 
-		if(i==ct)
+		if(i==ct&&date.getMonth()+1==dispMon&&date.getFullYear()==dispYear)
 		{
 			ctx.strokeStyle="#fff"
 			ctx.lineWidth=1
