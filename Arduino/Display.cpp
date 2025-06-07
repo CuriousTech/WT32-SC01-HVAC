@@ -174,7 +174,7 @@ void Display::buttonCmd(uint8_t btn)
       m_btnMode = btn - Btn_Up + 1;
       buttonRepeat();
       m_btnDelay = 7; // first repeat
-
+      break;
     case Btn_Forecast:
       if(FC.forecastPage())
         m_currPage = Page_Forecast;
