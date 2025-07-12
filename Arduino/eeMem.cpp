@@ -13,11 +13,6 @@ bool eeMem::init()
   uint8_t data[EESIZE];
   uint16_t *pwTemp = (uint16_t *)data;
 
-  if(INTERNAL_FS.exists("/eemem.bin") ) // old name
-  {
-    INTERNAL_FS.rename("/eemem.bin", szSettings);
-  }
-
   File F = INTERNAL_FS.open(szSettings, "r");
   if(F)
   {
