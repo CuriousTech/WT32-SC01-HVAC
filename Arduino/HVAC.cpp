@@ -536,7 +536,7 @@ void HVAC::tempCheck()
   {
     if(m_Sensor[i].IP)
     {
-      if(now() > 1700643600 && now() - m_Sensor[i].tm >= 90) // disregard expired sensor data if now() is valid
+      if(m_Sensor[i].tm > 1750000000 && now() > 1750000000 && now() - m_Sensor[i].tm >= 90) // disregard expired sensor data if valid
       {
         if( m_Sensor[i].f.f.Warn == 0)
         {
