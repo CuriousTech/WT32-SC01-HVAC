@@ -529,9 +529,8 @@ function draw_scale(ar,w,h,o,p,ct)
 			ctx.stroke()
 			x+=lw
 		}
-		ctx.strokeStyle="#FFF"
-		ctx.fillText(i+p,x-lw*2,o+h-7)
 
+		ctx.fillStyle="#FFF"
 		if(i==ct&&date.getMonth()+1==dispMon&&date.getFullYear()==dispYear)
 		{
 			ctx.strokeStyle="#fff"
@@ -541,7 +540,12 @@ function draw_scale(ar,w,h,o,p,ct)
 		    ctx.lineTo(x-1,o)
 			ctx.stroke()
 			ctx.lineWidth=lw
+			ctx.fillStyle="#FF0"
 		}
+		else if(ctx.lineWidth!=6&&i==dispMon-1)
+			ctx.fillStyle="#FF0"
+		ctx.fillText(i+p,x-lw*2,o+h-7)
+
 		if(mbh<25) mbh=25
 		costE=+(ppkwh*ar[i][0]*(cw/3600000))+(ppkwh*ar[i][2]*(fw/3600000))+(ppkwh*ar[i][1]*(frnw/3600000))
 		costG=+(ccf*ar[i][1]*cfm)/3600
