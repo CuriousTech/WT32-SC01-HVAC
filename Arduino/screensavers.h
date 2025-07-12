@@ -13,6 +13,7 @@ enum Saver
   SS_Clock,
   SS_Lines,
   SS_Boing,
+  SS_Calendar,
   SS_Count, // Last one
 };
 
@@ -56,7 +57,7 @@ private:
   void cspoint(uint16_t &x2, uint16_t &y2, uint16_t x, uint16_t y, float angle, float size);
   void Lines(bool bInit);
   void Boing(bool bInit);
+  void Calendar(bool bInit);
 };
-
 
 #endif // SCREENSAVERS_H
