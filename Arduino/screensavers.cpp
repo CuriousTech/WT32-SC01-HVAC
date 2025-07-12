@@ -25,17 +25,21 @@ void ScreenSavers::select(int n)
     case SS_Boing:
         Boing(true);
         break;
+    case SS_Calendar:
+        Calendar(true);
+        break;
   }
 }
 
 void ScreenSavers::run()
 {
-    switch(m_saver)
-    {
-      case SS_Clock: Clock(false); break;
-      case SS_Lines: Lines(false); break;
-      case SS_Boing: Boing(false); break;
-    }
+  switch(m_saver)
+  {
+    case SS_Clock: Clock(false); break;
+    case SS_Lines: Lines(false); break;
+    case SS_Boing: Boing(false); break;
+    case SS_Calendar: Calendar(false); break;
+  }
 }
 
 // Analog clock
@@ -281,4 +285,70 @@ void ScreenSavers::Boing(bool bInit)
     // Draw at new positions
     tft.drawCircle(ball[i].x, ball[i].y, rad, ball[i].color );
   }
+}
+
+void ScreenSavers::Calendar(bool bInit)
+{
+  static uint16_t xOffset = 40;
+  static uint16_t width = DISPLAY_WIDTH - 44 - (xOffset * 2);
+  static uint16_t yOffset = 68;
+
+  if(bInit)
+  {
+    uint8_t month_days[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    if(year() % 4 == 0) month_days[1] = 29;
+
+    uint8_t firstDay = (day() - weekday() + 2) % 7;
+    uint8_t lastDay = month_days[ month()-1 ];
+    uint8_t rows = (lastDay + firstDay + 1) / 7;
+
+    tft.fillRect(0, 0, DISPLAY_WIDTH, 34, rgb16(24,48,24)); // fill 3 areas
+    tft.fillRect(0, 34, DISPLAY_WIDTH, 34, rgb16(9,18,24));
+    tft.fillRect(0, yOffset, DISPLAY_WIDTH, DISPLAY_HEIGHT - yOffset, TFT_BLACK);
+
+    tft.setTextDatum(TC_DATUM);
+    tft.setFreeFont(&FreeSans12pt7b);
+    tft.setTextColor( TFT_BLACK, rgb16(24,48,24) );
+
+    // Top bar
+    String s = monthStr( month() ); s += " "; s += year();
+    tft.drawString(s, DISPLAY_WIDTH/2, 5);
+
+    // Weekday bar
+    tft.setTextColor( rgb16(0, 63, 31), rgb16(9,18,24) );
+    for (uint8_t dayNum = 0; dayNum < 7; ++dayNum)
+      tft.drawString( dayShortStr(dayNum+1), dayNum * (width / 7) + xOffset + 40 , 40 );
+
+    // Days
+    uint8_t digit = 1;
+    uint8_t curCell = 1;
+  
+    for (uint8_t row = 1; row <= rows; ++row)
+    {
+      for (uint8_t col = 1; col <= 7; ++col)
+      {
+        if (digit > lastDay) break;
+        if (curCell < firstDay)
+        {
+          curCell++;
+        }
+        else
+        {
+          uint16_t x = col * (width / 7) + xOffset - 12;
+          uint16_t y = row * ((DISPLAY_HEIGHT - yOffset - 3)/ rows) + yOffset - 34;
+
+          // rounded box around each day
+          uint16_t boxColor = (digit == day()) ? rgb16(20, 40, 10) : rgb16(10, 20, 10);
+          tft.fillRoundRect( x-22, y-10, 44, 40, 5, boxColor);
+          uint16_t txtColor = rgb16(0, 63, 31); // cyan
+          tft.setTextColor( txtColor, boxColor );
+          tft.drawString( String(digit), x, y);
+          digit++;
+        }
+      }
+    }
+
+    tft.setTextDatum(TL_DATUM);
+  }
+
 }
