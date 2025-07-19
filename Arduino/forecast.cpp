@@ -1,11 +1,13 @@
 #include "Forecast.h"
 #include "Display.h"
-#include "TimeLib.h"
+#include <Time.h>
 #include "eeMem.h"
 #include "Media.h"
+#include "ScreenSavers.h"
 
 #include <TFT_eSPI.h> // TFT_espi library
 extern TFT_eSPI tft;
+extern ScreenSavers ss;
 
 // OWM Format: https://openweathermap.org/forecast5
 
@@ -60,7 +62,7 @@ int Forecast::checkStatus()
   if(m_status == FCS_Done)
   {
     m_status = FCS_Idle;
-    m_fc.loadDate = now();
+    m_fc.loadDate = time(nullptr);
     m_bUpdateFcstIdle = true;
     m_bFcstUpdated = true;
     return FCS_Done;
@@ -275,7 +277,7 @@ bool Forecast::getCurrentIndex(int8_t& fcOff, int8_t& fcCnt, uint32_t& tm)
 
   for(fcCnt = 0; fcCnt < FC_CNT && m_fc.Data[fcCnt].temp != -1000; fcCnt++) // get current time in forecast and valid count
   {
-    if( tm + m_fc.Freq < now() - m_tzOffset)
+    if( tm + m_fc.Freq < time(nullptr) - m_tzOffset)
     {
       fcOff++;
       tm += m_fc.Freq;
@@ -643,20 +645,21 @@ bool Forecast::forecastPage()
   int8_t fcOff;
   int8_t fcDispOff = 0;
   int8_t fcCnt;
-  uint32_t tm;
+  uint32_t unused;
 
-  if(!getCurrentIndex(fcOff, fcCnt, tm))
+  if(!getCurrentIndex(fcOff, fcCnt, unused))
     return false;
 
-  tmElements_t tmE;
-  breakTime(m_fc.Date + m_tzOffset + (fcOff * m_fc.Freq), tmE); // get current hour
+  time_t tt = (m_fc.Date + m_tzOffset + (fcOff * m_fc.Freq));
+  tm *pTimeinfo = gmtime(&tt ); // get current hour
 
-  if(fcOff >= (tmE.Hour / 3) )
-    fcDispOff = fcOff - (tmE.Hour / 3); // shift back to start of day
+  if(fcOff >= (pTimeinfo->tm_hour / 3) )
+    fcDispOff = fcOff - (pTimeinfo->tm_hour / 3); // shift back to start of day
   else
     fcDispOff = fcOff; // else just shift the first day
 
-  breakTime(m_fc.Date + m_tzOffset + (fcDispOff * m_fc.Freq), tmE);  // get current hour after adjusting for display offset
+  tt = (time_t)(m_fc.Date + m_tzOffset + (fcDispOff * m_fc.Freq));
+  tm *ptmE = gmtime(&tt );  // get current hour after adjusting for display offset
 
   int8_t hrng = fcCnt - fcDispOff;
   if(hrng > ee.fcDisplay)
@@ -697,12 +700,12 @@ bool Forecast::forecastPage()
 
   tft.setTextDatum(TC_DATUM); // center day on noon
 
-  uint8_t wkday = tmE.Wday - 1;              // current DOW
+  uint8_t wkday = ptmE->tm_wday;              // current DOW
 
   int16_t low = 1500, high = -1500;
   uint16_t i2 = fcDispOff; // index into forecast
   uint16_t x;
-  uint8_t h = tmE.Hour; // starting hour
+  uint8_t h = ptmE->tm_hour; // starting hour
   uint8_t iDay = 0; // icon position day
   uint16_t lastDayX = 0;
 
@@ -744,7 +747,7 @@ bool Forecast::forecastPage()
       tft.drawLine(x, FC_Top, x, FC_Top+FC_Height, rgb16(7, 14, 7) ); // dark gray
       if(x < FC_Left + FC_Width - 26) // skip last day if too far right
       {
-        tft.drawString( dayShortStr(wkday+1), x, 10);
+        tft.drawString( ss.dayShortStr(wkday), x, 10);
       }
     }
     else if(h == 0) // new day (draw line, prev day peaks, and prev icon)
@@ -843,16 +846,20 @@ int16_t Forecast::getCurrentTemp(int& shiftedTemp, uint8_t shiftMins)
 {
   int8_t fcOff;
   int8_t fcCnt;
-  uint32_t tm;
-  if(!getCurrentIndex(fcOff, fcCnt, tm))
+  uint32_t tmO;
+
+  if(!getCurrentIndex(fcOff, fcCnt, tmO))
     return 0;
 
-  int16_t m = minute();
-  uint32_t tmNow = now() - m_tzOffset;
+  tm timeinfo;
+  getLocalTime(&timeinfo);
+
+  int16_t m = timeinfo.tm_min;
+  uint32_t tmNow = time(nullptr) - m_tzOffset;
   int16_t r = m_fc.Freq / 60; // usually 3 hour range (180 m)
 
-  if( tmNow >= tm )
-    m = (tmNow - tm) / 60;  // offset = minutes past forecast up to 179
+  if( tmNow >= tmO )
+    m = (tmNow - tmO) / 60;  // offset = minutes past forecast up to 179
 
   int16_t temp = tween(m_fc.Data[fcOff].temp, m_fc.Data[fcOff+1].temp, m, r);
 
