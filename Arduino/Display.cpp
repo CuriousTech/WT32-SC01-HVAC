@@ -2,7 +2,7 @@
 #include "display.h"
 #include <ESPAsyncWebServer.h> // https://github.com/me-no-dev/ESPAsyncWebServer
 #include "jsonstring.h"
-#include <TimeLib.h>
+#include <Time.h>
 #include "eeMem.h"
 #include "screensavers.h"
 #include "music.h"
@@ -507,29 +507,41 @@ void Display::buttonRepeat()
   updateTemps();
 }
 
+uint8_t hourFormat12(uint8_t h)
+{
+  if(h > 12) return h - 12;
+  if(h == 0) h = 12;
+  return h;
+}
+
 // time and dow on main page
 void Display::drawTime()
 {
   static bool bRefresh = true;
   static uint8_t last_day;
-  if(m_currPage || last_day != day() ) // not main page
+
+  struct tm timeinfo;
+
+  getLocalTime(&timeinfo);
+
+  if(m_currPage || last_day != timeinfo.tm_mday ) // not main page
   {
     bRefresh = true;
-    last_day = day();
+    last_day = timeinfo.tm_mday;
     return;
   }
-  
-  String sTime = String( hourFormat12() );
-  if(hourFormat12() < 10)
+
+  String sTime = String( hourFormat12(timeinfo.tm_hour) );
+  if(hourFormat12(timeinfo.tm_hour) < 10)
     sTime = " " + sTime;
   sTime += ":";
-  if(minute() < 10) sTime += "0";
-  sTime += minute();
+  if(timeinfo.tm_min < 10) sTime += "0";
+  sTime += timeinfo.tm_min;
   sTime += ":";
-  if(second() < 10) sTime += "0";
-  sTime += second();
+  if(timeinfo.tm_sec < 10) sTime += "0";
+  sTime += timeinfo.tm_sec;
   sTime += " ";
-  sTime += isPM() ? "PM":"AM";
+  sTime += (timeinfo.tm_hour >= 12) ? "PM":"AM";
   sTime += " ";
 
 #define TIME_X_OFFSET 80
@@ -539,12 +551,11 @@ void Display::drawTime()
 
   if(bRefresh) // Cut down on flicker a bit
   {
-    sTime = monthShortStr(month());
+    sTime = ss.monthShortStr(timeinfo.tm_mon);
     sTime += " ";
-    sTime += String(day());
+    sTime += String(timeinfo.tm_mday);
     tft.drawString(sTime, m_btn[Btn_Time].x, m_btn[Btn_Time].y);
-
-    tft.drawString(dayShortStr(weekday()), m_btn[Btn_Dow].x, m_btn[Btn_Dow].y);
+    tft.drawString(ss.dayShortStr(timeinfo.tm_wday), m_btn[Btn_Dow].x, m_btn[Btn_Dow].y);
   }
   bRefresh = false;
 }
@@ -752,7 +763,7 @@ void Display::addGraphPoints()
   m_temp_counter = 5*60;         // update every 5 minutes
   gPoint *p = &m_points[m_pointsIdx];
 
-  uint32_t pdate = now() - ((ee.tz+hvac.m_DST)*3600);
+  uint32_t pdate = time(nullptr);
   if(m_lastPDate == 0)
     m_lastPDate = pdate;
   p->bits.tmdiff = pdate - m_lastPDate;
@@ -807,8 +818,12 @@ void Display::historyPage()
 
   drawPointsTarget(rgb16( 6, 8, 4) ); // target (draw behind the other stuff)
 
-  int x = DISPLAY_WIDTH - RPAD - (minute() / 5); // center over even hour, 5 mins per pixel
-  int h = hourFormat12();
+  struct tm timeinfo;
+
+  getLocalTime(&timeinfo);
+
+  int x = DISPLAY_WIDTH - RPAD - (timeinfo.tm_min / 5); // center over even hour, 5 mins per pixel
+  int h = hourFormat12(timeinfo.tm_hour);
 
   while(x > 12 * 6)
   {
