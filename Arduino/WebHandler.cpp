@@ -7,7 +7,7 @@
 #ifdef OTA_ENABLE
 #include <ArduinoOTA.h>
 #endif
-#include <TimeLib.h> // http://www.pjrc.com/teensy/td_libs_Time.html
+#include <Time.h>
 #include "WebHandler.h"
 #include "HVAC.h"
 #include "jsonString.h"
@@ -155,7 +155,7 @@ void startServer()
     hvac.m_notif = Note_EspTouch;
     WiFi.beginSmartConfig();
   }
-  connectTimer = now();
+  connectTimer = time(nullptr);
 
   // attach AsyncWebSocket
   ws.onEvent(onWsEvent);
@@ -215,8 +215,11 @@ void startServer()
   ArduinoOTA.begin();
   ArduinoOTA.onStart([]() {
 #ifndef REMOTE
+    tm timeinfo;
+    getLocalTime(&timeinfo);
+
     hvac.disable();
-    hvac.dayTotals(day() - 1); // save for reload
+    hvac.dayTotals(timeinfo.tm_mday - 1); // save for reload
     ee.update();
     hvac.saveStats();
 #endif
@@ -244,10 +247,17 @@ void findHVAC() // find the HVAC on iot domain
 
     if(!strcmp(szName, HOSTNAME))
     {
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+      ee.hostIp[0] = MDNS.address(i)[0]; // update IP
+      ee.hostIp[1] = MDNS.address(i)[1];
+      ee.hostIp[2] = MDNS.address(i)[2];
+      ee.hostIp[3] = MDNS.address(i)[3];
+#else
       ee.hostIp[0] = MDNS.IP(i)[0]; // update IP
       ee.hostIp[1] = MDNS.IP(i)[1];
       ee.hostIp[2] = MDNS.IP(i)[2];
       ee.hostIp[3] = MDNS.IP(i)[3];
+#endif
       hvac.m_notif = Note_HVACFound;
       break;
     }
@@ -291,7 +301,7 @@ bool secondsServer() // called once per second
     if( WiFi.smartConfigDone())
     {
       bConfigDone = true;
-      connectTimer = now();
+      connectTimer = time(nullptr);
     }
   }
   if(bConfigDone)
@@ -313,9 +323,9 @@ bool secondsServer() // called once per second
 #endif
       }
     }
-    else if(now() - connectTimer > 10) // failed to connect for some reason
+    else if(time(nullptr) - connectTimer > 10) // failed to connect for some reason
     {
-      connectTimer = now();
+      connectTimer = time(nullptr);
       WiFi.mode(WIFI_AP_STA);
       WiFi.beginSmartConfig();
       bConfigDone = false;
@@ -331,7 +341,7 @@ bool secondsServer() // called once per second
   if(nUpdateDelay)
     nUpdateDelay--;
 
-  if(now() >= FC.m_fc.loadDate + (3600*3) && (nUpdateDelay == 0) ) // > 3 hours old
+  if(time(nullptr) >= FC.m_fc.loadDate + (3600*3) && (nUpdateDelay == 0) ) // > 3 hours old
   {
     FC.m_bUpdateFcst = true;
   }
@@ -361,7 +371,10 @@ bool secondsServer() // called once per second
   if(nWrongPass)
     nWrongPass--;
 
-  if(FC.m_bUpdateFcst && FC.m_bUpdateFcstIdle && nUpdateDelay == 0 && year() > 2020)
+  tm timeinfo;
+  getLocalTime(&timeinfo);
+
+  if(FC.m_bUpdateFcst && FC.m_bUpdateFcstIdle && nUpdateDelay == 0 && timeinfo.tm_year > 124)
   {
     FC.m_bUpdateFcst = false;
     FC.m_bUpdateFcstIdle = false;
@@ -690,7 +703,10 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
         uint8_t mon = iValue & 0xF;
         uint16_t yr = (iValue >> 4) & 0xFFF;
 
-        if(mon && mon != month()) // month is 1-12, so 0 can be used as current
+        tm timeinfo;
+        getLocalTime(&timeinfo);
+
+        if(mon && mon != timeinfo.tm_mon+1) // month is 1-12, so 0 can be used as current
         {
           String sName = "/statsday"; // decode requested file
           sName += yr;
@@ -705,7 +721,10 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
             F.close();
             pSecsDay = tempSecsDay;
           }
-          if(yr != year()) // not currrent year
+          tm timeinfo;
+          getLocalTime(&timeinfo);
+
+          if(yr != timeinfo.tm_year+1900) // not currrent year
           {
             sName = "/statsmonth";
             sName += yr;
@@ -830,7 +849,7 @@ void webSocketEventHandler(uint8_t event, char *data, uint16_t length)
       if(length != sizeof(FC.m_fc) )
         break;
       memcpy((void*)&FC.m_fc, data, sizeof(FC.m_fc));
-      FC.m_fc.loadDate = now();
+      FC.m_fc.loadDate = time(nullptr);
       FC.m_bUpdateFcstIdle = true;
       FC.m_bFcstUpdated = true;
       display.m_bShowFC = true;
