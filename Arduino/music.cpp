@@ -172,8 +172,12 @@ void Music::init()
 {
   pinMode(SPEAKER, OUTPUT);
   digitalWrite(SPEAKER, LOW);
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+  ledcAttach(SPEAKER, 2000, 10);
+#else
   ledcSetup(0, 2000, 10);
   ledcAttachPin(SPEAKER, 0);
+#endif
 }
 
 bool Music::add(uint16_t freq, uint16_t delay)
@@ -205,7 +209,11 @@ void Music::playNote(int freq, int duration)
     else
     {
       ledcWrite(SPEAKER, 0);
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+      ledcWriteTone(SPEAKER, 0);
+#else
       ledcWriteTone(0, 0);
+#endif
     } 
     m_toneEnd = millis() + duration;
 }
@@ -286,7 +294,11 @@ void Music::service()
   else if(millis() >= m_toneEnd)
   {
     ledcWrite(SPEAKER, 0);
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+    ledcWriteTone(SPEAKER, 0);
+#else
     ledcWriteTone(0, 0);
+#endif
     m_toneEnd = 0;
     m_bPlaying = false;
   }
