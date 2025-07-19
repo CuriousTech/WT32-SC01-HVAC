@@ -10,7 +10,7 @@
 
 #include <math.h>
 #include "HVAC.h"
-#include <TimeLib.h>
+#include <Time.h>
 #include "eeMem.h"
 #include "jsonstring.h"
 #include "music.h"
@@ -483,8 +483,11 @@ void HVAC::service()
 
   tempCheck();
 
+  struct tm timeinfo;
+  getLocalTime(&timeinfo);
+
   static bool bLoaded;
-  if(!bLoaded && year() > 2020) // ensure date is valid
+  if(!bLoaded && timeinfo.tm_year+1900 > 2024) // ensure date is valid
   {
     bLoaded = true;
     loadStats();
@@ -532,11 +535,14 @@ void HVAC::tempCheck()
   int16_t sensRh = 0;
   bool  remSens = false;
 
+  tm timeinfo;
+  getLocalTime(&timeinfo);
+
   for(int8_t i = 0; i < SNS_CNT; i++)
   {
     if(m_Sensor[i].IP)
     {
-      if(m_Sensor[i].tm > 1750000000 && now() > 1750000000 && now() - m_Sensor[i].tm >= 90) // disregard expired sensor data if valid
+      if(m_Sensor[i].tm > 1750000000 && time(nullptr) > 1750000000 && time(nullptr) - m_Sensor[i].tm >= 90) // disregard expired sensor data if valid
       {
         if( m_Sensor[i].f.f.Warn == 0)
         {
@@ -544,7 +550,7 @@ void HVAC::tempCheck()
           String s = "";
           s += (char*)&m_Sensor[i].ID;
           s += " sensor data expired ";
-          s += (now() - m_Sensor[i].tm);
+          s += (time(nullptr) - m_Sensor[i].tm);
           s += "s ";
           s += m_Sensor[i].tm;
 
@@ -552,7 +558,7 @@ void HVAC::tempCheck()
           js.Var("text", s);
           WsSend(js.Close());
         }
-        if(now() - m_Sensor[i].tm > 3*60) // Inactive 3 minutes. Remove the sensor
+        if(time(nullptr) - m_Sensor[i].tm > 3*60) // Inactive 3 minutes. Remove the sensor
         {
           if(i)
           {
@@ -597,7 +603,7 @@ void HVAC::tempCheck()
     if(m_cycleTimer < ee.cycleMin)
       return;
 
-    if(second() == 0 || m_bRecheck) // readjust while running
+    if(timeinfo.tm_sec == 0 || m_bRecheck) // readjust while running
     {
       m_bRecheck = false;
       preCalcCycle(tempL, tempH);
@@ -645,7 +651,7 @@ void HVAC::tempCheck()
     if(m_fanPreElap < 60*30) // how long since pre-cycle fan has run (if it does)
       m_fanPreElap++;
 
-    if(second() == 0 || m_bRecheck)
+    if(timeinfo.tm_sec == 0 || m_bRecheck)
     {
       m_bRecheck = false;
       if(m_bStart = preCalcCycle(tempL, tempH))
@@ -805,8 +811,11 @@ void HVAC::costAdd(int secs, int mode, int hm)
     case Mode_Humid:
       break;
   }
-  dayTotals(day() - 1);
-  monthTotal(month() - 1, day());
+  tm timeinfo;
+  getLocalTime(&timeinfo);
+
+  dayTotals(timeinfo.tm_mday - 1);
+  monthTotal(timeinfo.tm_mon, timeinfo.tm_mday);
 }
 
 bool HVAC::preCalcCycle(int16_t tempL, int16_t tempH)
@@ -880,6 +889,9 @@ void HVAC::calcTargetTemp(int mode)
   if( H-L == 0 && ee.b.nSchedMode == SM_Forecast) // divide by 0
     ee.b.nSchedMode = SM_Flat;
 
+  tm timeinfo;
+  getLocalTime(&timeinfo);
+
   switch(ee.b.nSchedMode)
   {
     case SM_Forecast:
@@ -904,7 +916,7 @@ void HVAC::calcTargetTemp(int mode)
         case Mode_Off:
         case Mode_Cool:
           {
-            float m = ( (hour() + 14) * 60 + minute() + ee.sineOffset[0] ) / 4;
+            float m = ( (timeinfo.tm_hour + 14) * 60 + timeinfo.tm_min + ee.sineOffset[0] ) / 4;
             float r = (ee.coolTemp[1] - ee.coolTemp[0]) / 2;
             float fs = r * sin(PI * (180 - m) / 180);
             m_targetTemp = (fs + ee.coolTemp[0] - r);
@@ -913,7 +925,7 @@ void HVAC::calcTargetTemp(int mode)
           break;
         case Mode_Heat:
           {
-            float m = ( (hour() + 14) * 60 + minute() + ee.sineOffset[1] ) / 4;
+            float m = ( (timeinfo.tm_hour + 14) * 60 + timeinfo.tm_min + ee.sineOffset[1] ) / 4;
             float r = (ee.heatTemp[1] - ee.heatTemp[0]) / 2;
             float fs = r * sin(PI * (180 - m) / 180);
             m_targetTemp = (fs + ee.heatTemp[0] + r);
@@ -1055,11 +1067,11 @@ void HVAC::updateIndoorTemp(int16_t Temp, int16_t rh)
   static int16_t oldRh;
   static uint32_t secs;
 
-  if(m_localTemp != oldTemp || m_localRh != oldRh || now() - secs > 30)
+  if(m_localTemp != oldTemp || m_localRh != oldRh || time(nullptr) - secs > 30)
   {
     oldTemp = m_localTemp;
     oldRh = m_localRh;
-    secs = now();
+    secs = time(nullptr);
     sendCmd("rmtname", RMTNAME); // RMT1
     String s = String(m_localTemp);
     s += (ee.b.bCelcius) ? 'C' : 'F'; // append C or F to the temp value
@@ -1073,7 +1085,7 @@ void HVAC::updateIndoorTemp(int16_t Temp, int16_t rh)
 #else
   m_Sensor[0].temp = Temp + ee.adj;
   m_Sensor[0].rh = rh;
-  m_Sensor[0].tm = now();
+  m_Sensor[0].tm = time(nullptr);
 
   // Auto1 == auto humidifier when running, Auto2 = even when not running (turns fan on)
   if(ee.b.humidMode >= HM_Auto1)
@@ -1191,7 +1203,7 @@ String HVAC::settingsJson()
 String HVAC::getPushData()
 {
   jsonString js("state");
-  js.Var("t", (long)now() - ((ee.tz+m_DST) * 3600));
+  js.Var("t", (long)time(nullptr));
   js.Var("r", m_bRunning);
   js.Var("fr", getFanRunning() );
   js.Var("it", m_inTemp);
@@ -1559,7 +1571,7 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
         deactivateSensor(snsIdx);
       }
       m_Sensor[snsIdx].temp = val;
-      m_Sensor[snsIdx].tm = now();
+      m_Sensor[snsIdx].tm = time(nullptr);
       break;
     case 46: // rmtrh
       snsIdx = getSensorID(ip);
@@ -1667,7 +1679,7 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
 void HVAC::override(int val)
 {
 #ifdef REMOTE
-  sendCmd("over", ee.overrideTime);
+  sendCmd("override", ee.overrideTime);
 #else
   if(val == 0)
   {
@@ -1767,9 +1779,12 @@ void HVAC::dayTotals(int d)
   m_iSecs[1] = 0;
   m_iSecs[2] = 0;
 
+  tm timeinfo;
+  getLocalTime(&timeinfo);
+
   jsonString js("update");
   js.Var("type", "day");
-  js.Var("e", day() - 1);
+  js.Var("e", timeinfo.tm_mday - 1);
   js.Var("d0", m_SecsDay[d][0]);
   js.Var("d1", m_SecsDay[d][1]);
   js.Var("d2", m_SecsDay[d][2]);
@@ -1801,10 +1816,13 @@ void HVAC::loadStats()
 {
 #ifndef REMOTE
 
+  tm timeinfo;
+  getLocalTime(&timeinfo);
+
   String sFileDay = "/statsday";
-  sFileDay += year();
+  sFileDay += timeinfo.tm_year+1900;
   sFileDay += ".";
-  sFileDay += month();
+  sFileDay += timeinfo.tm_mon+1;
   sFileDay += ".dat";
 
   File F = INTERNAL_FS.open(sFileDay, "r");
@@ -1817,7 +1835,7 @@ void HVAC::loadStats()
   m_daySum = ee.Fletcher16( (uint8_t*)&m_SecsDay, sizeof(m_SecsDay) );
 
   String sFileMon = "/statsmonth";
-  sFileMon += year();
+  sFileMon += timeinfo.tm_year+1900;
   sFileMon += ".dat";
 
   F = INTERNAL_FS.open(sFileMon, "r");
@@ -1835,15 +1853,18 @@ void HVAC::saveStats()
 #ifndef REMOTE
   uint16_t sum;
 
-  if( year() < 2020)
+  tm timeinfo;
+  getLocalTime(&timeinfo);
+
+  if( timeinfo.tm_year < 125)
     return;
 
   m_SecsDay[31][0] = m_filterMinutes; // store the filter timer with data that will change at the same frequency
 
   String sFileDay = "/statsday";
-  sFileDay += year();
+  sFileDay += timeinfo.tm_year+1900;
   sFileDay += ".";
-  sFileDay += month();
+  sFileDay += timeinfo.tm_mon+1;
   sFileDay += ".dat";
 
   sum = ee.Fletcher16( (uint8_t*) &m_SecsDay, sizeof(m_SecsDay) );
@@ -1856,7 +1877,7 @@ void HVAC::saveStats()
   }
 
   String sFileMon = "/statsmonth";
-  sFileMon += year();
+  sFileMon += timeinfo.tm_year+1900;
   sFileMon += ".dat";
 
   sum = ee.Fletcher16( (uint8_t*)&m_SecsMon, sizeof(m_SecsMon) );
