@@ -1,5 +1,5 @@
 #include "screensavers.h"
-#include <TimeLib.h>
+#include <Time.h>
 #include "digitalFont.h"
 #include "display.h"
 #include "forecast.h"
@@ -7,7 +7,28 @@
 
 extern Forecast FC;
 
+extern const char monthShortStr[12][4];
+extern const char dayShortStr[7][4];
+
+const char _dayStr[7][7] PROGMEM = {"Sun","Mon","Tues","Wednes","Thus","Fri","Satur"};
+const char _monthShortStr[12][4] PROGMEM = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
+const char _dayShortStr[7][4] PROGMEM = {"Sun","Mon","Tue","Wed","Thu","Fri","Sat"};
+const char _monthStr[12][10] PROGMEM = {"January","February","March","April","May","June","July","August","September","October","November","December"};
+
 extern void WsSend(String s);
+
+const char *ScreenSavers::monthStr(uint8_t m)
+{
+  return _monthStr[m];
+}
+const char *ScreenSavers::monthShortStr(uint8_t m)
+{
+  return _monthShortStr[m];
+}
+const char *ScreenSavers::dayShortStr(uint8_t m)
+{
+  return _dayShortStr[m];
+}
 
 void ScreenSavers::select(int n)
 {
@@ -42,30 +63,40 @@ void ScreenSavers::run()
   }
 }
 
+uint8_t ScreenSavers::hourFormat12(uint8_t h)
+{
+  if(h > 12) return h - 12;
+  if(h == 0) h = 12;
+  return h;
+}
+
 // Analog clock
 void ScreenSavers::Clock(bool bInit)
 {
+  tm timeinfo;
+  getLocalTime(&timeinfo);
+
   if(bInit)
   {
     media.loadImage("bgClock.png", 0, 0);
-    FC.drawIcon(0, hour(), DISPLAY_WIDTH - 50); // 0 = current day, current hour, right edge pos
+    FC.drawIcon(0, timeinfo.tm_hour, DISPLAY_WIDTH - 50); // 0 = current day, current hour, right edge pos
   }
 
   static uint8_t sec;
-  if(sec == second())
+  if(sec == timeinfo.tm_sec)
     return;
-  sec = second();
+  sec = timeinfo.tm_sec;
 
   const float x = 159; // center
   const float y = 158;
   const uint16_t bgColor = rgb16(9,18,9);
   uint16_t xH,yH, xM,yM, xS,yS, xS2,yS2;
 
-  float a = (hour() + (minute() * 0.00833) ) * 30;
+  float a = (timeinfo.tm_hour + timeinfo.tm_min * 0.00833) * 30;
   cspoint(xH, yH, x, y, a, 64);
-  cspoint(xM, yM, x, y, minute() * 6, 87);
-  cspoint(xS, yS, x, y, second() * 6, 91);
-  cspoint(xS2, yS2, x, y, (second()+30) * 6, 24);
+  cspoint(xM, yM, x, y, timeinfo.tm_min * 6, 87);
+  cspoint(xS, yS, x, y, timeinfo.tm_sec * 6, 91);
+  cspoint(xS2, yS2, x, y, (timeinfo.tm_sec+30) * 6, 24);
 
   tft.fillCircle(x, y, 92, bgColor ); // no sprites
   tft.drawWedgeLine(x, y, xH, yH, 10, 2, TFT_BLACK, bgColor); // hour hand
@@ -77,27 +108,29 @@ void ScreenSavers::Clock(bool bInit)
   tft.setTextColor(rgb16(16,63,0) );
   tft.setFreeFont(&FreeSans12pt7b);
 
-  String sTime = (hourFormat12() < 10) ? " ":"";
-  sTime += String( hourFormat12() );
+  String sTime = (hourFormat12(timeinfo.tm_hour) < 10) ? " ":"";
+  sTime += String( hourFormat12(timeinfo.tm_hour) );
   sTime += ":";
-  if(minute() < 10) sTime += "0";
-  sTime += minute();
+  if(timeinfo.tm_min < 10) sTime += "0";
+  sTime += timeinfo.tm_min;
   sTime += ":";
-  if(second() < 10) sTime += "0";
-  sTime += second();
+  if(timeinfo.tm_sec < 10) sTime += "0";
+  sTime += timeinfo.tm_sec;
   sTime += " ";
-  sTime += isPM() ? "PM":"AM";
+  sTime += (timeinfo.tm_hour >= 12) ? "PM":"AM";
 
   tft.fillRect(311, 17, 151, 25, rgb16(1,8,4));
   tft.drawString(sTime, 320, 20);
 
-  tft.drawString(dayStr(weekday()), 320, 60);
+  sTime = _dayStr[timeinfo.tm_wday];
+  sTime += "day";
+  tft.drawString(sTime, 320, 60);
 
-  sTime = monthShortStr(month());
+  sTime = _monthShortStr[timeinfo.tm_mon];
   sTime += " ";
-  sTime += String(day());
+  sTime += String(timeinfo.tm_mday);
   sTime += " ";
-  sTime += String(year());
+  sTime += String(timeinfo.tm_year+1900);
   tft.drawString(sTime, 320, 100);
 }
 
@@ -289,18 +322,21 @@ void ScreenSavers::Boing(bool bInit)
 
 void ScreenSavers::Calendar(bool bInit)
 {
-  static uint16_t xOffset = 40;
-  static uint16_t width = DISPLAY_WIDTH - 44 - (xOffset * 2);
+  static uint16_t xOffset = 60;
+  static uint16_t width = DISPLAY_WIDTH - (xOffset * 2);
   static uint16_t yOffset = 68;
 
   if(bInit)
   {
-    uint8_t month_days[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
-    if(year() % 4 == 0) month_days[1] = 29;
+    tm timeinfo;
+    getLocalTime(&timeinfo);
 
-    uint8_t firstDay = (day() - weekday() + 2) % 7;
-    uint8_t lastDay = month_days[ month()-1 ];
-    uint8_t rows = (lastDay + firstDay + 1) / 7;
+    uint8_t month_days[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+    if((timeinfo.tm_year+1900) % 4 == 0) month_days[1] = 29;
+
+    uint8_t firstDay =  timeinfo.tm_wday + 1 - (timeinfo.tm_mday % 7);
+    uint8_t lastDay = month_days[ timeinfo.tm_mon ];
+    uint8_t rows = (firstDay + lastDay + 5) / 7;
 
     tft.fillRect(0, 0, DISPLAY_WIDTH, 34, rgb16(24,48,24)); // fill 3 areas
     tft.fillRect(0, 34, DISPLAY_WIDTH, 34, rgb16(9,18,24));
@@ -311,21 +347,21 @@ void ScreenSavers::Calendar(bool bInit)
     tft.setTextColor( TFT_BLACK, rgb16(24,48,24) );
 
     // Top bar
-    String s = monthStr( month() ); s += " "; s += year();
+    String s = _monthStr[ timeinfo.tm_mon ]; s += " "; s += timeinfo.tm_year+1900;
     tft.drawString(s, DISPLAY_WIDTH/2, 5);
 
     // Weekday bar
     tft.setTextColor( rgb16(0, 63, 31), rgb16(9,18,24) );
     for (uint8_t dayNum = 0; dayNum < 7; ++dayNum)
-      tft.drawString( dayShortStr(dayNum+1), dayNum * (width / 7) + xOffset + 40 , 40 );
+      tft.drawString( _dayShortStr[dayNum], dayNum * (width / 7) + xOffset + 22, 40 );
 
     // Days
     uint8_t digit = 1;
-    uint8_t curCell = 1;
+    uint8_t curCell = 0;
   
     for (uint8_t row = 1; row <= rows; ++row)
     {
-      for (uint8_t col = 1; col <= 7; ++col)
+      for (uint8_t col = 0; col < 7; ++col)
       {
         if (digit > lastDay) break;
         if (curCell < firstDay)
@@ -334,15 +370,15 @@ void ScreenSavers::Calendar(bool bInit)
         }
         else
         {
-          uint16_t x = col * (width / 7) + xOffset - 12;
+          uint16_t x = col * (width / 7) + xOffset;
           uint16_t y = row * ((DISPLAY_HEIGHT - yOffset - 3)/ rows) + yOffset - 34;
 
           // rounded box around each day
-          uint16_t boxColor = (digit == day()) ? rgb16(20, 40, 10) : rgb16(10, 20, 10);
-          tft.fillRoundRect( x-22, y-10, 44, 40, 5, boxColor);
+          uint16_t boxColor = (digit == timeinfo.tm_mday) ? rgb16(20, 40, 10) : rgb16(10, 20, 10);
+          tft.fillRoundRect( x, y-10, 44, 40, 5, boxColor);
           uint16_t txtColor = rgb16(0, 63, 31); // cyan
           tft.setTextColor( txtColor, boxColor );
-          tft.drawString( String(digit), x, y);
+          tft.drawString( String(digit), x+22, y);
           digit++;
         }
       }
@@ -350,5 +386,4 @@ void ScreenSavers::Calendar(bool bInit)
 
     tft.setTextDatum(TL_DATUM);
   }
-
 }
