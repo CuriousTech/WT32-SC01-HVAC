@@ -27,8 +27,7 @@ SOFTWARE.
 // For remote unit, uncomment #define REMOTE in HVAC.h
 
 #include <ESPAsyncWebServer.h> // https://github.com/ESP32Async/ESPAsyncWebServer
-#include <TimeLib.h> // http://www.pjrc.com/teensy/td_libs_Time.html
-#include <UdpTime.h> // https://github.com/CuriousTech/ESP07_WiFiGarageDoor/tree/master/libraries/UdpTime
+#include <Time.h> // http://www.pjrc.com/teensy/td_libs_Time.html
 #include "HVAC.h"
 #include "WebHandler.h"
 #include "display.h"
@@ -73,8 +72,6 @@ DallasTemperature ds18(&oneWire);
 AM2320 am;
 #endif
 
-UdpTime uTime;
-
 extern void WsSend(String s);
 
 void setup()
@@ -105,19 +102,11 @@ void setup()
 void loop()
 {
   static uint8_t hour_save, min_save = 255, sec_save;
-  static int8_t lastSec;
   static int8_t lastHour;
   static int8_t lastDay = -1;
+  static uint32_t lastMS;
 
   display.service();  // check for touch, etc.
-
-  if(uTime.check(ee.tz))
-  {
-    hvac.m_DST = uTime.getDST();
-    if(lastDay == -1)
-      lastDay = day() - 1;
-  }
-
   handleServer(); // handles mDNS, web
 
 #ifdef DallasTemperature_h
@@ -136,12 +125,24 @@ void loop()
     ds18reqlastreq = ds18lastreq;
   }
 #endif
-  
-  if(sec_save != second()) // only do stuff once per second
+    
+  if(millis() - lastMS > 1000) // only do stuff once per second
   {
-    sec_save = second();
+    lastMS = millis();
     if(secondsServer()) // once per second stuff, returns true once on connect
-      uTime.start();
+    {
+      configTime(3600 * ee.tz, 0, "pool.ntp.org");
+      hvac.m_DST = DST();
+      configTime(3600 * ee.tz, (hvac.m_DST)?3600:0, "pool.ntp.org");
+
+      if(lastDay == -1)
+      {
+        tm timeinfo;
+        getLocalTime(&timeinfo);
+        lastDay = timeinfo.tm_mday - 1;
+      }
+
+    }
     display.oneSec();
     hvac.service();   // all HVAC code
 
@@ -209,31 +210,36 @@ void loop()
       read_delay = 5; // update every 5 seconds
     }
 #endif
+    tm timeinfo;
+    getLocalTime(&timeinfo);
 
-    if(min_save != minute()) // only do stuff once per minute
+    if(min_save != timeinfo.tm_min) // only do stuff once per minute
     {
-      min_save = minute();
+      min_save = timeinfo.tm_min;
 
-      if(hour_save != hour()) // update our IP and time daily (at 2AM for DST)
+      if(hour_save != timeinfo.tm_hour) // update our IP and time daily (at 2AM for DST)
       {
-        hour_save = hour();
+        hour_save = timeinfo.tm_hour;
         if(hour_save == 2)
-          uTime.start(); // update time daily at DST change
+        {
+          configTime(3600 * ee.tz, (hvac.m_DST)?3600:0, "pool.ntp.org");
+          hvac.m_DST = DST();
+        }
 #ifndef REMOTE
-        if(hour_save == 0 && year() > 2020)
+        if(hour_save == 0 && timeinfo.tm_year > 124)
         {
           if(lastDay != -1)
           {
             hvac.dayTotals(lastDay);
-            hvac.monthTotal(month() - 1, day());
+            hvac.monthTotal(timeinfo.tm_mon, timeinfo.tm_mday);
           }
-          lastDay = day() - 1;
+          lastDay = timeinfo.tm_mday - 1;
           hvac.m_SecsDay[lastDay][0] = 0; // reset
           hvac.m_SecsDay[lastDay][1] = 0;
           hvac.m_SecsDay[lastDay][2] = 0;
           if(lastDay == 0) // new month
           {
-            int m = (month() + 10) % 12; // last month: Dec = 10, Jan = 11, Feb = 0
+            int m = (timeinfo.tm_mon + 10) % 12; // last month: Dec = 10, Jan = 11, Feb = 0
             hvac.monthTotal(m, -1);
             memset(hvac.m_SecsDay, 0, sizeof(hvac.m_SecsDay)); // clear for new month
           }
@@ -247,4 +253,39 @@ void loop()
     }
   }
   delay(2);
+}
+
+bool DST() // 2016 starts 2AM Mar 13, ends Nov 6
+{
+  tm timeinfo;
+  getLocalTime(&timeinfo);
+
+  // save current time
+  uint8_t m = timeinfo.tm_mon;
+  int8_t d = timeinfo.tm_mday;
+  int8_t dow = timeinfo.tm_wday + 1;
+
+  timeinfo.tm_mon = 3; // set month = Mar
+  timeinfo.tm_mday = 14; // day of month = 14
+
+  time_t tt = mktime(&timeinfo);
+  tm *tmWd = gmtime( &tt ); // convert to get weekday
+
+  uint8_t day_of_mar = (7 - tmWd->tm_wday) + 8; // DST = 2nd Sunday
+
+  timeinfo.tm_mon = 11; // set month = Nov (0-11)
+  timeinfo.tm_mday = 7; // day of month = 7 (1-30)
+  tt = mktime(&timeinfo);
+  tmWd = gmtime( &tt  ); // convert to get weekday
+
+  uint8_t day_of_nov = (7 - tmWd->tm_mday) + 1;
+
+  if ((m  >  3 && m < 11 ) ||
+      (m ==  3 && d > day_of_mar) ||
+      (m ==  3 && d == day_of_mar && timeinfo.tm_hour >= 2) ||  // DST starts 2nd Sunday of March;  2am
+      (m == 11 && d <  day_of_nov) ||
+      (m == 11 && d == day_of_nov && timeinfo.tm_hour < 2))   // DST ends 1st Sunday of November; 2am
+   return true;
+ else
+   return false;
 }
