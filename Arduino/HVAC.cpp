@@ -145,8 +145,6 @@ void HVAC::updateVar(int iName, int iValue)// host values (sent to remote)
     case 1: // fr
       m_bFanRunning = iValue;
       break;
-    case 2: // s
-      break;
     case 3: // it
       m_inTemp = iValue;
       break;
@@ -159,12 +157,6 @@ void HVAC::updateVar(int iName, int iValue)// host values (sent to remote)
     case 6: // fm
       m_filterMinutes = iValue;
       break;
-    case 7: // outTemp
-      break;
-    case 8: // outmin
-      break;
-    case 9: // outmax
-      break;
     case 10: // ct
       m_cycleTimer = iValue;
       break;
@@ -176,10 +168,6 @@ void HVAC::updateVar(int iName, int iValue)// host values (sent to remote)
       break;
     case 13: // h
       m_bHumidRunning = iValue;
-      break;
-    case 14: // lt (localTemp on host)
-      break;
-    case 15: // lh (local Rh)
       break;
     case 16: // rmt
       m_bRemoteStream = false; // command to kill remote temp send
@@ -547,12 +535,8 @@ void HVAC::tempCheck()
         if( m_Sensor[i].f.f.Warn == 0)
         {
           m_Sensor[i].f.f.Warn = 1;
-          String s = "";
-          s += (char*)&m_Sensor[i].ID;
-          s += " sensor data expired ";
-          s += (time(nullptr) - m_Sensor[i].tm);
-          s += "s ";
-          s += m_Sensor[i].tm;
+          String s = (char*)&m_Sensor[i].ID;
+          s += " sensor data expired";
 
           jsonString js("print");
           js.Var("text", s);
@@ -763,7 +747,7 @@ void HVAC::fanSwitch(bool bOn)
   if(bOn)
   {
     if(ee.b.humidMode == HM_Fan) // run humidifier when fan is on
-        humidSwitch(true);
+      humidSwitch(true);
   }
   else
   {
@@ -806,10 +790,6 @@ void HVAC::costAdd(int secs, int mode, int hm)
           break;
       }
       break;
-    case Mode_Fan:
-      break;
-    case Mode_Humid:
-      break;
   }
   tm timeinfo;
   getLocalTime(&timeinfo);
@@ -833,16 +813,14 @@ bool HVAC::preCalcCycle(int16_t tempL, int16_t tempH)
       bRet = (tempH >= m_targetTemp);    // has reached threshold above desired temp
       break;
     case Mode_Heat:
-      calcTargetTemp(Mode_Heat);
-      bRet = (tempL <= m_targetTemp);
-      if(ee.b.heatMode == Heat_Auto)
-      {
-        if(m_outTemp < ee.eHeatThresh * 10)  // Use gas when efficiency too low for pump
-          m_AutoHeat = Heat_NG;
-        else
-          m_AutoHeat = Heat_HP;
-      }
-      break;
+      goto HEAT;
+//      calcTargetTemp(Mode_Heat);
+//      if(ee.b.heatMode == Heat_Auto)
+//      {
+//        m_AutoHeat = (m_outTemp < ee.eHeatThresh * 10) ? Heat_NG:Heat_HP;  // Use gas when efficiency too low for pump
+//      }
+//      bRet = (tempL <= m_targetTemp);
+//      break;
     case Mode_Auto:
       if(tempH >= ee.coolTemp[0])
       {
@@ -853,13 +831,10 @@ bool HVAC::preCalcCycle(int16_t tempL, int16_t tempH)
       else if(tempL <= ee.heatTemp[1])
       {
         m_AutoMode = Mode_Heat;
-        calcTargetTemp(Mode_Heat);
+HEAT:   calcTargetTemp(Mode_Heat);
         if(ee.b.heatMode == Heat_Auto)
         {
-          if(m_outTemp < ee.eHeatThresh * 10)  // Use gas when efficiency too low for pump
-            m_AutoHeat = Heat_NG;
-          else
-            m_AutoHeat = Heat_HP;
+          m_AutoHeat = (m_outTemp < ee.eHeatThresh * 10) ? Heat_NG:Heat_HP;  // Use gas when efficiency too low for pump
         }
         bRet = (tempL <= m_targetTemp);
       }
@@ -983,10 +958,8 @@ String HVAC::settingsJsonMod()
 }
 #endif
 
-//#ifdef REMOTE  // Uncomment for ESP32 1.0.6
 #define min(a,b) ((a) < (b) ? (a) : (b))
 #define max(a,b) ((a) > (b) ? (a) : (b))
-//#endif
 
 // User:Set new control temp
 void HVAC::setTemp(int mode, int16_t Temp, int hl)
@@ -1321,8 +1294,7 @@ int snsComp(const void *a, const void*b)
   if(c1[0] != c2[0]) return c1[0] - c2[0]; // strcmp is having trouble
   if(c1[1] != c2[1]) return c1[1] - c2[1];
   if(c1[2] != c2[2]) return c1[2] - c2[2];
-  if(c1[3] != c2[3]) return c1[3] - c2[3];
-  return 0;
+  return c1[3] - c2[3];
 }
 
 #endif
@@ -1333,7 +1305,7 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
   static uint8_t snsIdx; // current sensor in use
 
   int c = CmdIdx( sCmd );
-  if(ee.b.bLock && c!= 51)
+  if(ee.b.bLock && c!= 30)
     return;
 
   int i;
@@ -1538,33 +1510,10 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
           break;
         }
       }
-      if(val < (ee.b.bCelcius ? 156:600) || val > (ee.b.bCelcius ? 370:990) )
+      if(val < (ee.b.bCelcius ? 156:600) || val > (ee.b.bCelcius ? 370:990) || (m_Sensor[snsIdx].temp && (val < m_Sensor[snsIdx].temp - 20 || val > m_Sensor[snsIdx].temp + 20)) )
       {
-        String s = "";
+        String s = "Sensor deactivated ";
         s += (char *)&m_Sensor[snsIdx].ID;
-        s += " sensor range error ";
-        s += String((float)val / 10, 1);
-        jsonString js("print");
-        js.Var("text", s);
-        WsSend(js.Close());
-        deactivateSensor(snsIdx);
-      }
-      else if(m_Sensor[snsIdx].temp && (val < m_Sensor[snsIdx].temp - 20 || val > m_Sensor[snsIdx].temp + 20) )
-      {
-        String s = "";
-        s += (char *)&m_Sensor[snsIdx].ID;
-        s += " irratic sensor change idx=";
-        s += snsIdx;
-        s += " ";
-        s += ip.toString();
-        s += " ";
-
-        s += m_Sensor[i].IP;
-        s += " ";
-        
-        s += String((float)m_Sensor[snsIdx].temp / 10, 1);
-        s += " to ";
-        s += String((float)val / 10, 1);
         jsonString js("print");
         js.Var("text", s);
         WsSend(js.Close());
