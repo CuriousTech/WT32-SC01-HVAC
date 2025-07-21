@@ -134,7 +134,7 @@ void Media::loadImage(String Name, uint16_t x, uint16_t y, uint16_t srcX, uint16
 
   String sPath = "/";
   sPath += Name;
-
+  sPath += ".png";
   int16_t rc = png.open(sPath.c_str(), pngOpen, pngClose, pngRead, pngSeek, pngDraw);
 
   if(rc == PNG_SUCCESS)
