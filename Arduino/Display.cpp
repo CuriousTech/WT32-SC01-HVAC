@@ -59,7 +59,7 @@ bool Display::screen(bool bOn)
       return false; // no change occurred
     m_currPage = Page_Thermostat;
     goDark();
-    media.loadImage("bg.png", 0, 0);
+    media.loadImage("bg", 0, 0);
     refreshAll();
   }
   else
@@ -303,7 +303,7 @@ void Display::drawOutTemp()
   {
     tft.setTextColor( rgb16(0, 63, 31), TFT_BLACK );
     tft.setFreeFont(&digitaldreamSkew_28ptFont);
-    tft.drawFloat((float)outTempReal/10, 1, m_btn[Btn_OutTemp].x, m_btn[Btn_OutTemp].y );
+    drawFakeFloat(outTempReal, m_btn[Btn_OutTemp].x, m_btn[Btn_OutTemp].y );
 
     static bool bInit = false; // make first time display update fast
     if(!bInit)
@@ -313,6 +313,14 @@ void Display::drawOutTemp()
       bInit = true;
     }
   }
+}
+
+void Display::drawFakeFloat(uint16_t val, uint16_t x, uint16_t y)
+{
+  String s = String(val/10);
+  s += ".";
+  s += val % 10;
+  tft.drawString(s, x, y);
 }
 
 void Display::updateTemps(void)
@@ -332,15 +340,15 @@ void Display::updateTemps(void)
   tft.setTextColor( (m_displayLocal) ? rgb16(4, 63, 1) : rgb16(0, 63, 31), TFT_BLACK );
 
   if(last[0] != inTemp)
-    tft.drawFloat((float)(last[0] = inTemp)/10, 1, m_btn[Btn_InTemp].x, m_btn[Btn_InTemp].y );
+    drawFakeFloat((last[0] = inTemp), m_btn[Btn_InTemp].x, m_btn[Btn_InTemp].y );
 
   tft.setFreeFont(&digitaldreamSkew_28ptFont);
   if(last[1] != hvac.m_targetTemp)
-    tft.drawFloat((float)(last[1] = hvac.m_targetTemp)/10, 1, m_btn[Btn_TargetTemp].x, m_btn[Btn_TargetTemp].y );
+    drawFakeFloat((last[1] = hvac.m_targetTemp), m_btn[Btn_TargetTemp].x, m_btn[Btn_TargetTemp].y );
 
   if(last[2] != rh)
   {
-    tft.drawFloat((float)(last[2] = rh)/10, 1, m_btn[Btn_Rh].x, m_btn[Btn_Rh].y );
+    drawFakeFloat((last[2] = rh), m_btn[Btn_Rh].x, m_btn[Btn_Rh].y );
     tft.setFreeFont(&FreeSans12pt7b);
     tft.drawString("%", m_btn[Btn_Rh].x + 101, m_btn[Btn_Rh].y );
   }
@@ -367,24 +375,24 @@ void Display::updateTemps(void)
     case Mode_Cool:
       if(last[3] != ee.coolTemp[1])
       {
-        tft.drawFloat((float)(last[3] = ee.coolTemp[1])/10, 1, m_btn[Btn_SetTempH].x+1, m_btn[Btn_SetTempH].y+2 );
+        drawFakeFloat((last[3] = ee.coolTemp[1]), m_btn[Btn_SetTempH].x+1, m_btn[Btn_SetTempH].y+2 );
         last[6] = 10; // force outline refresh 
       }
       if(last[4] != ee.coolTemp[0])
       {
-        tft.drawFloat((float)(last[4] = ee.coolTemp[0])/10, 1, m_btn[Btn_SetTempL].x+1, m_btn[Btn_SetTempL].y+2 );
+        drawFakeFloat((last[4] = ee.coolTemp[0]), m_btn[Btn_SetTempL].x+1, m_btn[Btn_SetTempL].y+2 );
         last[6] = 10;
       }
       break;
     case Mode_Heat:
       if(last[3] != ee.heatTemp[1])
       {
-        tft.drawFloat((float)(last[3] = ee.heatTemp[1])/10, 1, m_btn[Btn_SetTempH].x+1, m_btn[Btn_SetTempH].y+2 );
+        drawFakeFloat((last[3] = ee.heatTemp[1]), m_btn[Btn_SetTempH].x+1, m_btn[Btn_SetTempH].y+2 );
         last[6] = 10;
       }
       if(last[4] != ee.heatTemp[0])
       {
-        tft.drawFloat((float)(last[4] = ee.heatTemp[0])/10, 1, m_btn[Btn_SetTempL].x+1, m_btn[Btn_SetTempL].y+2 );
+        drawFakeFloat((last[4] = ee.heatTemp[0]), m_btn[Btn_SetTempL].x+1, m_btn[Btn_SetTempL].y+2 );
         last[6] = 10;
       }
       break;
@@ -396,7 +404,6 @@ void Display::updateTemps(void)
     int8_t am = m_adjustMode;
     tft.drawRect(m_btn[Btn_SetTempH+am].x, m_btn[Btn_SetTempH+am].y, m_btn[Btn_SetTempH+am].w, m_btn[Btn_SetTempH+am].h, rgb16(0,31,0));
     tft.drawRect(m_btn[Btn_SetTempH+(am^1)].x, m_btn[Btn_SetTempH+(am^1)].y, m_btn[Btn_SetTempH+(am^1)].w, m_btn[Btn_SetTempH+(am^1)].h, (m_bLink) ? rgb16(0,31,0) : TFT_BLACK);
-
   }
 }
 
@@ -429,7 +436,7 @@ void Display::updateModes(bool bForce) // update any displayed settings
         idx = 2; // on and running
     }
 
-    const char *pFan[] = {"fanOff.png", "fanOn.png", "fanAutoOn.png"};
+    const char *pFan[] = {"fanOff", "fanOn", "fanAutoOn"};
     loadBtnImage(pFan[idx], Btn_Fan);
   }
 
@@ -437,7 +444,7 @@ void Display::updateModes(bool bForce) // update any displayed settings
   {
     nMode = hvac.getSetMode();
 
-    const char *szModes[] = {"off.png", "cool.png", "heat.png", "auto.png", "auto.png"};
+    const char *szModes[] = {"off", "cool", "heat", "auto", "auto"};
     loadBtnImage(szModes[nMode], Btn_Mode);
 
     m_bLink = true;
@@ -446,13 +453,13 @@ void Display::updateModes(bool bForce) // update any displayed settings
 
     nState = hvac.getState();
     if(nState) // draw the ON indicator on the button
-      loadBtnImage("btnled.png", Btn_Mode);
+      loadBtnImage("btnled", Btn_Mode);
   }
 
   if(heatMode != hvac.getHeatMode())
   {
     heatMode = hvac.getHeatMode();
-    const char *szHeatModes[] = {"hp.png", "ng.png", "hauto.png"};
+    const char *szHeatModes[] = {"hp", "ng", "hauto"};
     loadBtnImage(szHeatModes[heatMode], Btn_HeatMode);
   }
 
@@ -460,7 +467,7 @@ void Display::updateModes(bool bForce) // update any displayed settings
   {
     humidMode = (hvac.getHumidifierMode() + hvac.getHumidifierRunning());
 
-    loadBtnImage("humid.png", Btn_Humid);
+    loadBtnImage("humid", Btn_Humid);
 
     const char szHmode[][2] = {"", "F", "R", "1", "2", ""};
     tft.setFreeFont(&FreeSans9pt7b);
@@ -468,15 +475,15 @@ void Display::updateModes(bool bForce) // update any displayed settings
     tft.drawString((char*)szHmode[hvac.getHumidifierMode()], m_btn[Btn_Humid].x + 27, m_btn[Btn_Humid].y + 28);
 
     if(hvac.getHumidifierRunning())
-      loadBtnImage("btnled.png", Btn_Humid);
+      loadBtnImage("btnled", Btn_Humid);
   }
 
-  loadBtnImage( ( (ee.b.bLock) ? "lock.png" : "unlock.png" ), Btn_Lock);
+  loadBtnImage( ( (ee.b.bLock) ? "lock" : "unlock" ), Btn_Lock);
 
-  loadBtnImage( "over.png", Btn_Override);
+  loadBtnImage( "over", Btn_Override);
   if((hvac.m_overrideTimer ? true:false) != bOverride)
   {
-    loadBtnImage("btnled.png", Btn_Override);
+    loadBtnImage("btnled", Btn_Override);
     bOverride = (hvac.m_overrideTimer ? true:false);
   }
 }
@@ -507,21 +514,13 @@ void Display::buttonRepeat()
   updateTemps();
 }
 
-uint8_t hourFormat12(uint8_t h)
-{
-  if(h > 12) return h - 12;
-  if(h == 0) h = 12;
-  return h;
-}
-
 // time and dow on main page
 void Display::drawTime()
 {
   static bool bRefresh = true;
   static uint8_t last_day;
 
-  struct tm timeinfo;
-
+  tm timeinfo;
   getLocalTime(&timeinfo);
 
   if(m_currPage || last_day != timeinfo.tm_mday ) // not main page
@@ -531,17 +530,7 @@ void Display::drawTime()
     return;
   }
 
-  String sTime = String( hourFormat12(timeinfo.tm_hour) );
-  if(hourFormat12(timeinfo.tm_hour) < 10)
-    sTime = " " + sTime;
-  sTime += ":";
-  if(timeinfo.tm_min < 10) sTime += "0";
-  sTime += timeinfo.tm_min;
-  sTime += ":";
-  if(timeinfo.tm_sec < 10) sTime += "0";
-  sTime += timeinfo.tm_sec;
-  sTime += " ";
-  sTime += (timeinfo.tm_hour >= 12) ? "PM":"AM";
+  String sTime = ss.localTimeString();
   sTime += " ";
 
 #define TIME_X_OFFSET 80
@@ -559,6 +548,30 @@ void Display::drawTime()
   }
   bRefresh = false;
 }
+
+const char *pNotes[] ={
+  "",  //  Note_None,
+  "Connecting", //  Note_Connecting,
+#ifdef REMOTE
+   "Searching for HVAC",
+#else
+  "Connected",  //  Note_Connected,
+#endif
+  "", //  Note_HVAC_connected,
+  "Remote Off", //  Note_RemoteOff,
+  "Remote On",  //  Note_RemoteOn,
+  "Cycle Limit",  //  Note_CycleLimit,
+  "HVAC Not Connected", //  Note_Network, // Sound errors below this point
+  "Forecast Error", //  Note_Forecast,
+  "Replace Filter", //  Note_Filter,
+  "Use EspTouch App", //  Note_EspTouch,
+  "Sensor Falied",  //  Note_Sensor,
+  "HVAC Found", //  Note_HVACFound,
+  "Updating Firmware",  //  Note_Updating,
+  "HP Malfunction", //  Note_HPHeatError,
+  "NG Malfunction", //  Note_NGHeatError,
+  "Cool Malfunction", //  Note_CoolError,
+};
 
 // update the notification text box
 void Display::updateNotification(bool bRef)
@@ -582,71 +595,25 @@ void Display::updateNotification(bool bRef)
 
   note_last = hvac.m_notif;
   nTimer = 0;
-  String s = "";
+  String s = pNotes[hvac.m_notif];
+  
   switch(hvac.m_notif)
   {
-    case Note_None:
+    case Note_Connecting:
+    case Note_Connected:
+    case Note_HVAC_connected:
+    case Note_RemoteOff:
+    case Note_RemoteOn:
+      nTimer = 30;
       break;
     case Note_CycleLimit:
-      s = "Cycle Limit";
-      nTimer = 60;
-      break;
-    case Note_Filter:
-      s = "Replace Filter";
-      break;
-    case Note_Forecast:
-      s = "Forecast Error"; // max chars 14 with this font
-      break;
-    case Note_Network:
-      s = "HVAC Not Connected";
-      break;
-    case Note_Connecting:
-      s = "Connecting";
-      nTimer = 30;
-      break;
-    case Note_Connected:
-#ifdef REMOTE
-      s = "Searching for HVAC";
-#else
-      s = "Connected";
-#endif
-      nTimer = 30;
-      break;
-    case Note_HVAC_connected:
-      nTimer = 30;
-      break;
-    case Note_RemoteOff:
-      s = "Remote Off";
-      nTimer = 30;
-      break;
-    case Note_RemoteOn:
-      s = "Remote On";
-      nTimer = 30;
-      break;
-    case Note_EspTouch:
-      s = "Use EspTouch App";
-      break;
-    case Note_Sensor:
-      s = "Sensor Falied";
-      break;
     case Note_HVACFound:
-      nTimer = 60;
-      s = "HVAC Found";
-      break;
     case Note_HPHeatError:
-      nTimer = 60;
-      s = "HP Malfunction";
-      break;
     case Note_NGHeatError:
-      nTimer = 60;
-      s = "NG Malfunction";
-      break;
     case Note_CoolError:
       nTimer = 60;
-      s = "Cool Malfunction";
       break;
     case Note_Updating:
-      s = "Updating Firmware";
       m_bright = 20;
       analogWrite(TFT_BL, m_bright); // dim it a lot. flashing takes power, so this evens it out a bit
       break;
@@ -655,7 +622,7 @@ void Display::updateNotification(bool bRef)
   tft.setTextColor(rgb16(31, 5, 10), rgb16(0,3,4));
   tft.setFreeFont(&FreeSans12pt7b);
   tft.drawString(s, m_btn[Btn_Note].x+2, m_btn[Btn_Note].y+6);
-  if(s != "")
+  if(s.length())
   {
     if(bRef == false) // refresh shouldn't be resent
     {
@@ -702,11 +669,11 @@ void Display::refreshAll()
   updateTemps();
   updateModes(true);
   drawOutTemp();
-  loadBtnImage("up.png", Btn_Up);
-  loadBtnImage("dn.png", Btn_Dn);
-  loadBtnImage("bbtn.png", Btn_Unused);
-  loadBtnImage("weather.png", Btn_Forecast);
-  loadBtnImage("history.png", Btn_History);
+  loadBtnImage("up", Btn_Up);
+  loadBtnImage("dn", Btn_Dn);
+  loadBtnImage("bbtn", Btn_Unused);
+  loadBtnImage("weather", Btn_Forecast);
+  loadBtnImage("history", Btn_History);
 }
 
 void Display::updateRSSI()
@@ -737,8 +704,6 @@ void Display::updateRSSI()
   rssiAvg /= RSSI_CNT;
   if(rssiAvg == rssiT)
     return;
-
-//  nex.itemText(22, String(rssiT = rssiAvg) + "dB");
 
   int sigStrength = 127 + rssiT;
   int wh = m_btn[Btn_RSSI].w; // width and height
@@ -794,7 +759,7 @@ void Display::historyPage()
 {
   m_currPage = Page_Graph; // chart thing
   goDark();
-  media.loadImage("bgBlank.png", 0, 0);
+  media.loadImage("bgBlank", 0, 0);
   
   int minTh, maxTh, maxTemp;
 
@@ -818,12 +783,11 @@ void Display::historyPage()
 
   drawPointsTarget(rgb16( 6, 8, 4) ); // target (draw behind the other stuff)
 
-  struct tm timeinfo;
-
+  tm timeinfo;
   getLocalTime(&timeinfo);
 
   int x = DISPLAY_WIDTH - RPAD - (timeinfo.tm_min / 5); // center over even hour, 5 mins per pixel
-  int h = hourFormat12(timeinfo.tm_hour);
+  int h = ss.hourFormat12(timeinfo.tm_hour);
 
   while(x > 12 * 6)
   {
@@ -943,27 +907,10 @@ void Display::drawPointsTemp()
 
 uint16_t Display::stateColor(gflags v) // return a color based on run state
 {
-  uint16_t color;
+                                //   gray, blue, yellow, red
+const uint16_t nColors[4] PROGMEM = {rgb16(25, 50, 25), rgb16(0, 0, 31), rgb16(31, 50, 0), rgb16(31, 0, 0)};
 
-  if(v.fan) // fan
-    color = rgb16(0, 50, 0); // green
-
-  switch(v.state)
-  {
-    case State_Off: // off
-      color = rgb16(25, 50, 25); // gray
-      break;
-    case State_Cool: // cool
-      color = rgb16(0, 0, 31); // blue
-      break;
-    case State_HP:
-      color = rgb16(31, 50, 0); // yellow
-      break;
-    case State_NG:
-      color = rgb16(31, 0, 0); // red
-      break;
-  }
-  return color;
+  return nColors[v.state];
 }
 
 bool Display::getGrapthPoints(gPoint *pts, int n)
