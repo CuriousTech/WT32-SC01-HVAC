@@ -184,9 +184,6 @@ void startServer()
   });
 
 #endif
-  server.on("/heap", HTTP_GET, [](AsyncWebServerRequest * request) { // just for checking
-    request->send(200, "text/plain", String(ESP.getFreeHeap()));
-  });
 
   server.on ( "/fm.html", HTTP_GET, [](AsyncWebServerRequest *request){
     request->send ( 200, "text/html",  fileman);
