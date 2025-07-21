@@ -44,9 +44,9 @@ void WebSocketClient::_onConnect(AsyncClient* client)
             "Connection: Upgrade\n"
             "Host: ";
     head += client->remoteIP().toString();
-    head += "\nOrigin: ESP32WebSocketClient\n";
-    head += "Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==\n"; // fake key
-    head += "Sec-WebSocket-Version: 13\n\n";
+    head += "\nOrigin: ESP32WebSocketClient\n"
+            "Sec-WebSocket-Key: x3JJHMbDL1EzLkh9GBhXDw==\n" // fake key
+            "Sec-WebSocket-Version: 13\n\n";
     m_ac.add(head.c_str(), head.length());
     return;
   }
