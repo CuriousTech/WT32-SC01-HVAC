@@ -85,16 +85,10 @@ void Forecast::_onConnect(AsyncClient* client)
         path += "Forecast.json";
         break;
     }
-    path += " HTTP/1.1\n"
-      "Host: ";
-    path += client->remoteIP().toString();
-    path += "\n"
-      "Connection: close\n"
-      "Accept: */*\n\n";
   }
   else // OWM server
   {
-    path = "GET /data/2.5/forecast?id=";
+    path += "data/2.5/forecast?id=";
     path += m_cityID;
     path += "&appid=";
     path += APPID;   // Account
@@ -103,13 +97,14 @@ void Forecast::_onConnect(AsyncClient* client)
       path += "celcius";
     else
       path += "imperial";
-    path += " HTTP/1.1\n"
-      "Host: ";
-    path += client->remoteIP().toString();
-    path += "\n"
-      "Connection: close\n"
-      "Accept: */*\n\n";
   }
+
+  path += " HTTP/1.1\n"
+    "Host: ";
+  path += client->remoteIP().toString();
+  path += "\n"
+    "Connection: close\n"
+    "Accept: */*\n\n";
 
   m_ac.add(path.c_str(), path.length());
   m_pBuffer = new char[OWBUF_SIZE + 2];
@@ -219,6 +214,7 @@ void Forecast::processOWM()
 // read data as comma delimited 'time,temp,rh,code' per line
 void Forecast::processCDT()
 {
+/* not used
   const char *p = m_pBuffer;
   m_status = FCS_Done;
 
@@ -259,6 +255,7 @@ void Forecast::processCDT()
     while(*p == '\r' || *p == '\n') p ++;
   }
   m_fc.Data[m_fcIdx].temp = -1000;
+ */
   delete m_pBuffer;
 }
 
@@ -606,7 +603,7 @@ static const iconLookup ic[] = {
   {762,50,TFT_LIGHTGREY}, // Ash volcanic ash   50d
   {771,50,TFT_LIGHTGREY}, // Squall  squalls  50d
   {781,50,TFT_YELLOW}, // Tornado tornado  50d
-  {800,1,0}, // Clear clear sky  01d
+  {800,1,0}, // Clear   clear sky  01d
   {801,2,0}, // Clouds  few clouds: 11-25%   02d
   {802,3,0}, // Clouds  scattered clouds: 25-50%   03d
   {803,2,0}, // Clouds  broken clouds: 51-84%  04d
@@ -629,7 +626,6 @@ String Forecast::makeName(uint8_t icon, uint8_t h)
     sName += 'd';
   else
     sName += (h > 5 && h < 20) ? "d" : "n";
-  sName += ".png";
   return sName;
 }
 
@@ -681,7 +677,7 @@ bool Forecast::forecastPage()
     return false;
 
   display.goDark();
-  media.loadImage("bgForecast.png", 0, 0); // load the background image
+  media.loadImage("bgForecast", 0, 0); // load the background image
 
   // temp scale
   tft.setFreeFont(&FreeSans9pt7b);
@@ -757,9 +753,9 @@ bool Forecast::forecastPage()
       if(low != 1500) // show peaks
       {
         if(x > FC_Left + 23)
-          tft.drawFloat((float)high / 10, 1, x - 20, FC_Top+FC_Height + 10);
+          display.drawFakeFloat(high, x - 20, FC_Top+FC_Height + 10);
         if(x >FC_Left + 63) // first one shouldn't go too far left
-          tft.drawFloat((float)low / 10, 1, x - 54, FC_Top+FC_Height + 10 + 21);
+          display.drawFakeFloat(low, x - 54, FC_Top+FC_Height + 10 + 21);
       }
 
       iconAni *pIcon = &m_fcIcon[iDay - 1];
@@ -789,8 +785,8 @@ bool Forecast::forecastPage()
   if(x < DISPLAY_WIDTH + 30 && low != 1500)
   {
     if(x < DISPLAY_WIDTH - 10 && high != -1000)
-      tft.drawFloat((float)high / 10, 1, x - 20, FC_Top+FC_Height + 10);
-    tft.drawFloat((float)low / 10, 1, x - 54, FC_Top+FC_Height + 10 + 21);
+      display.drawFakeFloat(high, x - 20, FC_Top+FC_Height + 10);
+    display.drawFakeFloat(low, x - 54, FC_Top+FC_Height + 10 + 21);
 
     m_fcIcon[iDay].x = x;
     int8_t h1 = 0;
@@ -882,7 +878,7 @@ int16_t Forecast::getCurrentTemp(int& shiftedTemp, uint8_t shiftMins)
   return temp;
 }
 
-// get value at current minute between hours
+// get value at current minute between hours (uses 400 bytes because of floating point)
 int Forecast::tween(int16_t t1, int16_t t2, int m, int r)
 {
   if(r == 0) r = 1; // div by zero check
