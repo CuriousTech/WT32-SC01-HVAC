@@ -106,6 +106,7 @@ public:
   bool getGrapthPoints(gPoint *pt, int n);
   int  minPointVal(int n, int &max);
   String makeName(uint8_t icon, uint8_t h);
+  void drawFakeFloat(uint16_t val, uint16_t x, uint16_t y);
 
 private:
   void buttonCmd(uint8_t btn);
