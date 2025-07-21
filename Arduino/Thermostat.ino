@@ -76,8 +76,8 @@ extern void WsSend(String s);
 
 void setup()
 {
-  Serial.begin(115200);  // Just for debug
-  Serial.println("starting");
+//  Serial.begin(115200);  // Just for debug (uses almost 10K)
+//  Serial.println("starting");
 
   ee.init();
   pinMode(AMPWR, OUTPUT);
@@ -96,7 +96,6 @@ void setup()
   ds18lastreq = millis();
   ds18delay = 750 / (1 << (12 - ds18Resolution)); //delay based on resolution
 #endif
-  btStop(); // power saving
 }
 
 void loop()
