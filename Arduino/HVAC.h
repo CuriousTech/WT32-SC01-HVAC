@@ -5,8 +5,7 @@
 //#define REMOTE
 
 #define HOSTNAME "HVAC" // Main unit name, remote will search for this
-#define RMTNAME 0x31544d52 // 1TMR reversed sensor ID
-#define RMTNAMEFULL "HVACRemote1"
+#define RMTNAME "Remote1"
 
 //  HVAC Control
 //----------------
@@ -121,10 +120,9 @@ struct Sensor
   uint32_t timerStart;
   uint32_t IP; //
   usensorFlags f;
-  int16_t temp;
+  int16_t  temp;
   uint16_t rh;
-  uint32_t ID; // hex text?
-  uint8_t pad; // NULL for ID
+  char     szID[12];
 };
 
 #define SNS_PRI   (1 << 0) // Give extra weight to this sensor
