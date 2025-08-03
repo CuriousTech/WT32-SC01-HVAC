@@ -212,9 +212,9 @@ void Display::buttonCmd(uint8_t btn)
       hvac.m_notif = Note_None;
       break;
     case Btn_Time: // time
-      m_currPage = Page_ScreenSaver;
-      goDark();
-      ss.select( SS_Clock );
+//      m_currPage = Page_ScreenSaver;
+//      goDark();
+//      ss.select( SS_Clock );
       break;
     case Btn_TargetTemp:
       if(ee.b.bLock) break;
@@ -652,8 +652,8 @@ void Display::dimmer()
   if(m_bright == m_brightness)
     return;
 
-  if(m_brightness > m_bright + 2 && ee.brightLevel[1] > 50)
-    m_bright += 3;
+  if(m_brightness > m_bright + 4 && ee.brightLevel[1] > 50)
+    m_bright += 5;
   else if(m_brightness > m_bright)
     m_bright ++;
   else
