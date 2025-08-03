@@ -30,15 +30,15 @@ public:
 public:
   uint16_t size = EESIZE;            // if size changes, use defaults
   uint16_t sum = 0xAAAA;             // if sum is different from memory struct, write
-  char     szSSID[24] = "";          // Enter you WiFi router SSID
-  char     szSSIDPassword[24] = "";  // and password
+  char     szSSID[24] = "";  // Enter you WiFi router SSID
+  char     szSSIDPassword[24] = ""; // and password
   uint16_t coolTemp[2] = {850, 860}; // cool to temp *10 low/high F/C issue
   uint16_t heatTemp[2] = {740, 750}; // heat to temp *10 low/high F/C issue
   int8_t   cycleThresh[2] = {28, 8}; // temp range for cycle *10 [cool|heat] F/C issue
   flags_t  b =  {0,0,0,0,0,0,0,0};   // see flags_t
-  uint8_t  eHeatThresh = 33;        // degree threshold to switch to gas    F/C issue
-  int8_t   tz = -5;                 // current timezone
-  int8_t   adj;                     // temp sensor offset adjust by 0.1
+  uint8_t  eHeatThresh = 20;        // degree threshold to switch to gas    F/C issue
+  int8_t   tz = -5;                // current timezone
+  int8_t   calib;                   // temp sensor offset adjust by 0.1
   uint16_t cycleMin = 60*4;         // min time to run a cycle in seconds
   uint16_t cycleMax = 60*30;        // max time to run a cycle in seconds
   uint16_t idleMin = 60*8;          // min time to not run in seconds
@@ -68,8 +68,8 @@ public:
   int16_t  fcOffset[2] = {-180,0};  // forecast offset adjust in minutes (cool/heat)
   uint16_t fanIdleMax = 60*4;       // fan idle max in minutes
   int16_t  sineOffset[2] = {0, 0};  // sine offset adjust (cool/heat)
-  uint32_t sensorActive[8];         // sensor IDs for restart
-  uint8_t  reserved[320];           // Note: To force an EEPROM update, just subtract 1 byte and flash again
+  char     szSensorActive[8][12];   // sensor IDs for restart
+  uint8_t  reserved[256];           // Note: To force an EEPROM update, just subtract 1 byte and flash again
   uint8_t  end;
 }; // 512 bytes
 
