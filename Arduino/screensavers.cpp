@@ -56,9 +56,9 @@ void ScreenSavers::select(int n)
 
   switch(m_saver)
   {
-    case SS_Clock:
-        Clock(true);
-        break;
+//    case SS_Clock:
+//        Clock(true);
+//        break;
     case SS_Lines:
         Lines(true);
         break;
@@ -75,7 +75,7 @@ void ScreenSavers::run()
 {
   switch(m_saver)
   {
-    case SS_Clock: Clock(false); break;
+//    case SS_Clock: Clock(false); break;
     case SS_Lines: Lines(false); break;
     case SS_Boing: Boing(false); break;
     case SS_Calendar: Calendar(false); break;
@@ -90,6 +90,7 @@ uint8_t ScreenSavers::hourFormat12(uint8_t h)
 }
 
 // Analog clock
+/*
 void ScreenSavers::Clock(bool bInit)
 {
   tm timeinfo;
@@ -151,7 +152,7 @@ void ScreenSavers::cspoint(uint16_t &x2, uint16_t &y2, uint16_t x, uint16_t y, u
   x2 = x + size * sin(ang);
   y2 = y + size * cos(ang);  
 }
-
+*/
 void ScreenSavers::Lines(bool bInit)
 {
   static Line *line = (Line *)m_buffer, delta;
@@ -352,7 +353,7 @@ void ScreenSavers::Calendar(bool bInit)
 
     uint8_t firstDay = timeinfo.tm_wday;
     uint8_t lastDay = month_days[ timeinfo.tm_mon ];
-    uint8_t rows = (firstDay + lastDay + 5) / 7;
+    uint8_t rows = (firstDay + lastDay + 6) / 7;
 
     tft.fillRect(0, 0, DISPLAY_WIDTH, 34, rgb16(24,48,24)); // fill 3 areas
     tft.fillRect(0, 34, DISPLAY_WIDTH, 34, rgb16(9,18,24));
