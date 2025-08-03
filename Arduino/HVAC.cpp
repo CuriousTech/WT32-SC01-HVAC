@@ -54,7 +54,7 @@ void HVAC::init()
 
 #ifndef REMOTE
   m_Sensor[0].IP= 192 | 168<<8 | 1<<24; // Setup sensor 0 as internal sensor
-  m_Sensor[0].ID = 0x4e544e49; // 'NTNI';
+  strcpy(m_Sensor[0].szID, "Internal");
   m_Sensor[0].f.f.Enabled = 1;
   m_Sensor[0].f.f.Weight = 1;
   m_Sensor[0].f.f.currWeight = 1;
@@ -535,7 +535,7 @@ void HVAC::tempCheck()
         if( m_Sensor[i].f.f.Warn == 0)
         {
           m_Sensor[i].f.f.Warn = 1;
-          String s = (char*)&m_Sensor[i].ID;
+          String s = m_Sensor[i].szID;
           s += " sensor data expired";
 
           jsonString js("print");
@@ -1027,12 +1027,12 @@ void HVAC::setTemp(int mode, int16_t Temp, int hl)
 void HVAC::updateIndoorTemp(int16_t Temp, int16_t rh)
 {
 #ifdef REMOTE
-  m_localTemp = Temp + ee.adj;
+  m_localTemp = Temp + ee.calib;
   m_localRh = rh;
 
   if( m_bRemoteStream )
   {
-    m_inTemp = Temp + ee.adj;
+    m_inTemp = Temp + ee.calib;
     m_rh = rh;
   }
 
@@ -1045,18 +1045,18 @@ void HVAC::updateIndoorTemp(int16_t Temp, int16_t rh)
     oldTemp = m_localTemp;
     oldRh = m_localRh;
     secs = time(nullptr);
-    sendCmd("rmtname", RMTNAME); // RMT1
+
     String s = String(m_localTemp);
     s += (ee.b.bCelcius) ? 'C' : 'F'; // append C or F to the temp value
     jsonString js;
     js.Var("key", ee.password);
+    js.Var("rmtname", RMTNAME);
     js.Var("rmttemp", s);
+    js.Var("rmtrh", m_localRh);
     WscSend(js.Close());
-
-    sendCmd("rmtrh", m_localRh);
   }
 #else
-  m_Sensor[0].temp = Temp + ee.adj;
+  m_Sensor[0].temp = Temp + ee.calib;
   m_Sensor[0].rh = rh;
   m_Sensor[0].tm = time(nullptr);
 
@@ -1161,7 +1161,7 @@ String HVAC::settingsJson()
   js.Var("brt0", ee.brightLevel[0]);
   js.Var("brt1", ee.brightLevel[1]);
 #endif
-  js.Var("cal", ee.adj);
+  js.Var("cal", ee.calib);
   js.Var("ppk", ee.ppkwh);
   js.Var("ccf", ee.ccf);
   js.Var("cfm", ee.cfm);
@@ -1289,12 +1289,7 @@ int snsComp(const void *a, const void*b)
 {
   Sensor *a1 = (Sensor *)a;
   Sensor *b1 = (Sensor *)b;
-  const char *c1 = (const char*)&a1->ID;
-  const char *c2 = (const char*)&b1->ID;
-  if(c1[0] != c2[0]) return c1[0] - c2[0]; // strcmp is having trouble
-  if(c1[1] != c2[1]) return c1[1] - c2[1];
-  if(c1[2] != c2[2]) return c1[2] - c2[2];
-  return c1[3] - c2[3];
+  return strcmp(a1->szID, b1->szID);
 }
 
 #endif
@@ -1361,7 +1356,7 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       m_bRecheck = true;
       break;
     case 14:    // eheatthresh
-      ee.eHeatThresh = constrain(val, (ee.b.bCelcius ? 2:5), (ee.b.bCelcius ? 28:50) ); // Limit 5 to 50 degrees F
+      ee.eHeatThresh = constrain(val, (ee.b.bCelcius ? 2:5), (ee.b.bCelcius ? 4:40) ); // Limit 5 to 40 degrees F
       break;
     case 15:    // override
       override(val);
@@ -1380,7 +1375,7 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       ee.rhLevel[1] = constrain(val, 300, 900);
       break;
     case 20: // cal
-      ee.adj = constrain(val, (ee.b.bCelcius ? -44:-80), (ee.b.bCelcius ? 5:10) ); // calibrate can only be -8.0 to +1.0
+      ee.calib = constrain(val, (ee.b.bCelcius ? -44:-80), (ee.b.bCelcius ? 5:10) ); // calibrate can only be -8.0 to +1.0
       break;
     case 21:     // fanPretime
       ee.fanPreTime[ee.b.Mode == Mode_Heat] = constrain(val, 0, 60*8); // Limit 0 to 8 minutes
@@ -1483,7 +1478,7 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       snsIdx = getSensorID(ip);
       for(i = 0; i < SNS_CNT; i++)
       {
-        if(ee.sensorActive[i] == m_Sensor[snsIdx].ID) // find in active list
+        if(!strcmp(ee.szSensorActive[i], m_Sensor[snsIdx].szID)) // find in active list
         {
           m_Sensor[snsIdx].f.f.Enabled = 1;
           if(m_Sensor[snsIdx].f.f.currWeight == 0)
@@ -1513,7 +1508,7 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       if(val < (ee.b.bCelcius ? 156:600) || val > (ee.b.bCelcius ? 370:990) || (m_Sensor[snsIdx].temp && (val < m_Sensor[snsIdx].temp - 20 || val > m_Sensor[snsIdx].temp + 20)) )
       {
         String s = "Sensor deactivated ";
-        s += (char *)&m_Sensor[snsIdx].ID;
+        s += m_Sensor[snsIdx].szID;
         jsonString js("print");
         js.Var("text", s);
         WsSend(js.Close());
@@ -1567,10 +1562,9 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       break;
     case 48: // rmtname
       snsIdx = getSensorID(ip);
-      if(m_Sensor[snsIdx].ID != val) // Added, sort the list
+      if(strcmp(m_Sensor[snsIdx].szID, psValue)) // Added, sort the list
       {
-        m_Sensor[snsIdx].ID = val;
-        m_Sensor[snsIdx].pad = 0;
+        strncpy(m_Sensor[snsIdx].szID, psValue, 11);
 
         int nCnt;
         for(nCnt = 0; nCnt < SNS_CNT && m_Sensor[nCnt].IP; nCnt++);
@@ -1691,15 +1685,15 @@ void HVAC::activateSensor(int idx)
   int8_t i;
   for(i = 0; i < SNS_CNT; i++)
   {
-    if(ee.sensorActive[i] == m_Sensor[idx].ID) // find if previously active. Shouldn't be
+    if(!strcmp(ee.szSensorActive[i], m_Sensor[idx].szID)) // find if previously active. Shouldn't be
       found = i;
   }
   if(found < 0)
   {
     for(i = 0; i < SNS_CNT; i++)
-      if(ee.sensorActive[i] == 0) // open spot
+      if(ee.szSensorActive[i][0] == 0) // open spot
       {
-        ee.sensorActive[i] = m_Sensor[idx].ID;
+        strcpy(ee.szSensorActive[i], m_Sensor[idx].szID);
         break;
       }
   }
@@ -1710,9 +1704,9 @@ void HVAC::deactivateSensor(int idx)
   m_Sensor[idx].f.val = 0;
   for(int j = 0; j < SNS_CNT; j++)
   {
-    if(ee.sensorActive[j] == m_Sensor[idx].ID) // remove from eeprom set
+    if(!strcmp(ee.szSensorActive[j], m_Sensor[idx].szID)) // remove from eeprom set
     {
-      ee.sensorActive[j] = 0;
+      ee.szSensorActive[j][0] = 0;
     }
   }
 }
