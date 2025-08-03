@@ -10,7 +10,7 @@ extern TFT_eSPI tft;
 
 enum Saver
 {
-  SS_Clock,
+//  SS_Clock,
   SS_Lines,
   SS_Boing,
   SS_Calendar,
@@ -58,8 +58,8 @@ public:
   String localTimeString();
 
 private:
-  void Clock(bool bInit);
-  void cspoint(uint16_t &x2, uint16_t &y2, uint16_t x, uint16_t y, uint16_t angle, uint16_t size);
+//  void Clock(bool bInit);
+//  void cspoint(uint16_t &x2, uint16_t &y2, uint16_t x, uint16_t y, uint16_t angle, uint16_t size);
   void Lines(bool bInit);
   void Boing(bool bInit);
   void Calendar(bool bInit);
