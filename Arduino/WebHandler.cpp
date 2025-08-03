@@ -22,7 +22,7 @@ int serverPort = 80;
 
 #ifdef REMOTE
 #include "WebSocketClient.h"
-const char *hostName = RMTNAMEFULL;
+const char *hostName = RMTNAME;
 WebSocketClient WsClient;
 bool bWscConnected;
 void WscSend(String s);
