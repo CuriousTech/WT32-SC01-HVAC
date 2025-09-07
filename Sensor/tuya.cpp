@@ -2,7 +2,6 @@
 
 #include "tuya.h"
 #include <TimeLib.h>
-#include <UdpTime.h>
 #include "defs.h"
 
 //#define BWAR01 // BlitzWolf BW-AR01
@@ -18,8 +17,6 @@
 #define WIFI_LED  4  // high = on
 #define BTN      13  // C/F button (connected to MCU as well)
 #endif
-
-extern UdpTime utime;
 
 extern void WsSend(String s);
 
