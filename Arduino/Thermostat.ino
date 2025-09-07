@@ -27,7 +27,7 @@ SOFTWARE.
 // For remote unit, uncomment #define REMOTE in HVAC.h
 
 #include <ESPAsyncWebServer.h> // https://github.com/ESP32Async/ESPAsyncWebServer
-#include <Time.h> // http://www.pjrc.com/teensy/td_libs_Time.html
+#include <time.h>
 #include "HVAC.h"
 #include "WebHandler.h"
 #include "display.h"
@@ -35,6 +35,8 @@ SOFTWARE.
 #include "eeMem.h"
 #include "RunningMedian.h"
 #include "Media.h"
+
+#define TZ  "EST5EDT,M3.2.0,M11.1.0"  // https://github.com/nayarsystems/posix_tz_db/blob/master/zones.csv
 
 // Uncomment only one of these
 //#include <DHT.h>  // http://www.github.com/markruys/arduino-DHT
@@ -52,6 +54,7 @@ eeMem ee;
 
 HVAC hvac;
 Media media;
+tm gLTime;
 
 RunningMedian<int16_t,25> tempMedian; //median of 25 samples
 
@@ -128,17 +131,18 @@ void loop()
   if(millis() - lastMS > 1000) // only do stuff once per second
   {
     lastMS = millis();
+
+    getLocalTime(&gLTime);
+
     if(secondsServer()) // once per second stuff, returns true once on connect
     {
-      configTime(3600 * ee.tz, 0, "pool.ntp.org");
-      hvac.m_DST = DST();
-      configTime(3600 * ee.tz, (hvac.m_DST)?3600:0, "pool.ntp.org");
+      configTime(0, 0, "pool.ntp.org");
+      setenv("TZ", TZ, 1);
+      tzset();
 
       if(lastDay == -1)
       {
-        tm timeinfo;
-        getLocalTime(&timeinfo);
-        lastDay = timeinfo.tm_mday - 1;
+        lastDay = gLTime.tm_mday - 1;
       }
 
     }
@@ -209,36 +213,35 @@ void loop()
       read_delay = 5; // update every 5 seconds
     }
 #endif
-    tm timeinfo;
-    getLocalTime(&timeinfo);
 
-    if(min_save != timeinfo.tm_min) // only do stuff once per minute
+    if(min_save != gLTime.tm_min) // only do stuff once per minute
     {
-      min_save = timeinfo.tm_min;
+      min_save = gLTime.tm_min;
 
-      if(hour_save != timeinfo.tm_hour) // update our IP and time daily (at 2AM for DST)
+      if(hour_save != gLTime.tm_hour) // update our IP and time daily (at 2AM for DST)
       {
-        hour_save = timeinfo.tm_hour;
+        hour_save = gLTime.tm_hour;
         if(hour_save == 2)
         {
-          configTime(3600 * ee.tz, (hvac.m_DST)?3600:0, "pool.ntp.org");
-          hvac.m_DST = DST();
+          configTime(0, 0, "pool.ntp.org");
+          setenv("TZ", TZ, 1);
+          tzset();
         }
 #ifndef REMOTE
-        if(hour_save == 0 && timeinfo.tm_year > 124)
+        if(hour_save == 0 && gLTime.tm_year > 124)
         {
           if(lastDay != -1)
           {
             hvac.dayTotals(lastDay);
-            hvac.monthTotal(timeinfo.tm_mon, timeinfo.tm_mday);
+            hvac.monthTotal(gLTime.tm_mon, gLTime.tm_mday);
           }
-          lastDay = timeinfo.tm_mday - 1;
+          lastDay = gLTime.tm_mday - 1;
           hvac.m_SecsDay[lastDay][0] = 0; // reset
           hvac.m_SecsDay[lastDay][1] = 0;
           hvac.m_SecsDay[lastDay][2] = 0;
           if(lastDay == 0) // new month
           {
-            int m = (timeinfo.tm_mon + 10) % 12; // last month: Dec = 10, Jan = 11, Feb = 0
+            int m = (gLTime.tm_mon + 10) % 12; // last month: Dec = 10, Jan = 11, Feb = 0
             hvac.monthTotal(m, -1);
             memset(hvac.m_SecsDay, 0, sizeof(hvac.m_SecsDay)); // clear for new month
           }
@@ -252,39 +255,4 @@ void loop()
     }
   }
   delay(2);
-}
-
-bool DST() // 2016 starts 2AM Mar 13, ends Nov 6
-{
-  tm timeinfo;
-  getLocalTime(&timeinfo);
-
-  // save current time
-  uint8_t m = timeinfo.tm_mon;
-  int8_t d = timeinfo.tm_mday;
-  int8_t dow = timeinfo.tm_wday + 1;
-
-  timeinfo.tm_mon = 3; // set month = Mar
-  timeinfo.tm_mday = 14; // day of month = 14
-
-  time_t tt = mktime(&timeinfo);
-  tm *tmWd = gmtime( &tt ); // convert to get weekday
-
-  uint8_t day_of_mar = (7 - tmWd->tm_wday) + 8; // DST = 2nd Sunday
-
-  timeinfo.tm_mon = 11; // set month = Nov (0-11)
-  timeinfo.tm_mday = 7; // day of month = 7 (1-30)
-  tt = mktime(&timeinfo);
-  tmWd = gmtime( &tt  ); // convert to get weekday
-
-  uint8_t day_of_nov = (7 - tmWd->tm_mday) + 1;
-
-  if ((m  >  3 && m < 11 ) ||
-      (m ==  3 && d > day_of_mar) ||
-      (m ==  3 && d == day_of_mar && timeinfo.tm_hour >= 2) ||  // DST starts 2nd Sunday of March;  2am
-      (m == 11 && d <  day_of_nov) ||
-      (m == 11 && d == day_of_nov && timeinfo.tm_hour < 2))   // DST ends 1st Sunday of November; 2am
-   return true;
- else
-   return false;
 }
