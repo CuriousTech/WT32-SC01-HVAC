@@ -42,8 +42,8 @@ SOFTWARE.
 #include <ESPAsyncWebServer.h> // https://github.com/me-no-dev/ESPAsyncWebServer
 #include <TimeLib.h> // http://www.pjrc.com/teensy/td_libs_Time.html
 #include "eeMem.h"
-#include <JsonParse.h> // https://github.com/CuriousTech/ESP8266-HVAC/tree/master/Libraries/JsonParse
-#include <JsonClient.h> // https://github.com/CuriousTech/ESP8266-HVAC/tree/master/Libraries/JsonClient
+#include <JsonParse.h> // https://github.com/CuriousTech/ESP-HVAC/tree/master/Libraries/JsonParse
+#include <JsonClient.h> // https://github.com/CuriousTech/ESP-HVAC/tree/master/Libraries/JsonClient
 #include <FS.h>
 #ifdef OTA_ENABLE
 #include <ArduinoOTA.h>
@@ -54,8 +54,8 @@ SOFTWARE.
 #include "TempArray.h"
 
 // Uncomment only one
-//#include "tuya.h"  // Uncomment device in tuya.cpp
-#include "BasicSensor.h"
+#include "tuya.h"  // Uncomment device in tuya.cpp
+//#include "BasicSensor.h"
 
 int serverPort = 80;
 
@@ -369,7 +369,7 @@ void jsonPushCallback(int16_t iName, int iValue, char *psValue)
       tzOffset = iValue;
       break;
     case 1: // time
-      setTime(iValue + tzOffset);
+      setTime(iValue + tzOffset + (DST() ? 3600:0) );
       temps.m_bValidDate = true;
       break;
     case 3: // outtemp
@@ -879,6 +879,36 @@ void loop()
     bClear = true;
   display.display();
 #endif
+}
+
+bool DST() // 2016 starts 2AM Mar 13, ends Nov 6
+{
+  tmElements_t tm;
+  breakTime(now(), tm);
+  // save current time
+  uint8_t m = tm.Month;
+  int8_t d = tm.Day;
+  int8_t dow = tm.Wday;
+
+  tm.Month = 3; // set month = Mar
+  tm.Day = 14; // day of month = 14
+  breakTime(makeTime(tm), tm); // convert to get weekday
+
+  uint8_t day_of_mar = (7 - tm.Wday) + 8; // DST = 2nd Sunday
+
+  tm.Month = 11; // set month = Nov (0-11)
+  tm.Day = 7; // day of month = 7 (1-30)
+  breakTime(makeTime(tm), tm); // convert to get weekday
+
+  uint8_t day_of_nov = (7 - tm.Wday) + 1;
+
+  if ((m  >  3 && m < 11 ) ||
+      (m ==  3 && d > day_of_mar) ||
+      (m ==  3 && d == day_of_mar && hour() >= 2) ||  // DST starts 2nd Sunday of March;  2am
+      (m == 11 && d <  day_of_nov) ||
+      (m == 11 && d == day_of_nov && hour() < 2))   // DST ends 1st Sunday of November; 2am
+    return true;
+  return false;
 }
 
 // Text scroller optimized for very long lines
