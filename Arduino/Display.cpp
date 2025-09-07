@@ -2,7 +2,7 @@
 #include "display.h"
 #include <ESPAsyncWebServer.h> // https://github.com/me-no-dev/ESPAsyncWebServer
 #include "jsonstring.h"
-#include <Time.h>
+#include <time.h>
 #include "eeMem.h"
 #include "screensavers.h"
 #include "music.h"
@@ -21,6 +21,7 @@ Adafruit_FT6206 ts = Adafruit_FT6206();
 
 extern Forecast FC;
 extern HVAC hvac;
+extern tm gLTime;
 extern void WsSend(String s);
 
 ScreenSavers ss;
@@ -37,7 +38,7 @@ void Display::init(void)
   tft.setRotation(1);                 // set desired rotation
   tft.setTextDatum(TL_DATUM);
   mus.init();
-  FC.init( (ee.tz+hvac.m_DST)*3600 );
+  FC.init();
   screen(true);
 }
 
@@ -520,13 +521,10 @@ void Display::drawTime()
   static bool bRefresh = true;
   static uint8_t last_day;
 
-  tm timeinfo;
-  getLocalTime(&timeinfo);
-
-  if(m_currPage || last_day != timeinfo.tm_mday ) // not main page
+  if(m_currPage || last_day != gLTime.tm_mday ) // not main page
   {
     bRefresh = true;
-    last_day = timeinfo.tm_mday;
+    last_day = gLTime.tm_mday;
     return;
   }
 
@@ -540,11 +538,11 @@ void Display::drawTime()
 
   if(bRefresh) // Cut down on flicker a bit
   {
-    sTime = ss.monthShortStr(timeinfo.tm_mon);
+    sTime = ss.monthShortStr(gLTime.tm_mon);
     sTime += " ";
-    sTime += String(timeinfo.tm_mday);
+    sTime += String(gLTime.tm_mday);
     tft.drawString(sTime, m_btn[Btn_Time].x, m_btn[Btn_Time].y);
-    tft.drawString(ss.dayShortStr(timeinfo.tm_wday), m_btn[Btn_Dow].x, m_btn[Btn_Dow].y);
+    tft.drawString(ss.dayShortStr(gLTime.tm_wday), m_btn[Btn_Dow].x, m_btn[Btn_Dow].y);
   }
   bRefresh = false;
 }
@@ -783,11 +781,8 @@ void Display::historyPage()
 
   drawPointsTarget(rgb16( 6, 8, 4) ); // target (draw behind the other stuff)
 
-  tm timeinfo;
-  getLocalTime(&timeinfo);
-
-  int x = DISPLAY_WIDTH - RPAD - (timeinfo.tm_min / 5); // center over even hour, 5 mins per pixel
-  int h = ss.hourFormat12(timeinfo.tm_hour);
+  int x = DISPLAY_WIDTH - RPAD - (gLTime.tm_min / 5); // center over even hour, 5 mins per pixel
+  int h = ss.hourFormat12(gLTime.tm_hour);
 
   while(x > 12 * 6)
   {
