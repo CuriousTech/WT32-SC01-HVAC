@@ -43,7 +43,7 @@ class Forecast
 {
 public:
   Forecast(void);
-  void init(int16_t tzOff);
+  void init(void);
 
   void JsonParse(char *p, int8_t event, const char **jsonList, void (*pcb)(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue));
   void start(IPAddress serverIP, uint16_t port, bool bCelcius, int8_t type);
@@ -87,7 +87,6 @@ private:
   bool m_bLocal;
   int8_t m_type;
   iconAni m_fcIcon[7];
-  int16_t m_tzOffset;
   uint8_t m_iconIdx;
 public:
   forecastData m_fc;
