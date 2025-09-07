@@ -188,7 +188,6 @@ public:
   int16_t  m_outMin, m_outMax;
   uint16_t m_iSecs[3];
   int8_t   m_modeShadow = Mode_Cool;  // shadow last valid mode
-  int8_t   m_DST;
   int      m_overrideTimer; // countdown for override in seconds
 
 #define SNS_CNT 8
