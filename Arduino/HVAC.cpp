@@ -25,6 +25,7 @@ extern void WscSend(String s); // remote WebSocket
 bool bValidData;
 #endif
 
+extern tm gLTime;
 extern void WsSend(String s);
 
 HVAC::HVAC()
@@ -471,11 +472,8 @@ void HVAC::service()
 
   tempCheck();
 
-  struct tm timeinfo;
-  getLocalTime(&timeinfo);
-
   static bool bLoaded;
-  if(!bLoaded && timeinfo.tm_year+1900 > 2024) // ensure date is valid
+  if(!bLoaded && gLTime.tm_year > 124) // ensure date is valid
   {
     bLoaded = true;
     loadStats();
@@ -522,9 +520,6 @@ void HVAC::tempCheck()
   int16_t sensTemp = 0;
   int16_t sensRh = 0;
   bool  remSens = false;
-
-  tm timeinfo;
-  getLocalTime(&timeinfo);
 
   for(int8_t i = 0; i < SNS_CNT; i++)
   {
@@ -587,7 +582,7 @@ void HVAC::tempCheck()
     if(m_cycleTimer < ee.cycleMin)
       return;
 
-    if(timeinfo.tm_sec == 0 || m_bRecheck) // readjust while running
+    if(gLTime.tm_sec == 0 || m_bRecheck) // readjust while running
     {
       m_bRecheck = false;
       preCalcCycle(tempL, tempH);
@@ -635,7 +630,7 @@ void HVAC::tempCheck()
     if(m_fanPreElap < 60*30) // how long since pre-cycle fan has run (if it does)
       m_fanPreElap++;
 
-    if(timeinfo.tm_sec == 0 || m_bRecheck)
+    if(gLTime.tm_sec == 0 || m_bRecheck)
     {
       m_bRecheck = false;
       if(m_bStart = preCalcCycle(tempL, tempH))
@@ -791,11 +786,9 @@ void HVAC::costAdd(int secs, int mode, int hm)
       }
       break;
   }
-  tm timeinfo;
-  getLocalTime(&timeinfo);
 
-  dayTotals(timeinfo.tm_mday - 1);
-  monthTotal(timeinfo.tm_mon, timeinfo.tm_mday);
+  dayTotals(gLTime.tm_mday - 1);
+  monthTotal(gLTime.tm_mon, gLTime.tm_mday);
 }
 
 bool HVAC::preCalcCycle(int16_t tempL, int16_t tempH)
@@ -864,9 +857,6 @@ void HVAC::calcTargetTemp(int mode)
   if( H-L == 0 && ee.b.nSchedMode == SM_Forecast) // divide by 0
     ee.b.nSchedMode = SM_Flat;
 
-  tm timeinfo;
-  getLocalTime(&timeinfo);
-
   switch(ee.b.nSchedMode)
   {
     case SM_Forecast:
@@ -891,7 +881,7 @@ void HVAC::calcTargetTemp(int mode)
         case Mode_Off:
         case Mode_Cool:
           {
-            float m = ( (timeinfo.tm_hour + 14) * 60 + timeinfo.tm_min + ee.sineOffset[0] ) / 4;
+            float m = ( (gLTime.tm_hour + 14) * 60 + gLTime.tm_min + ee.sineOffset[0] ) / 4;
             float r = (ee.coolTemp[1] - ee.coolTemp[0]) / 2;
             float fs = r * sin(PI * (180 - m) / 180);
             m_targetTemp = (fs + ee.coolTemp[0] - r);
@@ -900,7 +890,7 @@ void HVAC::calcTargetTemp(int mode)
           break;
         case Mode_Heat:
           {
-            float m = ( (timeinfo.tm_hour + 14) * 60 + timeinfo.tm_min + ee.sineOffset[1] ) / 4;
+            float m = ( (gLTime.tm_hour + 14) * 60 + gLTime.tm_min + ee.sineOffset[1] ) / 4;
             float r = (ee.heatTemp[1] - ee.heatTemp[0]) / 2;
             float fs = r * sin(PI * (180 - m) / 180);
             m_targetTemp = (fs + ee.heatTemp[0] + r);
@@ -1722,12 +1712,9 @@ void HVAC::dayTotals(int d)
   m_iSecs[1] = 0;
   m_iSecs[2] = 0;
 
-  tm timeinfo;
-  getLocalTime(&timeinfo);
-
   jsonString js("update");
   js.Var("type", "day");
-  js.Var("e", timeinfo.tm_mday - 1);
+  js.Var("e", gLTime.tm_mday - 1);
   js.Var("d0", m_SecsDay[d][0]);
   js.Var("d1", m_SecsDay[d][1]);
   js.Var("d2", m_SecsDay[d][2]);
@@ -1759,13 +1746,10 @@ void HVAC::loadStats()
 {
 #ifndef REMOTE
 
-  tm timeinfo;
-  getLocalTime(&timeinfo);
-
   String sFileDay = "/statsday";
-  sFileDay += timeinfo.tm_year+1900;
+  sFileDay += gLTime.tm_year+1900;
   sFileDay += ".";
-  sFileDay += timeinfo.tm_mon+1;
+  sFileDay += gLTime.tm_mon+1;
   sFileDay += ".dat";
 
   File F = INTERNAL_FS.open(sFileDay, "r");
@@ -1778,7 +1762,7 @@ void HVAC::loadStats()
   m_daySum = ee.Fletcher16( (uint8_t*)&m_SecsDay, sizeof(m_SecsDay) );
 
   String sFileMon = "/statsmonth";
-  sFileMon += timeinfo.tm_year+1900;
+  sFileMon += gLTime.tm_year+1900;
   sFileMon += ".dat";
 
   F = INTERNAL_FS.open(sFileMon, "r");
@@ -1796,18 +1780,15 @@ void HVAC::saveStats()
 #ifndef REMOTE
   uint16_t sum;
 
-  tm timeinfo;
-  getLocalTime(&timeinfo);
-
-  if( timeinfo.tm_year < 125)
+  if( gLTime.tm_year < 125)
     return;
 
   m_SecsDay[31][0] = m_filterMinutes; // store the filter timer with data that will change at the same frequency
 
   String sFileDay = "/statsday";
-  sFileDay += timeinfo.tm_year+1900;
+  sFileDay += gLTime.tm_year+1900;
   sFileDay += ".";
-  sFileDay += timeinfo.tm_mon+1;
+  sFileDay += gLTime.tm_mon+1;
   sFileDay += ".dat";
 
   sum = ee.Fletcher16( (uint8_t*) &m_SecsDay, sizeof(m_SecsDay) );
@@ -1820,7 +1801,7 @@ void HVAC::saveStats()
   }
 
   String sFileMon = "/statsmonth";
-  sFileMon += timeinfo.tm_year+1900;
+  sFileMon += gLTime.tm_year+1900;
   sFileMon += ".dat";
 
   sum = ee.Fletcher16( (uint8_t*)&m_SecsMon, sizeof(m_SecsMon) );
