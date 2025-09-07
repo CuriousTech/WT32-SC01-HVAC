@@ -8,6 +8,7 @@
 #include <TFT_eSPI.h> // TFT_espi library
 extern TFT_eSPI tft;
 extern ScreenSavers ss;
+extern tm gLTime;
 
 // OWM Format: https://openweathermap.org/forecast5
 
@@ -24,9 +25,8 @@ Forecast::Forecast()
   m_fc.Date = 0;
 }
 
-void Forecast::init(int16_t tzOff)
+void Forecast::init()
 {
-  m_tzOffset = tzOff;
 }
 
 // File retrieval start
@@ -272,9 +272,10 @@ bool Forecast::getCurrentIndex(int8_t& fcOff, int8_t& fcCnt, uint32_t& tm)
     return false;
   }
 
+  uint32_t tmLocal = mktime(&gLTime);
   for(fcCnt = 0; fcCnt < FC_CNT && m_fc.Data[fcCnt].temp != -1000; fcCnt++) // get current time in forecast and valid count
   {
-    if( tm + m_fc.Freq < time(nullptr) - m_tzOffset)
+    if( tm + m_fc.Freq < tmLocal)
     {
       fcOff++;
       tm += m_fc.Freq;
@@ -646,7 +647,7 @@ bool Forecast::forecastPage()
   if(!getCurrentIndex(fcOff, fcCnt, unused))
     return false;
 
-  time_t tt = (m_fc.Date + m_tzOffset + (fcOff * m_fc.Freq));
+  time_t tt = (m_fc.Date + (fcOff * m_fc.Freq));
   tm *pTimeinfo = gmtime(&tt ); // get current hour
 
   if(fcOff >= (pTimeinfo->tm_hour / 3) )
@@ -654,7 +655,7 @@ bool Forecast::forecastPage()
   else
     fcDispOff = fcOff; // else just shift the first day
 
-  tt = (time_t)(m_fc.Date + m_tzOffset + (fcDispOff * m_fc.Freq));
+  tt = (time_t)(m_fc.Date + (fcDispOff * m_fc.Freq));
   tm *ptmE = gmtime(&tt );  // get current hour after adjusting for display offset
 
   int8_t hrng = fcCnt - fcDispOff;
@@ -847,11 +848,8 @@ int16_t Forecast::getCurrentTemp(int& shiftedTemp, uint8_t shiftMins)
   if(!getCurrentIndex(fcOff, fcCnt, tmO))
     return 0;
 
-  tm timeinfo;
-  getLocalTime(&timeinfo);
-
-  int16_t m = timeinfo.tm_min;
-  uint32_t tmNow = time(nullptr) - m_tzOffset;
+  int16_t m = gLTime.tm_min;
+  uint32_t tmNow = mktime(&gLTime);
   int16_t r = m_fc.Freq / 60; // usually 3 hour range (180 m)
 
   if( tmNow >= tmO )
