@@ -31,16 +31,16 @@ int32_t pngSeek(PNGFILE *page, int32_t position) {
   return pngfile.seek(position);
 }
 
-void pngDraw(PNGDRAW *pDraw)
+int pngDraw(PNGDRAW *pDraw)
 {
   ImageCtrl *pPos = (ImageCtrl *)pDraw->pUser;
 
   if(pPos->srcY)
   {
     if(pDraw->y < pPos->srcY) // skip lines above
-      return;
+      return 1;
     if(pPos->srcY + pPos->h >= pDraw->y) // skip lines below
-      return;
+      return 1;
   }
 
   png.getLineAsRGB565(pDraw, pngbuffer, PNG_RGB565_BIG_ENDIAN, 0xffffffff);
@@ -53,6 +53,7 @@ void pngDraw(PNGDRAW *pDraw)
     y -= pPos->srcY;
 
   tft.pushImage(pPos->x, y, w, 1, pngbuffer + pPos->srcX);
+  return 1;
 }
 
 Media::Media()
