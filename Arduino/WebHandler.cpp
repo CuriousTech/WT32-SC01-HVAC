@@ -33,6 +33,7 @@ IPAddress ipFcServer(192,168,31,100);    // local forecast server and port
 int nFcPort = 80;
 #endif
 
+extern tm gLTime;
 AsyncWebServer server( serverPort );
 AsyncWebSocket ws("/ws"); // access at ws://[esp ip]/ws
 
@@ -53,7 +54,6 @@ IPAddress WsClientIP;
 
 bool bConfigDone = false; // EspTouch done or creds set
 bool bStarted = false;
-uint32_t connectTimer;
 
 #ifdef REMOTE
 const char *jsonListSettings[] = { "cmd",
@@ -155,7 +155,6 @@ void startServer()
     hvac.m_notif = Note_EspTouch;
     WiFi.beginSmartConfig();
   }
-  connectTimer = time(nullptr);
 
   // attach AsyncWebSocket
   ws.onEvent(onWsEvent);
@@ -212,11 +211,8 @@ void startServer()
   ArduinoOTA.begin();
   ArduinoOTA.onStart([]() {
 #ifndef REMOTE
-    tm timeinfo;
-    getLocalTime(&timeinfo);
-
     hvac.disable();
-    hvac.dayTotals(timeinfo.tm_mday - 1); // save for reload
+    hvac.dayTotals(gLTime.tm_mday - 1); // save for reload
     ee.update();
     hvac.saveStats();
 #endif
@@ -298,7 +294,8 @@ bool secondsServer() // called once per second
     if( WiFi.smartConfigDone())
     {
       bConfigDone = true;
-      connectTimer = time(nullptr);
+      WiFi.SSID().toCharArray(ee.szSSID, sizeof(ee.szSSID)); // Get the SSID from SmartConfig or last used
+      WiFi.psk().toCharArray(ee.szSSIDPassword, sizeof(ee.szSSIDPassword) );
     }
   }
   if(bConfigDone)
@@ -307,12 +304,10 @@ bool secondsServer() // called once per second
     {
       if(!bStarted)
       {
-//        WiFi.mode(WIFI_STA); // Stop broadcasting SSID
+        WiFi.mode(WIFI_STA); // Stop broadcasting SSID
         MDNS.begin( hostName );
         bStarted = true;
         MDNS.addService("iot", "tcp", serverPort);
-        WiFi.SSID().toCharArray(ee.szSSID, sizeof(ee.szSSID)); // Get the SSID from SmartConfig or last used
-        WiFi.psk().toCharArray(ee.szSSIDPassword, sizeof(ee.szSSIDPassword) );
         hvac.m_notif = Note_Connected;
         bConn = true;
 #ifdef REMOTE
@@ -320,9 +315,8 @@ bool secondsServer() // called once per second
 #endif
       }
     }
-    else if(time(nullptr) - connectTimer > 10) // failed to connect for some reason
+    else if(WiFi.status() == WL_CONNECT_FAILED) // failed to connect
     {
-      connectTimer = time(nullptr);
       WiFi.mode(WIFI_AP_STA);
       WiFi.beginSmartConfig();
       bConfigDone = false;
@@ -346,7 +340,7 @@ bool secondsServer() // called once per second
 #ifdef REMOTE
 
   static uint8_t start = 4; // give it time to settle before initial connect
-  if(start && WiFi.status() == WL_CONNECTED)
+  if(start)
     if(--start == 0)
         startListener();
 
@@ -368,10 +362,7 @@ bool secondsServer() // called once per second
   if(nWrongPass)
     nWrongPass--;
 
-  tm timeinfo;
-  getLocalTime(&timeinfo);
-
-  if(FC.m_bUpdateFcst && FC.m_bUpdateFcstIdle && nUpdateDelay == 0 && timeinfo.tm_year > 124)
+  if(FC.m_bUpdateFcst && FC.m_bUpdateFcstIdle && nUpdateDelay == 0 && gLTime.tm_year > 124)
   {
     FC.m_bUpdateFcst = false;
     FC.m_bUpdateFcstIdle = false;
@@ -700,10 +691,7 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
         uint8_t mon = iValue & 0xF;
         uint16_t yr = (iValue >> 4) & 0xFFF;
 
-        tm timeinfo;
-        getLocalTime(&timeinfo);
-
-        if(mon && mon != timeinfo.tm_mon+1) // month is 1-12, so 0 can be used as current
+        if(mon && mon != gLTime.tm_mon+1) // month is 1-12, so 0 can be used as current
         {
           String sName = "/statsday"; // decode requested file
           sName += yr;
@@ -718,10 +706,8 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
             F.close();
             pSecsDay = tempSecsDay;
           }
-          tm timeinfo;
-          getLocalTime(&timeinfo);
 
-          if(yr != timeinfo.tm_year+1900) // not currrent year
+          if(yr != gLTime.tm_year+1900) // not currrent year
           {
             sName = "/statsmonth";
             sName += yr;
