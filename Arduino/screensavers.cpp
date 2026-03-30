@@ -1,15 +1,13 @@
+// Uses about 7K sans clock
+
 #include "screensavers.h"
-#include <Time.h>
-#include "digitalFont.h"
+#include <time.h>
 #include "display.h"
 #include "forecast.h"
 #include "Media.h"
 
 extern Forecast FC;
 extern tm gLTime;
-
-extern const char monthShortStr[12][4];
-extern const char dayShortStr[7][4];
 
 const char _dayStr[7][7] PROGMEM = {"Sun","Mon","Tues","Wednes","Thurs","Fri","Satur"};
 const char _monthShortStr[12][4] PROGMEM = {"Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"};
@@ -33,7 +31,6 @@ const char *ScreenSavers::dayShortStr(uint8_t m)
 
 String ScreenSavers::localTimeString()
 {
-
   String sTime = String( hourFormat12(gLTime.tm_hour) );
   if(hourFormat12(gLTime.tm_hour) < 10)
     sTime = " " + sTime;
@@ -331,7 +328,7 @@ void ScreenSavers::Boing(bool bInit)
 void ScreenSavers::Calendar(bool bInit)
 {
   const uint16_t xOffset = 60;
-  const uint16_t width = DISPLAY_WIDTH - (xOffset * 2);
+  const uint16_t width = DISPLAY_WIDTH - (xOffset << 1);
   const uint16_t yOffset = 68;
 
   if(bInit)
