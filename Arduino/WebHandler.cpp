@@ -2,6 +2,7 @@
 
 #define OTA_ENABLE  //uncomment to enable Arduino IDE Over The Air update code
 
+#include <WiFi.h>
 #include <ESPmDNS.h>
 
 #ifdef OTA_ENABLE
@@ -29,8 +30,8 @@ void WscSend(String s);
 void startListener(void);
 #else
 const char *hostName = HOSTNAME;
-IPAddress ipFcServer(192,168,31,100);    // local forecast server and port
-int nFcPort = 80;
+//IPAddress ipFcServer(192,168,31,100);    // local forecast server and port
+//int nFcPort = 80;
 #endif
 
 extern tm gLTime;
@@ -68,11 +69,9 @@ const char *jsonListSettings[] = { "cmd", "m", "am", "hm", "fm", "ot", "ht", "c0
 #endif
 extern const char *cmdList[];
 
-#ifndef REMOTE
 void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len)
 {  //Handle WebSocket event
   static bool rebooted = true;
-  String s;
 
   switch(type)
   {
@@ -84,15 +83,16 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
       }
       client->text( hvac.settingsJson() );
       client->text( dataJson() );
-      media.setPath("/"); // trigger file list send
       break;
     case WS_EVT_DISCONNECT:    //client disconnected
     case WS_EVT_ERROR:    //error was received from the other end
+#ifndef REMOTE
       if(hvac.m_bRemoteStream && client->id() == WsRemoteID) // stop remote
       {
         hvac.m_bRemoteStream = false;
         hvac.m_notif = Note_RemoteOff;
       }
+#endif
       break;
     case WS_EVT_PONG:    //pong message was received (in response to a ping request maybe)
       break;
@@ -111,32 +111,21 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
       break;
   }
 }
-#else // Remote ws
-void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventType type, void * arg, uint8_t *data, size_t len)
-{  //Handle WebSocket event
-  static bool rebooted = true;
 
-  switch(type)
-  {
-    case WS_EVT_CONNECT:      //client connected
-      if(rebooted)
-      {
-        rebooted = false;
-        client->text( "{\"cmd\":\"alert\",\"text\":\"Restarted\"}" );
-      }
-      client->text(hvac.settingsJson()); // update free space
-      media.setPath("/"); // trigger file list send
-      break;
-    case WS_EVT_DISCONNECT:    //client disconnected
-    case WS_EVT_ERROR:    //error was received from the other end
-      break;
-    case WS_EVT_PONG:    //pong message was received (in response to a ping request maybe)
-      break;
-    case WS_EVT_DATA:  //data packet
-      break;
-  }
+void setDamper(bool bOpen)
+{
+  static bool bIsOpen;
+  if(ee.damperIp[0] == 0)
+    return;
+  IPAddress ip(ee.damperIp);
+
+  String s = "/s?key=";
+  s += ee.password;
+  s += "&";
+  s += bOpen ? "half":"close";
+  s += "=0";
+  FC.start(ip, 80, s);
 }
-#endif
 
 void startServer()
 {
@@ -165,11 +154,13 @@ void startServer()
     // no 404, just an empty response
   });
 
-  // For quick commands. Remotes have a seperate command list
+  // For quick commands, sensors. Remotes have a seperate command list
   server.on ( "/s", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
     parseParams(request);
     String s = "OK\r\n\r\n";
     jsonString js;
+    js.Var("tzoffset", (uint32_t)(time(nullptr) - mktime(&gLTime)) );
+    js.Var("time", (uint32_t)time(nullptr));
     js.Var("outtemp", hvac.m_outTemp);
     js.Var("outrh", hvac.m_outRh);
     s += js.Close();
@@ -315,7 +306,16 @@ bool secondsServer() // called once per second
 #endif
       }
     }
-    else if(WiFi.status() == WL_CONNECT_FAILED) // failed to connect
+    else if(WiFi.status() == WL_DISCONNECTED) // connection dropped
+    {
+      static uint8_t nCounter = 5;
+      if(--nCounter == 0)
+      {
+        nCounter = 5;
+        WiFi.begin(ee.szSSID, ee.szSSIDPassword);
+      }
+    }
+    else if(WiFi.status() == WL_CONNECT_FAILED || WiFi.status() == WL_NO_SSID_AVAIL) // failed to connect
     {
       WiFi.mode(WIFI_AP_STA);
       WiFi.beginSmartConfig();
@@ -367,12 +367,14 @@ bool secondsServer() // called once per second
     FC.m_bUpdateFcst = false;
     FC.m_bUpdateFcstIdle = false;
     nUpdateDelay = 60; // delay retries by 1 minute
+    IPAddress hostIp(ee.hostIp);
+
     switch(ee.b.nFcstSource)
     {
       case 1:
-        FC.start(ipFcServer, nFcPort, ee.b.bCelcius, 0);    // get preformatted data from local server
+        FC.start(hostIp, ee.hostPort, ee.b.bCelcius, 0);    // get preformatted data from local server
       case 0:
-        FC.start(ipFcServer, nFcPort, ee.b.bCelcius, 1);    // get OpenWeatherMap file from local server
+        FC.start(hostIp, ee.hostPort, ee.b.bCelcius, 1);    // get OpenWeatherMap file from local server
         break;
       case 2:
         FC.start(ee.cityID, ee.b.bCelcius);    // get data from OpenWeatherMap 5 day
@@ -461,6 +463,49 @@ String dataJson()
   return hvac.getPushData();
 }
 
+String gptArr(gPoint& gpt, uint32_t tb)
+{
+  String out = "[";         // [seconds, temp, rh, lowThresh, state, outTemp],
+  out += tb;
+  out += ",";
+  out += gpt.t.inTemp;
+  out += ",";
+  out += gpt.bits.rh;
+  out += ",";
+  out += gpt.t.target;
+  out += ",";
+  out += gpt.bits.u & 7;
+  out += ",";
+  out += gpt.t.outTemp;
+  if(hvac.m_Sensor[0].IP)
+  {
+    out += ",";
+    out += gpt.sens0 + gpt.t.inTemp;
+    if(hvac.m_Sensor[1].IP)
+    {
+      out += ",";
+      out += gpt.sens1 + gpt.t.inTemp;
+      if(hvac.m_Sensor[2].IP)
+      {
+        out += ",";
+        out += gpt.sens2 + gpt.t.inTemp;
+        if(hvac.m_Sensor[3].IP)
+        {
+          out += ",";
+          out += gpt.sens3 + gpt.t.inTemp;
+          if(hvac.m_Sensor[4].IP)
+          {
+            out += ",";
+            out += gpt.bits.sens4 + gpt.t.inTemp;
+          }
+        }
+      }
+    }
+  }
+  out += "]";
+  return out;
+}
+
 void historyDump(bool bStart)
 {
 #ifndef REMOTE
@@ -518,44 +563,7 @@ void historyDump(bool bStart)
     int len = out.length();
     if(bC) out += ",";
     bC = true;
-    out += "[";         // [seconds, temp, rh, lowThresh, state, outTemp],
-    out += gpt.bits.tmdiff;
-    out += ",";
-    out += gpt.t.inTemp - tempMin;
-    out += ",";
-    out += gpt.bits.rh - rhMin;
-    out += ",";
-    out += gpt.t.target - lMin;
-    out += ",";
-    out += gpt.bits.u & 7; // state + fan
-    out += ",";
-    out += gpt.t.outTemp - otMin;
-    if(hvac.m_Sensor[0].IP)
-    {
-      out += ",";
-      out += gpt.sens0 + gpt.t.inTemp - tempMin;
-      if(hvac.m_Sensor[1].IP)
-      {
-        out += ",";
-        out += gpt.sens1 + gpt.t.inTemp - tempMin;
-        if(hvac.m_Sensor[2].IP)
-        {
-          out += ",";
-          out += gpt.sens2 + gpt.t.inTemp - tempMin;
-          if(hvac.m_Sensor[3].IP)
-          {
-            out += ",";
-            out += gpt.sens3 + gpt.t.inTemp - tempMin;
-          }
-          if(hvac.m_Sensor[4].IP)
-          {
-            out += ",";
-            out += gpt.bits.sens4 + gpt.t.inTemp - tempMin;
-          }
-        }
-      }
-    }
-    out += "]";
+    out += gptArr(gpt, gpt.bits.tmdiff);
     if( out.length() == len) // memory full
       break;
   }
@@ -584,45 +592,8 @@ void appendDump(uint32_t startTime)
   {
     if(bC) out += ",";
     bC = true;
-    out += "[";         // [seconds, temp, rh, lowThresh, state, outTemp],
-    out += tb;
+    out += gptArr(gpt, tb);
     tb -= gpt.bits.tmdiff;
-    out += ",";
-    out += gpt.t.inTemp;
-    out += ",";
-    out += gpt.bits.rh;
-    out += ",";
-    out += gpt.t.target;
-    out += ",";
-    out += gpt.bits.u & 7;
-    out += ",";
-    out += gpt.t.outTemp;
-    if(hvac.m_Sensor[0].IP)
-    {
-      out += ",";
-      out += gpt.sens0 + gpt.t.inTemp;
-      if(hvac.m_Sensor[1].IP)
-      {
-        out += ",";
-        out += gpt.sens1 + gpt.t.inTemp;
-        if(hvac.m_Sensor[2].IP)
-        {
-          out += ",";
-          out += gpt.sens2 + gpt.t.inTemp;
-          if(hvac.m_Sensor[3].IP)
-          {
-            out += ",";
-            out += gpt.sens3 + gpt.t.inTemp;
-            if(hvac.m_Sensor[4].IP)
-            {
-              out += ",";
-              out += gpt.bits.sens4 + gpt.t.inTemp;
-            }
-          }
-        }
-      }
-    }
-    out += "]";
   }
   if(bC) // don't send blank
   {
@@ -637,6 +608,7 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
   static int8_t cmd = 0;
 
 #ifdef REMOTE
+
   switch(iName)
   {
     case 0: // cmd
@@ -651,9 +623,14 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
         cmd = 2;
       }
       break;
+    case 1: // key (from page)
+//      FC.setList(jsonListSettings);
+//      cmd = 1;
+      break;
   }
   if(iName) switch(cmd)
   {
+    case 0:
     case 1: //settings
       hvac.setSettings(iName - 1, iValue);
       break;
@@ -662,7 +639,7 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
       break;
   }
 
-#else
+#else //!REMOTE
   switch(cmd) // Should always be 0
   {
     case 0: // key
