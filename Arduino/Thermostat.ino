@@ -22,7 +22,7 @@ SOFTWARE.
 */
 
 // Build with Arduino IDE 1.8.57.0
-//  ESP32: (2.0.14) ESP32 Dev Module, CPU Freq 80MHz (for power reduction), QIO, Default 4MB with spiffs (ESP32 partitions SPIFFS easiest)
+//  ESP32: (2.0.17) almost fits 3.3.7 now! ESP32 Dev Module, CPU Freq 80MHz (for power reduction), QIO, Default 4MB with spiffs (ESP32 partitions SPIFFS easiest)
 //  In TFT_eSPI/User_Setup_Select.h use #include <User_Setups/Setup201_WT32_SC01.h>
 // For remote unit, uncomment #define REMOTE in HVAC.h
 
