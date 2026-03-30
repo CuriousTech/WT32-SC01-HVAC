@@ -1,0 +1,41 @@
+﻿
+table{
+border-radius: 2px;
+margin-bottom: 2px;
+box-shadow: 4px 4px 10px #000000;
+background: rgb(160,160,160);
+background: linear-gradient(0deg, rgba(94,94,94,1) 0%, rgba(160,160,160,1) 90%);
+background-clip: padding-box;
+}
+input{
+border-radius: 2px;
+margin-bottom: 2px;
+box-shadow: 4px 4px 10px #000000;
+background: rgb(160,160,160);
+background: linear-gradient(0deg, rgba(160,160,160,1) 0%, rgba(239,255,255,1) 100%);
+background-clip: padding-box;
+}
+.style1{border-width: 0;}
+.style2{text-align: left;}
+.style3{
+border-radius: 5px;
+margin-bottom: 5px;
+box-shadow: 2px 2px 10px #000000;
+background: rgb(95,194,230);
+background: linear-gradient(0deg, rgba(95,194,230,1) 0%, rgba(79,79,79,1) 100%);
+background-clip: padding-box;
+}
+.style4{
+border-radius: 5px;
+margin-bottom: 5px;
+box-shadow: 2px 2px 10px #000000;
+background: rgb(80,160,255);
+background: linear-gradient(0deg, rgba(80,160,255,1) 0%, rgba(79,79,79,1) 100%);
+background-clip: padding-box;
+}
+.style5{
+border-radius: 1px;
+box-shadow: 2px 2px 10px #000000;
+background: rgb(0,160,224);
+background: linear-gradient(0deg, rgba(0,160,224,1) 0%, rgba(0,224,224,1) 100%);
+}
