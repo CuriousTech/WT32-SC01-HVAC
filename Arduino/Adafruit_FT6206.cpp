@@ -33,9 +33,6 @@
 #define Wire Wire1
 #endif
 
-//#define FT6206_DEBUG
-//#define I2C_DEBUG
-
 /**************************************************************************/
 /*!
     @brief  Instantiates a new FT6206 class
@@ -59,28 +56,6 @@ boolean Adafruit_FT6206::begin(uint8_t thresh) {
   Wire.begin(18, 19); // SDA, SCL for the WT32-SC01 development board
 
 // Note: TOUCH_UP = IO36 TOUCH_DN = IO39
-
-#ifdef FT6206_DEBUG
-  Serial.begin(115200);
-  Serial.print("Vend ID: 0x");
-  Serial.println(readRegister8(FT62XX_REG_VENDID), HEX);
-  Serial.print("Chip ID: 0x");
-  Serial.println(readRegister8(FT62XX_REG_CHIPID), HEX);
-  Serial.print("Firm V: ");
-  Serial.println(readRegister8(FT62XX_REG_FIRMVERS));
-  Serial.print("Point Rate Hz: ");
-  Serial.println(readRegister8(FT62XX_REG_POINTRATE));
-  Serial.print("Thresh: ");
-  Serial.println(readRegister8(FT62XX_REG_THRESHHOLD));
-
-  // dump all registers
-  for (int16_t i = 0; i < 0x10; i++) {
-    Serial.print("I2C $");
-    Serial.print(i, HEX);
-    Serial.print(" = 0x");
-    Serial.println(readRegister8(i), HEX);
-  }
-#endif
 
   // change threshhold to be higher/lower
   writeRegister8(FT62XX_REG_THRESHHOLD, thresh);
@@ -150,35 +125,10 @@ void Adafruit_FT6206::readData(void) {
   for (uint8_t i = 0; i < 16; i++)
     i2cdat[i] = Wire.read();
 
-#ifdef FT6206_DEBUG
-  for (int16_t i = 0; i < 16; i++) {
-    Serial.print("I2C $");
-    Serial.print(i, HEX);
-    Serial.print(" = 0x");
-    Serial.println(i2cdat[i], HEX);
-  }
-#endif
-
   touches = i2cdat[0x02];
   if ((touches > 2) || (touches == 0)) {
     touches = 0;
   }
-
-#ifdef FT6206_DEBUG
-  Serial.print("# Touches: ");
-  Serial.println(touches);
-
-  for (uint8_t i = 0; i < 16; i++) {
-    Serial.print("0x");
-    Serial.print(i2cdat[i], HEX);
-    Serial.print(" ");
-  }
-  Serial.println();
-  if (i2cdat[0x01] != 0x00) {
-    Serial.print("Gesture #");
-    Serial.println(i2cdat[0x01]);
-  }
-#endif
 
   for (uint8_t i = 0; i < 2; i++) {
     touchX[i] = i2cdat[0x03 + i * 6] & 0x0F;
@@ -189,40 +139,16 @@ void Adafruit_FT6206::readData(void) {
     touchY[i] |= i2cdat[0x06 + i * 6];
     touchID[i] = i2cdat[0x05 + i * 6] >> 4;
   }
-
-#ifdef FT6206_DEBUG
-  Serial.println();
-  for (uint8_t i = 0; i < touches; i++) {
-    Serial.print("ID #");
-    Serial.print(touchID[i]);
-    Serial.print("\t(");
-    Serial.print(touchX[i]);
-    Serial.print(", ");
-    Serial.print(touchY[i]);
-    Serial.print(") ");
-  }
-  Serial.println();
-#endif
 }
 
 uint8_t Adafruit_FT6206::readRegister8(uint8_t reg) {
-  uint8_t x;
   // use i2c
   Wire.beginTransmission(FT62XX_ADDR);
   Wire.write((byte)reg);
   Wire.endTransmission();
 
   Wire.requestFrom((byte)FT62XX_ADDR, (uint8_t)1, (uint8_t)1 );
-  x = Wire.read();
-
-#ifdef I2C_DEBUG
-  Serial.print("$");
-  Serial.print(reg, HEX);
-  Serial.print(": 0x");
-  Serial.println(x, HEX);
-#endif
-
-  return x;
+  return Wire.read();
 }
 
 void Adafruit_FT6206::writeRegister8(uint8_t reg, uint8_t val) {
