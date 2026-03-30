@@ -59,7 +59,7 @@ public:
   uint8_t  furnaceWatts = 140;      // 1.84A inducer motor mostly
   uint8_t  humidWatts = 150;
   uint8_t  brightLevel[2] = {30, 100}; // brightness {dim, highest}
-  uint16_t ppkwh = 150;             // price per KWH in cents * 10000 ($0.15)
+  uint16_t ppkwh = 160;             // price per KWH in cents * 10000 ($0.16)
   uint16_t ccf = 1190;              // nat gas cost per 1000 cubic feet in 10th of cents * 1000 ($1.190)
   uint16_t cfm = 820;               // cubic feet per minute * 1000 of furnace (0.82)
   uint16_t compressorWatts = 2600;  // compressorWatts
@@ -69,7 +69,8 @@ public:
   uint16_t fanIdleMax = 60*4;       // fan idle max in minutes
   int16_t  sineOffset[2] = {0, 0};  // sine offset adjust (cool/heat)
   char     szSensorActive[8][12];   // sensor IDs for restart
-  uint8_t  reserved[256];           // Note: To force an EEPROM update, just subtract 1 byte and flash again
+  uint8_t  damperIp[4] = {192,168,31,85}; // IP of backdraft damper
+  uint8_t  reserved[252];           // Note: To force an EEPROM update, just subtract 1 byte and flash again
   uint8_t  end;
 }; // 512 bytes
 
