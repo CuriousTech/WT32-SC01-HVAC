@@ -3,57 +3,24 @@
 #include "screensavers.h"
 
 extern void WsSend(String s);
+int16_t _srcX, _srcY;
 
-uint16_t pngbuffer[512]; // 512 pixel width max
-File pngfile;
-PNG png;
-
-void *pngOpen(const char *filename, int32_t *size) {
-  pngfile = INTERNAL_FS.open(filename, "r");
-  *size = pngfile.size();
-  return &pngfile;
-}
-
-void pngClose(void *handle) {
-  File pngfile = *((File*)handle);
-  if (pngfile) pngfile.close();
-}
-
-int32_t pngRead(PNGFILE *page, uint8_t *buffer, int32_t length) {
-  if (!pngfile) return 0;
-  page = page; // Avoid warning
-  return pngfile.read(buffer, length);
-}
-
-int32_t pngSeek(PNGFILE *page, int32_t position) {
-  if (!pngfile) return 0;
-  page = page; // Avoid warning
-  return pngfile.seek(position);
-}
-
-int pngDraw(PNGDRAW *pDraw)
+bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap)
 {
-  ImageCtrl *pPos = (ImageCtrl *)pDraw->pUser;
-
-  if(pPos->srcY)
+  if ( y >= tft.height() ) return 0; // Stop further decoding as image is running off bottom of screen
+  if(_srcY)
   {
-    if(pDraw->y < pPos->srcY) // skip lines above
+    if(y < _srcY) // skip lines above
       return 1;
-    if(pPos->srcY + pPos->h >= pDraw->y) // skip lines below
+    if(_srcY + h >= y) // skip lines below
       return 1;
   }
-
-  png.getLineAsRGB565(pDraw, pngbuffer, PNG_RGB565_BIG_ENDIAN, 0xffffffff);
-
-  uint16_t w = pDraw->iWidth;
-  if(pPos->w) w = pPos->w; // crop to desired width (todo: should maybe do some checking)
-
-  uint16_t y = pPos->y + pDraw->y;
-  if(pPos->srcY) // offset lib incremented y pos to srcY offset
-    y -= pPos->srcY;
-
-  tft.pushImage(pPos->x, y, w, 1, pngbuffer + pPos->srcX);
-  return 1;
+  if(_srcY) // offset lib incremented y pos to srcY offset
+    y -= _srcY;
+  if( y < _srcY) return 1; // skip source lines not rendered
+  // This function will clip the image block rendering automatically at the TFT boundaries
+  tft.pushImage(x, y, w, h, bitmap + _srcX);
+  return 1;  // Return 1 to decode next block
 }
 
 Media::Media()
@@ -63,6 +30,9 @@ Media::Media()
 void Media::init()
 {
 //  INTERNAL_FS.begin(true); // started in eemem
+  TJpgDec.setJpgScale(1);
+  TJpgDec.setSwapBytes(true);  // The byte order can be swapped (set true for TFT_eSPI)
+  TJpgDec.setCallback(tft_output);   // The decoder must be given the exact name of the rendering function above
 }
 
 uint32_t Media::freeSpace()
@@ -118,41 +88,29 @@ void Media::createDir(char *pszName)
     INTERNAL_FS.mkdir(pszName);
 }
 
-void Media::loadImage(String Name, uint16_t x, uint16_t y)
+void Media::loadImage(String sName, uint16_t x, uint16_t y)
 {
-  loadImage(Name, x, y, 0, 0, 0, 0);
+  loadImage(sName, x, y, 0, 0, 0, 0);
 }
 
-void Media::loadImage(String Name, uint16_t x, uint16_t y, uint16_t srcX, uint16_t srcY, uint16_t w, uint16_t h)
+void Media::loadImage(String sName, uint16_t x, uint16_t y, int16_t srcX, int16_t srcY, uint16_t w, uint16_t h)
 {
-  static ImageCtrl pos;
-  pos.x = x;
-  pos.y = y;
-  pos.srcX = srcX;
-  pos.srcY = srcY;
-  pos.w = w;
-  pos.h = h;
+  _srcX = srcX;
+  _srcY = srcY;
 
   String sPath = "/";
-  sPath += Name;
-  sPath += ".png";
-  int16_t rc = png.open(sPath.c_str(), pngOpen, pngClose, pngRead, pngSeek, pngDraw);
-
-  if(rc == PNG_SUCCESS)
+  sPath += sName;
+  sPath += ".jpg";
+  uint16_t wReal, hReal;
+  TJpgDec.getFsJpgSize(&wReal, &hReal, sPath);
+  if(w == 0) w = wReal;
+  if(h == 0) h = hReal;
+  if(w == 0 || h == 0)
   {
-    tft.startWrite();
-//    Serial.printf("image specs: (%d x %d), %d bpp, pixel type: %d\r\n", png.getWidth(), png.getHeight(), png.getBpp(), png.getPixelType());
-//    uint32_t dt = millis();
-    rc = png.decode((void*)&pos, 0);
-    png.close();
-    tft.endWrite();
-    // How long did rendering take...
-//    Serial.print(millis()-dt); Serial.println("ms");
+//    String s = "File not found: ";
+//    s += sPath;
+//    Serial.println(s);
+    return;
   }
-  else
-  {
-//    Serial.print(Name);
-//    Serial.print(" loadImage error: ");
-//    Serial.println(rc);
-  }
+  TJpgDec.drawFsJpg(x, y, sPath);
 }
