@@ -1,3 +1,5 @@
+// Uses 6K
+
 const char fileman[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
@@ -28,7 +30,7 @@ $(document).ready(function(){
 function openSocket(){
  ws=new WebSocket("ws://"+window.location.host+"/ws")
 // ws=new WebSocket("ws://192.168.31.110/ws")
- ws.onopen=function(evt){}
+ ws.onopen=function(evt){setVar('cd','/');}
  ws.onclose=function(evt){alert("Connection closed.");}
  ws.onmessage=function(evt){
  console.log(evt.data)
@@ -114,6 +116,9 @@ function AddFile(item)
       td.innerHTML=' '+item[1]
   }
   tr.appendChild(td)
+  td=document.createElement("td")
+  td.innerHTML=' '+(new Date(item[3]*1000).toLocaleString())
+  tr.appendChild(td)
 
   tbody=document.createElement("tbody")
   tbody.id='tbody'+idx
@@ -146,7 +151,7 @@ function delfile(idx,name)
 function fullName(name)
 {
   if(path.length>1) return path+'/'+name
-  else return '/'+name
+  else return name
 }
 function download(name){
   const b = document.createElement('a')
