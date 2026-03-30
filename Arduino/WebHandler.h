@@ -12,5 +12,6 @@ String dataJson(void);
 void WsSend(String s);
 void historyDump(bool bStart);
 void appendDump(uint32_t startTime);
+void setDamper(bool bOpen);
 
 #endif // WEBHANDLER_H
