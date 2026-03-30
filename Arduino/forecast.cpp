@@ -14,6 +14,8 @@ extern tm gLTime;
 
 // forecast retrieval
 
+extern void WsSend(String s);
+
 Forecast::Forecast()
 {
   m_ac.onConnect([](void* obj, AsyncClient* c) { (static_cast<Forecast*>(obj))->_onConnect(c); }, this);
@@ -57,6 +59,21 @@ void Forecast::start(char *pCityID, bool bCelcius)
   m_bLocal = false;
 }
 
+// local device control, such as dampers
+void Forecast::start(IPAddress serverIP, uint16_t port, String sUri)
+{
+  if(m_ac.connected() || m_ac.connecting())
+    return;
+
+  m_status = FCS_Busy;
+  m_serverIP = serverIP;
+  if(!m_ac.connect(serverIP, port))
+    m_status = FCS_ConnectError;
+  m_type = 2;
+  m_sUri = sUri;
+  m_bLocal = true;
+}
+
 int Forecast::checkStatus()
 {
   if(m_status == FCS_Done)
@@ -83,6 +100,10 @@ void Forecast::_onConnect(AsyncClient* client)
         break;
       case 1:
         path += "Forecast.json";
+        break;
+      case 2:
+        path += m_sUri;
+        m_sUri = ""; // save mem
         break;
     }
   }
@@ -177,6 +198,8 @@ void Forecast::_onDisconnect(AsyncClient* client)
       break;
     case 1:
       processOWM(); // json type
+      break;
+    case 2:
       break;
   }
   m_fc.Data[m_fcIdx].temp = -1000; // mark past last as invalid
@@ -754,9 +777,9 @@ bool Forecast::forecastPage()
       if(low != 1500) // show peaks
       {
         if(x > FC_Left + 23)
-          display.drawFakeFloat(high, x - 20, FC_Top+FC_Height + 10);
+          display.drawFakeFloat(high, x - 20, FC_Top+FC_Height + 10, 8, rgb16(0, 63, 31) );
         if(x >FC_Left + 63) // first one shouldn't go too far left
-          display.drawFakeFloat(low, x - 54, FC_Top+FC_Height + 10 + 21);
+          display.drawFakeFloat(low, x - 54, FC_Top+FC_Height + 10 + 21, 8, rgb16(0, 63, 31) );
       }
 
       iconAni *pIcon = &m_fcIcon[iDay - 1];
@@ -786,8 +809,8 @@ bool Forecast::forecastPage()
   if(x < DISPLAY_WIDTH + 30 && low != 1500)
   {
     if(x < DISPLAY_WIDTH - 10 && high != -1000)
-      display.drawFakeFloat(high, x - 20, FC_Top+FC_Height + 10);
-    display.drawFakeFloat(low, x - 54, FC_Top+FC_Height + 10 + 21);
+      display.drawFakeFloat(high, x - 20, FC_Top+FC_Height + 10, 8, rgb16(8,16,8) );
+    display.drawFakeFloat(low, x - 54, FC_Top+FC_Height + 10 + 21, 8, rgb16(8,16,8));
 
     m_fcIcon[iDay].x = x;
     int8_t h1 = 0;
