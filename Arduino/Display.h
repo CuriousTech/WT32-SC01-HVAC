@@ -101,14 +101,15 @@ public:
   bool screen(bool bOn);
   void service(void);
   void goDark(void);
-  void updateTemps(void);
+  void updateTemps(bool bForce);
   void updateNotification(bool bRef);
   bool getGrapthPoints(gPoint *pt, int n);
   int  minPointVal(int n, int &max);
   String makeName(uint8_t icon, uint8_t h);
-  void drawFakeFloat(uint16_t val, uint16_t x, uint16_t y);
+  void drawFakeFloat(uint16_t val, int16_t x, int16_t y, uint8_t h, uint16_t fg, uint16_t bg = 0);
 
 private:
+  void drawDigit(uint8_t digit, uint8_t pos, int16_t x, int16_t y, uint8_t h, uint16_t fg, uint16_t bg);
   void buttonCmd(uint8_t btn);
   void dimmer(void);
   void updateModes(bool bForce); // update any displayed settings
@@ -142,12 +143,12 @@ private:
   const Button m_btn[Btn_Count] = {
     {Btn_Dow, 30, 8, 50, 20},
     {Btn_Time, 106, 8, 182, 20},
-    {Btn_OutTemp, DISPLAY_WIDTH-126, 24, 103, 41},
-    {Btn_InTemp, 25, 52, 174, 64},
-    {Btn_Rh, 201, 52, 100, 40},
-    {Btn_TargetTemp, DISPLAY_WIDTH-184, 124, 105, 41},
-    {Btn_SetTempH, DISPLAY_WIDTH-185, 185, 105, 43},
-    {Btn_SetTempL, DISPLAY_WIDTH-185, 250, 105, 43},
+    {Btn_OutTemp, DISPLAY_WIDTH-144, 24, 103, 41},
+    {Btn_InTemp, 0, 52, 164, 64},
+    {Btn_Rh, 170, 52, 90, 40},
+    {Btn_TargetTemp, DISPLAY_WIDTH-204, 124, 105, 41},
+    {Btn_SetTempH, DISPLAY_WIDTH-215, 185, 105, 43},
+    {Btn_SetTempL, DISPLAY_WIDTH-215, 250, 105, 43},
 
     {Btn_History,   15, 138, 60, 60},
     {Btn_Override,  82, 138, 60, 60},
