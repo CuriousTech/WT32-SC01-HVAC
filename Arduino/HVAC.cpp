@@ -10,16 +10,16 @@
 
 #include <math.h>
 #include "HVAC.h"
-#include <Time.h>
+#include <time.h>
 #include "eeMem.h"
 #include "jsonstring.h"
 #include "music.h"
 extern Music mus;
 #include "Media.h"
+#include "WebHandler.h"
 
 #ifdef REMOTE
 #include <ESPAsyncWebServer.h> // https://github.com/ESP32Async/ESPAsyncWebServer
-#include "WebHandler.h"
 
 extern void WscSend(String s); // remote WebSocket
 bool bValidData;
@@ -137,7 +137,6 @@ void HVAC::enableRemote()
 void HVAC::updateVar(int iName, int iValue)// host values (sent to remote)
 {
 #ifdef REMOTE
-
   switch(iName)
   {
     case 0: // r
@@ -402,6 +401,7 @@ void HVAC::service()
         if(hm == Heat_NG)  // gas
         {
             digitalWrite(P_HEAT, HEAT_ON);
+            setDamper(true);
         }
         else
         {
@@ -430,6 +430,7 @@ void HVAC::service()
     m_bStop = false;
     digitalWrite(P_COOL, COOL_OFF);
     digitalWrite(P_HEAT, HEAT_OFF);
+    setDamper(false);
 
     costAdd(m_cycleTimer, mode, hm);
     m_cycleTimer = 0;
@@ -451,13 +452,13 @@ void HVAC::service()
       if(hm)
       {
         m_furnaceFan = ee.furnacePost;    // count run time as fan time in winter
-        if(m_endTemp < m_startTemp) // not heating HP
-          m_notif = Note_HPHeatError;
+        if(m_endTemp < m_startTemp) // not heating NG
+          m_notif = Note_NGHeatError;
       }
       else
       {
-        if(m_endTemp < m_startTemp) // not heating NG
-          m_notif = Note_NGHeatError;
+        if(m_endTemp < m_startTemp) // not heating HP
+          m_notif = Note_HPHeatError;
       }
     }
     else
@@ -807,13 +808,6 @@ bool HVAC::preCalcCycle(int16_t tempL, int16_t tempH)
       break;
     case Mode_Heat:
       goto HEAT;
-//      calcTargetTemp(Mode_Heat);
-//      if(ee.b.heatMode == Heat_Auto)
-//      {
-//        m_AutoHeat = (m_outTemp < ee.eHeatThresh * 10) ? Heat_NG:Heat_HP;  // Use gas when efficiency too low for pump
-//      }
-//      bRet = (tempL <= m_targetTemp);
-//      break;
     case Mode_Auto:
       if(tempH >= ee.coolTemp[0])
       {
@@ -1288,7 +1282,6 @@ int snsComp(const void *a, const void*b)
 void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
 {
   static uint8_t snsIdx; // current sensor in use
-
   int c = CmdIdx( sCmd );
   if(ee.b.bLock && c!= 30)
     return;
@@ -1427,7 +1420,6 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       ee.update();
       break;
     case 35: // TZ
-      ee.tz = constrain(val, -12, 12);
       break;
     case 36: // cw
       ee.compressorWatts = val;
