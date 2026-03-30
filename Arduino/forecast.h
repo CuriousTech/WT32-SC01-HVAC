@@ -48,6 +48,7 @@ public:
   void JsonParse(char *p, int8_t event, const char **jsonList, void (*pcb)(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue));
   void start(IPAddress serverIP, uint16_t port, bool bCelcius, int8_t type);
   void start(char *pCityID, bool bCelcius); // Openweathermmap start
+  void start(IPAddress serverIP, uint16_t port, String sUri);
   void setList(const char **jsonList);
   int checkStatus();
   bool getCurrentIndex(int8_t& fcOff, int8_t& fcCnt, uint32_t& tm); // index into stored data at current timeframme
@@ -88,6 +89,7 @@ private:
   int8_t m_type;
   iconAni m_fcIcon[7];
   uint8_t m_iconIdx;
+  String m_sUri;
 public:
   forecastData m_fc;
   bool    m_bUpdateFcst = true;
