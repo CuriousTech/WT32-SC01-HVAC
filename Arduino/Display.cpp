@@ -1,5 +1,6 @@
 #include "HVAC.h"
 #include "display.h"
+#include <WiFi.h>
 #include <ESPAsyncWebServer.h> // https://github.com/me-no-dev/ESPAsyncWebServer
 #include "jsonstring.h"
 #include <time.h>
@@ -12,7 +13,7 @@ Music mus;
 TFT_eSPI tft = TFT_eSPI();
 static_assert(USER_SETUP_ID==201, "User setup incorrect in TFT_eSPI");
 
-#include "digitalFont.h"
+//#include "digitalFont.h"
 #include "forecast.h"
 
 // FT6206, FT6336U - touchscreen library                  // modified -> Wire.begin(18, 19)
@@ -38,6 +39,7 @@ void Display::init(void)
   tft.setRotation(1);                 // set desired rotation
   tft.setTextDatum(TL_DATUM);
   mus.init();
+  media.init();
   FC.init();
   screen(true);
 }
@@ -61,6 +63,8 @@ bool Display::screen(bool bOn)
     m_currPage = Page_Thermostat;
     goDark();
     media.loadImage("bg", 0, 0);
+    tft.fillRect(m_btn[Btn_SetTempH].x + 25, m_btn[Btn_SetTempH].y, m_btn[Btn_SetTempH].w, m_btn[Btn_SetTempH].h, TFT_BLACK );
+    tft.fillRect(m_btn[Btn_SetTempL].x + 25, m_btn[Btn_SetTempL].y, m_btn[Btn_SetTempL].w, m_btn[Btn_SetTempL].h, TFT_BLACK );
     refreshAll();
   }
   else
@@ -166,7 +170,7 @@ void Display::buttonCmd(uint8_t btn)
       if(ee.b.bLock) break;
       m_bLink = !m_bLink;
       m_adjustMode = btn - Btn_SetTempH;
-      updateTemps();
+      updateTemps(false);
       break;
 
     case Btn_Up: // Up button mode = 1
@@ -243,7 +247,7 @@ void Display::oneSec()
 {
   drawTime();    // time update every second
   updateModes(false);    // mode, heat mode, fan mode
-  updateTemps();    // 
+  updateTemps(false);    // 
   updateNotification(false);
   updateRSSI();     //
   if(m_currPage == Page_Forecast)
@@ -302,9 +306,7 @@ void Display::drawOutTemp()
 
   if(m_currPage == Page_Thermostat)
   {
-    tft.setTextColor( rgb16(0, 63, 31), TFT_BLACK );
-    tft.setFreeFont(&digitaldreamSkew_28ptFont);
-    drawFakeFloat(outTempReal, m_btn[Btn_OutTemp].x, m_btn[Btn_OutTemp].y );
+    drawFakeFloat(outTempReal, m_btn[Btn_OutTemp].x, m_btn[Btn_OutTemp].y, 17, rgb16(0, 63, 31) );
 
     static bool bInit = false; // make first time display update fast
     if(!bInit)
@@ -316,45 +318,96 @@ void Display::drawOutTemp()
   }
 }
 
-void Display::drawFakeFloat(uint16_t val, uint16_t x, uint16_t y)
+void Display::drawFakeFloat(uint16_t val, int16_t x, int16_t y, uint8_t h, uint16_t fg, uint16_t bg)
 {
-  String s = String(val/10);
-  s += ".";
-  s += val % 10;
-  tft.drawString(s, x, y);
+  uint8_t digits[5] = {0};
+  bool bNone = true;
+
+  for(int8_t i = 0; i < 4; i++)
+  {
+    digits[i] = val % 10;
+    val /= 10;
+  }
+
+  uint8_t nCnt = 4;
+  if(digits[3] == 0) nCnt--;
+
+  for(int8_t i = 0; i < nCnt; i++)
+  {
+    drawDigit(digits[i], 4 - i, x, y, h, fg, bg);
+    if(i == 0)
+    {
+      x -= h>>2;
+      drawDigit(10, 4 - i, x, y, h, fg, bg); // decimal place
+    }
+  }
 }
 
-void Display::updateTemps(void)
+void Display::drawDigit(uint8_t digit, uint8_t pos, int16_t x, int16_t y, uint8_t h, uint16_t fg, uint16_t bg)
+{
+  int8_t h2 = h << 1;
+  int8_t w = h;
+  y++;                          // 0    1     2     3      4     5     6     7     8     9 
+  static uint8_t bitmask[12] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F, 0x00};
+
+  uint8_t bit = bitmask[digit];
+  x += pos * ( (w>>1) + w);
+
+  int16_t yh = y + h;
+  int16_t yh2= y + h2;
+  int16_t xw = x + w;
+
+  uint8_t thick = h / 5;
+
+  if(digit == 10)
+  {
+    tft.drawWideLine( x-3, yh2-1, x-2, yh2, thick, fg); // decimal
+    return;
+  }
+
+  if((bit & 0x01) == 0) tft.drawWideLine( x+ 3, y   , xw+1, y    , thick, bg); // T
+  if((bit & 0x02) == 0) tft.drawWideLine( xw+2, y +1, xw+1, yh -1, thick, bg); // R1
+  if((bit & 0x04) == 0) tft.drawWideLine( xw+1, yh+1, xw  , yh2-1, thick, bg); // R2
+  if((bit & 0x08) == 0) tft.drawWideLine( x+ 1, yh2 , xw-1, yh2  , thick, bg); // B
+  if((bit & 0x10) == 0) tft.drawWideLine( x+ 1, yh+1, x   , yh2-1, thick, bg); // L2
+  if((bit & 0x20) == 0) tft.drawWideLine( x+ 2, y +1, x +1, yh -1, thick, bg); // L1
+  if((bit & 0x40) == 0) tft.drawWideLine( x+ 2, yh  , xw  , yh   , thick, bg); // C
+ 
+  if((bit & 0x01)) tft.drawWideLine( x+ 3, y   , xw+1, y    , thick, fg); // T
+  if((bit & 0x02)) tft.drawWideLine( xw+2, y +1, xw+1, yh -1, thick, fg); // R1
+  if((bit & 0x04)) tft.drawWideLine( xw+1, yh+1, xw  , yh2-1, thick, fg); // R2
+  if((bit & 0x08)) tft.drawWideLine( x+ 1, yh2 , xw-1, yh2  , thick, fg); // B
+  if((bit & 0x10)) tft.drawWideLine( x+ 1, yh+1, x   , yh2-1, thick, fg); // L2
+  if((bit & 0x20)) tft.drawWideLine( x+ 2, y +1, x +1, yh -1, thick, fg); // L1
+  if((bit & 0x40)) tft.drawWideLine( x+ 2, yh  , xw  , yh   , thick, fg); // C
+}
+
+void Display::updateTemps(bool bForce)
 {
   static uint16_t last[7];  // only draw changes
-  if(m_currPage)
+  if(m_currPage || bForce)
   {
     memset(last, 0, sizeof(last));
     return;
   }
 
-  tft.setFreeFont(&digitaldreamSkew_48ptFont);
-
   int16_t inTemp = (m_displayLocal) ? hvac.m_localTemp : hvac.m_inTemp;
   int16_t rh = (m_displayLocal) ? hvac.m_localRh : hvac.m_rh;
-
-  tft.setTextColor( (m_displayLocal) ? rgb16(4, 63, 1) : rgb16(0, 63, 31), TFT_BLACK );
+  uint16_t fg = (m_displayLocal) ? rgb16(4, 63, 1) : rgb16(0, 63, 31);
 
   if(last[0] != inTemp)
-    drawFakeFloat((last[0] = inTemp), m_btn[Btn_InTemp].x, m_btn[Btn_InTemp].y );
+    drawFakeFloat((last[0] = inTemp), m_btn[Btn_InTemp].x - 20, m_btn[Btn_InTemp].y, 28, fg );
 
-  tft.setFreeFont(&digitaldreamSkew_28ptFont);
   if(last[1] != hvac.m_targetTemp)
-    drawFakeFloat((last[1] = hvac.m_targetTemp), m_btn[Btn_TargetTemp].x, m_btn[Btn_TargetTemp].y );
+    drawFakeFloat((last[1] = hvac.m_targetTemp), m_btn[Btn_TargetTemp].x, m_btn[Btn_TargetTemp].y, 17, fg );
 
   if(last[2] != rh)
   {
-    drawFakeFloat((last[2] = rh), m_btn[Btn_Rh].x, m_btn[Btn_Rh].y );
+    drawFakeFloat((last[2] = rh), m_btn[Btn_Rh].x, m_btn[Btn_Rh].y, 17, fg );
     tft.setFreeFont(&FreeSans12pt7b);
-    tft.drawString("%", m_btn[Btn_Rh].x + 101, m_btn[Btn_Rh].y );
+    tft.setTextColor(fg);
+    tft.drawString("%", m_btn[Btn_Rh].x + 130, m_btn[Btn_Rh].y );
   }
-
-  tft.setFreeFont(&digitaldreamSkew_28ptFont);
 
   uint8_t nMode = hvac.getSetMode();
 
@@ -362,7 +415,7 @@ void Display::updateTemps(void)
     nMode = (hvac.getAutoMode() == Mode_Cool) ? Mode_Cool : Mode_Heat;
 
   static const uint16_t colors[] = {rgb16(21, 44, 21), rgb16(0, 4, 31), rgb16(31, 13, 10) };
-  tft.setTextColor( colors[nMode], TFT_BLACK );
+  uint16_t fgm = colors[nMode];
 
   if( last[5] != nMode || last[6] != ((m_adjustMode<<1) | m_bLink) ) // force temp redraw
   {
@@ -376,24 +429,24 @@ void Display::updateTemps(void)
     case Mode_Cool:
       if(last[3] != ee.coolTemp[1])
       {
-        drawFakeFloat((last[3] = ee.coolTemp[1]), m_btn[Btn_SetTempH].x+1, m_btn[Btn_SetTempH].y+2 );
+        drawFakeFloat((last[3] = ee.coolTemp[1]), m_btn[Btn_SetTempH].x+1, m_btn[Btn_SetTempH].y+2, 17, fgm );
         last[6] = 10; // force outline refresh 
       }
       if(last[4] != ee.coolTemp[0])
       {
-        drawFakeFloat((last[4] = ee.coolTemp[0]), m_btn[Btn_SetTempL].x+1, m_btn[Btn_SetTempL].y+2 );
+        drawFakeFloat((last[4] = ee.coolTemp[0]), m_btn[Btn_SetTempL].x+1, m_btn[Btn_SetTempL].y+2, 17, fgm );
         last[6] = 10;
       }
       break;
     case Mode_Heat:
       if(last[3] != ee.heatTemp[1])
       {
-        drawFakeFloat((last[3] = ee.heatTemp[1]), m_btn[Btn_SetTempH].x+1, m_btn[Btn_SetTempH].y+2 );
+        drawFakeFloat((last[3] = ee.heatTemp[1]), m_btn[Btn_SetTempH].x+1, m_btn[Btn_SetTempH].y+2, 17, fgm );
         last[6] = 10;
       }
       if(last[4] != ee.heatTemp[0])
       {
-        drawFakeFloat((last[4] = ee.heatTemp[0]), m_btn[Btn_SetTempL].x+1, m_btn[Btn_SetTempL].y+2 );
+        drawFakeFloat((last[4] = ee.heatTemp[0]), m_btn[Btn_SetTempL].x+1, m_btn[Btn_SetTempL].y+2, 17, fgm );
         last[6] = 10;
       }
       break;
@@ -403,8 +456,8 @@ void Display::updateTemps(void)
   {
     last[6] = (m_adjustMode<<1) | m_bLink;
     int8_t am = m_adjustMode;
-    tft.drawRect(m_btn[Btn_SetTempH+am].x, m_btn[Btn_SetTempH+am].y, m_btn[Btn_SetTempH+am].w, m_btn[Btn_SetTempH+am].h, rgb16(0,31,0));
-    tft.drawRect(m_btn[Btn_SetTempH+(am^1)].x, m_btn[Btn_SetTempH+(am^1)].y, m_btn[Btn_SetTempH+(am^1)].w, m_btn[Btn_SetTempH+(am^1)].h, (m_bLink) ? rgb16(0,31,0) : TFT_BLACK);
+    tft.drawRect(m_btn[Btn_SetTempH+am].x + 25, m_btn[Btn_SetTempH+am].y, m_btn[Btn_SetTempH+am].w, m_btn[Btn_SetTempH+am].h, rgb16(0,31,0));
+    tft.drawRect(m_btn[Btn_SetTempH+(am^1)].x + 25, m_btn[Btn_SetTempH+(am^1)].y, m_btn[Btn_SetTempH+(am^1)].w, m_btn[Btn_SetTempH+(am^1)].h, (m_bLink) ? rgb16(0,31,0) : TFT_BLACK);
   }
 }
 
@@ -450,7 +503,7 @@ void Display::updateModes(bool bForce) // update any displayed settings
 
     m_bLink = true;
     m_adjustMode = 0;
-    updateTemps();
+    updateTemps(bForce);
 
     nState = hvac.getState();
     if(nState) // draw the ON indicator on the button
@@ -479,8 +532,12 @@ void Display::updateModes(bool bForce) // update any displayed settings
       loadBtnImage("btnled", Btn_Humid);
   }
 
-  loadBtnImage( ( (ee.b.bLock) ? "lock" : "unlock" ), Btn_Lock);
-
+  static bool bLock = true;
+  if(bLock != ee.b.bLock || bForce)
+  {
+    loadBtnImage( ( (ee.b.bLock) ? "lock" : "unlock" ), Btn_Lock);
+    bLock != ee.b.bLock;
+  }
   loadBtnImage( "over", Btn_Override);
   if((hvac.m_overrideTimer ? true:false) != bOverride)
   {
@@ -512,7 +569,7 @@ void Display::buttonRepeat()
     t = hvac.getSetTemp(m, hilo^1 ) + ((m_btnMode==1) ? 1:-1); // adjust opposite hi/lo the same
     hvac.setTemp(m, t, hilo^1);
   }
-  updateTemps();
+  updateTemps(false);
 }
 
 // time and dow on main page
@@ -547,9 +604,9 @@ void Display::drawTime()
   bRefresh = false;
 }
 
-const char *pNotes[] ={
+const char *pNotes[] = {
   "",  //  Note_None,
-  "Connecting", //  Note_Connecting,
+  "Connecting to WiFi", //  Note_Connecting,
 #ifdef REMOTE
    "Searching for HVAC",
 #else
@@ -664,7 +721,7 @@ void Display::dimmer()
 void Display::refreshAll()
 {
   updateNotification(true);
-  updateTemps();
+  updateTemps(true);
   updateModes(true);
   drawOutTemp();
   loadBtnImage("up", Btn_Up);
