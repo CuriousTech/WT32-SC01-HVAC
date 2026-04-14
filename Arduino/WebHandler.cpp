@@ -159,7 +159,7 @@ void startServer()
     parseParams(request);
     String s = "OK\r\n\r\n";
     jsonString js;
-    js.Var("tzoffset", (uint32_t)(time(nullptr) - mktime(&gLTime)) );
+    js.Var("tzoffset", (int32_t)(time(nullptr) - mktime(&gLTime)) );
     js.Var("time", (uint32_t)time(nullptr));
     js.Var("outtemp", hvac.m_outTemp);
     js.Var("outrh", hvac.m_outRh);
