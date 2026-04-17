@@ -151,7 +151,7 @@ function delfile(idx,name)
 function fullName(name)
 {
   if(path.length>1) return path+'/'+name
-  else return name
+  else return '/'+name
 }
 function download(name){
   const b = document.createElement('a')
@@ -215,7 +215,6 @@ dropContainer.ondrop = function(evt) {
    item=evt.dataTransfer.items[i].webkitGetAsEntry()
    it=new Array()
    it[0]=data.name
-   console.log(data.name)
    if(item.isDirectory){
     it[1]=0
     it[2]=1
