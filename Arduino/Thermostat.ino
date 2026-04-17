@@ -137,9 +137,7 @@ void loop()
 
     if(secondsServer()) // once per second stuff, returns true once on connect
     {
-      configTime(0, 0, "pool.ntp.org");
-      setenv("TZ", TZ, 1);
-      tzset();
+      configTzTime(TZ, "pool.ntp.org");
 
       if(lastDay == -1)
       {
@@ -224,9 +222,7 @@ void loop()
         hour_save = gLTime.tm_hour;
         if(hour_save == 2)
         {
-          configTime(0, 0, "pool.ntp.org");
-          setenv("TZ", TZ, 1);
-          tzset();
+          configTzTime(TZ, "pool.ntp.org");
         }
 #ifndef REMOTE
         if(hour_save == 0 && gLTime.tm_year > 124)
