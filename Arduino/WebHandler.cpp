@@ -8,7 +8,7 @@
 #ifdef OTA_ENABLE
 #include <ArduinoOTA.h>
 #endif
-#include <Time.h>
+#include <time.h>
 #include "WebHandler.h"
 #include "HVAC.h"
 #include "jsonString.h"
@@ -131,7 +131,7 @@ void startServer()
 {
   WiFi.hostname(hostName);
   WiFi.mode(WIFI_STA);
-
+  
   if ( ee.szSSID[0] )
   {
     WiFi.begin(ee.szSSID, ee.szSSIDPassword);
@@ -151,7 +151,8 @@ void startServer()
 #ifndef REMOTE
 
   server.on ( "/", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
-    // no 404, just an empty response
+    // no 404, just an empty response. In latest library version, comment out line 900:
+    // \libraries\ESP_Async_WebServer\src\WebRequest.cpp line 900: send(501, T_text_plain, "Handler did not handle the request");
   });
 
   // For quick commands, sensors. Remotes have a seperate command list
@@ -159,7 +160,15 @@ void startServer()
     parseParams(request);
     String s = "OK\r\n\r\n";
     jsonString js;
-    js.Var("tzoffset", (int32_t)(time(nullptr) - mktime(&gLTime)) );
+
+    static int32_t tzOffset;
+
+    if(tzOffset == 0)
+    {
+      tzOffset = time(nullptr) - mktime(&gLTime); // works sometimes
+    }
+
+    js.Var("tzoffset", tzOffset );
     js.Var("time", (uint32_t)time(nullptr));
     js.Var("outtemp", hvac.m_outTemp);
     js.Var("outrh", hvac.m_outRh);
@@ -221,6 +230,12 @@ void startServer()
 #ifdef REMOTE
 void findHVAC() // find the HVAC on iot domain
 {
+
+ ee.hostIp[0] = 192; // update IP
+ ee.hostIp[1] = 168;
+ ee.hostIp[2] = 31;
+ ee.hostIp[3] = 111;
+
   // Find HVAC
   int cnt = MDNS.queryService("iot", "tcp");
   for(int i = 0; i < cnt; ++i)
@@ -463,40 +478,43 @@ String dataJson()
   return hvac.getPushData();
 }
 
+int nOffsets[4];
+
 String gptArr(gPoint& gpt, uint32_t tb)
 {
   String out = "[";         // [seconds, temp, rh, lowThresh, state, outTemp],
   out += tb;
   out += ",";
-  out += gpt.t.inTemp;
+  out += gpt.t.inTemp - nOffsets[0];
   out += ",";
-  out += gpt.bits.rh;
+  out += gpt.bits.rh - nOffsets[1];
   out += ",";
-  out += gpt.t.target;
+  out += gpt.t.target - nOffsets[2];
   out += ",";
   out += gpt.bits.u & 7;
   out += ",";
-  out += gpt.t.outTemp;
+  out += gpt.t.outTemp - nOffsets[3];
+
   if(hvac.m_Sensor[0].IP)
   {
     out += ",";
-    out += gpt.sens0 + gpt.t.inTemp;
+    out += gpt.sens0 + gpt.t.inTemp - nOffsets[0];
     if(hvac.m_Sensor[1].IP)
     {
       out += ",";
-      out += gpt.sens1 + gpt.t.inTemp;
+      out += gpt.sens1 + gpt.t.inTemp - nOffsets[0];
       if(hvac.m_Sensor[2].IP)
       {
         out += ",";
-        out += gpt.sens2 + gpt.t.inTemp;
+        out += gpt.sens2 + gpt.t.inTemp - nOffsets[0];
         if(hvac.m_Sensor[3].IP)
         {
           out += ",";
-          out += gpt.sens3 + gpt.t.inTemp;
+          out += gpt.sens3 + gpt.t.inTemp - nOffsets[0];
           if(hvac.m_Sensor[4].IP)
           {
             out += ",";
-            out += gpt.bits.sens4 + gpt.t.inTemp;
+            out += gpt.bits.sens4 + gpt.t.inTemp - nOffsets[0];
           }
         }
       }
@@ -511,11 +529,6 @@ void historyDump(bool bStart)
 #ifndef REMOTE
   static bool bSending = false;
   static int entryIdx = 0;
-  static int tempMin = 0;
-  static int lMin;
-  static int hMin;
-  static int rhMin;
-  static int otMin;
 
   if(bStart)
     bSending = true;
@@ -535,18 +548,17 @@ void historyDump(bool bStart)
 
     jsonString js("ref");
     int maxv;
-    tempMin = display.minPointVal(0, maxv);
-    lMin = display.minPointVal(1, maxv);
-    hMin = display.minPointVal(2, maxv);
-    rhMin = display.minPointVal(3, maxv);
-    otMin = display.minPointVal(4, maxv);
+    nOffsets[0] = display.minPointVal(0, maxv);
+    nOffsets[2] = display.minPointVal(1, maxv);
+    nOffsets[1] = display.minPointVal(3, maxv);
+    nOffsets[3] = display.minPointVal(4, maxv);
   
     js.Var("tb", display.m_lastPDate);
     js.Var("th", ee.cycleThresh[ (hvac.m_modeShadow == Mode_Heat) ? 1:0] ); // threshold
-    js.Var("tm", tempMin); // temp min
-    js.Var("lm", lMin); // threshold low min
-    js.Var("rm", rhMin); // rh min
-    js.Var("om", otMin); // ot min
+    js.Var("tm", nOffsets[0]); // temp min
+    js.Var("lm", nOffsets[2]); // threshold low min
+    js.Var("rm", nOffsets[1]); // rh min
+    js.Var("om", nOffsets[3]); // ot min
     ws.text(WsClientID, js.Close());
   }
 
