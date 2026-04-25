@@ -31,18 +31,11 @@ const char *ScreenSavers::dayShortStr(uint8_t m)
 
 String ScreenSavers::localTimeString()
 {
-  String sTime = String( hourFormat12(gLTime.tm_hour) );
-  if(hourFormat12(gLTime.tm_hour) < 10)
-    sTime = " " + sTime;
-  sTime += ":";
-  if(gLTime.tm_min < 10) sTime += "0";
-  sTime += gLTime.tm_min;
-  sTime += ":";
-  if(gLTime.tm_sec < 10) sTime += "0";
-  sTime += gLTime.tm_sec;
-  sTime += " ";
-  sTime += (gLTime.tm_hour >= 12) ? "PM":"AM";
-  return sTime;
+  char buf[12];
+  uint8_t h = hourFormat12(gLTime.tm_hour);
+  sprintf(buf, "%2d:%02d:%02d %s", h, gLTime.tm_min, gLTime.tm_sec,
+          (gLTime.tm_hour >= 12) ? "PM" : "AM");
+  return String(buf);
 }
 
 void ScreenSavers::select(int n)
@@ -52,25 +45,16 @@ void ScreenSavers::select(int n)
 
   switch(m_saver)
   {
-//    case SS_Clock:
-//        Clock(true);
-//        break;
-    case SS_Lines:
-        Lines(true);
-        break;
-    case SS_Boing:
-        Boing(true);
-        break;
-    case SS_Calendar:
-        Calendar(true);
-        break;
+//    case SS_Clock:    Clock(true);    break;
+    case SS_Lines:    Lines(true);    break;
+    case SS_Boing:    Boing(true);    break;
+    case SS_Calendar: Calendar(true); break;
   }
 }
 
 void ScreenSavers::run()
 {
-  switch(m_saver)
-  {
+  switch(m_saver) {
 //    case SS_Clock: Clock(false); break;
     case SS_Lines: Lines(false); break;
     case SS_Boing: Boing(false); break;
@@ -112,31 +96,32 @@ void ScreenSavers::Clock(bool bInit)
   cspoint(xS, yS, x, y, gLTime.tm_sec * 6, 91);
   cspoint(xS2, yS2, x, y, (gLTime.tm_sec+30) * 6, 24);
 
-  tft.fillCircle(x, y, 92, bgColor ); // no sprites
-  tft.drawWedgeLine(x, y, xH, yH, 10, 2, TFT_BLACK, bgColor); // hour hand
-  tft.drawWedgeLine(x, y, xM, yM, 6, 2, TFT_BLACK, bgColor); // minute hand
-  tft.fillCircle(x, y, 12, TFT_BLACK ); // center cap
-  tft.drawWideLine(xS2, yS2, xS, yS, 2.5, rgb16(31, 0, 0), bgColor ); // second hand
+  sprite.fillCircle(x, y, 92, bgColor ); // no sprites
+  sprite.drawWedgeLine(x, y, xH, yH, 10, 2, TFT_BLACK, bgColor); // hour hand
+  sprite.drawWedgeLine(x, y, xM, yM, 6, 2, TFT_BLACK, bgColor); // minute hand
+  sprite.fillCircle(x, y, 12, TFT_BLACK ); // center cap
+  sprite.drawWideLine(xS2, yS2, xS, yS, 2.5, rgb16(31, 0, 0), bgColor ); // second hand
 
 /// text
-  tft.setTextColor(rgb16(16,63,0) );
-  tft.setFreeFont(&FreeSans12pt7b);
+  sprite.setTextColor(rgb16(16,63,0) );
+  sprite.setFreeFont(&FreeSans12pt7b);
 
   String sTime = localTimeString();
 
-  tft.fillRect(311, 17, 151, 25, rgb16(1,8,4));
-  tft.drawString(sTime, 320, 20);
+  sprite.fillRect(311, 17, 151, 25, rgb16(1,8,4));
+  sprite.drawString(sTime, 320, 20);
 
   sTime = _dayStr[gLTime.tm_wday];
   sTime += "day";
-  tft.drawString(sTime, 320, 60);
+  sprite.drawString(sTime, 320, 60);
 
   sTime = _monthShortStr[gLTime.tm_mon];
   sTime += " ";
   sTime += String(gLTime.tm_mday);
   sTime += " ";
   sTime += String(gLTime.tm_year+1900);
-  tft.drawString(sTime, 320, 100);
+  sprite.drawString(sTime, 320, 100);
+  sprite.pushSprite(0, 0);
 }
 
 void ScreenSavers::cspoint(uint16_t &x2, uint16_t &y2, uint16_t x, uint16_t y, uint16_t angle, uint16_t size)
@@ -248,16 +233,13 @@ void ScreenSavers::Boing(bool bInit)
     int y1 = ball[i].y;
 
     // check for wall collision
-    if(y1 <= rad && ball[i].dy < 0)   // top of screen
+    if(y1 <= rad && ball[i].dy < 0)
       ball[i].dy = -ball[i].dy + (int16_t)random(0, 4);
-
-    if(y1 >= DISPLAY_HEIGHT - rad && ball[i].dy > 0) // bottom
+    if(y1 >= DISPLAY_HEIGHT - rad && ball[i].dy > 0)
       ball[i].dy = -ball[i].dy - (int16_t)random(5, 17);
-
-    if(x1 <= rad && ball[i].dx < 0)  // left wall
+    if(x1 <= rad && ball[i].dx < 0)
       ball[i].dx = -ball[i].dx;
-
-    if(x1 >= DISPLAY_WIDTH - rad && ball[i].dx > 0)  // right wall
+    if(x1 >= DISPLAY_WIDTH - rad && ball[i].dx > 0)
       ball[i].dx = -ball[i].dx;
 
     static uint8_t dly = 1;
@@ -267,10 +249,9 @@ void ScreenSavers::Boing(bool bInit)
       dly = 1;
     }
     if(ball[i].dx < 2 && ball[i].dx > -2)
-      ball[i].dx += (int16_t)random(-2, 4); // keep balls from sitting still
-
+      ball[i].dx += (int16_t)random(-2, 4);
     if(ball[i].dy < 2 && ball[i].dy > -2)
-      ball[i].dy += (int16_t)random(-2, 4); // keep balls from sitting still
+      ball[i].dy += (int16_t)random(-2, 4);
 
     // check for ball to ball collision
     for(uint8_t i2 = i+1; i2 < BALLS; i2++)
@@ -304,7 +285,7 @@ void ScreenSavers::Boing(bool bInit)
       }
     }
 
-    ball[i].dx = constrain(ball[i].dx, -20, 40); // speed limit
+    ball[i].dx = constrain(ball[i].dx, -20, 40);
     ball[i].dy = constrain(ball[i].dy, -20, 40);
   }
 
@@ -347,22 +328,22 @@ void ScreenSavers::Calendar(bool bInit)
     uint8_t lastDay = month_days[ timeinf.tm_mon ];
     uint8_t rows = (firstDay + lastDay + 6) / 7;
 
-    tft.fillRect(0, 0, DISPLAY_WIDTH, 34, rgb16(24,48,24)); // fill 3 areas
-    tft.fillRect(0, 34, DISPLAY_WIDTH, 34, rgb16(9,18,24));
-    tft.fillRect(0, yOffset, DISPLAY_WIDTH, DISPLAY_HEIGHT - yOffset, TFT_BLACK);
+    sprite.fillRect(0, 0, DISPLAY_WIDTH, 34, rgb16(24,48,24)); // fill 3 areas
+    sprite.fillRect(0, 34, DISPLAY_WIDTH, 34, rgb16(9,18,24));
+    sprite.fillRect(0, yOffset, DISPLAY_WIDTH, DISPLAY_HEIGHT - yOffset, TFT_BLACK);
 
-    tft.setTextDatum(TC_DATUM);
-    tft.setFreeFont(&FreeSans12pt7b);
-    tft.setTextColor( TFT_BLACK, rgb16(24,48,24) );
+    sprite.setTextDatum(TC_DATUM);
+    sprite.setFreeFont(&FreeSans12pt7b);
+    sprite.setTextColor( TFT_BLACK, rgb16(24,48,24) );
 
     // Top bar
     String s = _monthStr[ timeinf.tm_mon ]; s += " "; s += timeinf.tm_year+1900;
-    tft.drawString(s, DISPLAY_WIDTH/2, 5);
+    sprite.drawString(s, DISPLAY_WIDTH/2, 5);
 
     // Weekday bar
-    tft.setTextColor( rgb16(0, 63, 31), rgb16(9,18,24) );
+    sprite.setTextColor( rgb16(0, 63, 31), rgb16(9,18,24) );
     for (uint8_t dayNum = 0; dayNum < 7; ++dayNum)
-      tft.drawString( _dayShortStr[dayNum], dayNum * (width / 7) + xOffset + 22, 40 );
+      sprite.drawString( _dayShortStr[dayNum], dayNum * (width / 7) + xOffset + 22, 40 );
 
     // Days
     uint8_t digit = 1;
@@ -384,15 +365,16 @@ void ScreenSavers::Calendar(bool bInit)
 
           // rounded box around each day
           uint16_t boxColor = (digit == day) ? rgb16(20, 40, 10) : rgb16(10, 20, 10);
-          tft.fillRoundRect( x, y-10, 44, 40, 5, boxColor);
+          sprite.fillRoundRect( x, y-10, 44, 40, 5, boxColor);
           uint16_t txtColor = rgb16(0, 63, 31); // cyan
-          tft.setTextColor( txtColor, boxColor );
-          tft.drawString( String(digit), x+22, y);
+          sprite.setTextColor( txtColor, boxColor );
+          sprite.drawString( String(digit), x+22, y);
           digit++;
         }
       }
     }
 
-    tft.setTextDatum(TL_DATUM);
+    sprite.setTextDatum(TL_DATUM);
+    sprite.pushSprite(0, 0);
   }
 }
