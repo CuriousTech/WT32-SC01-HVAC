@@ -100,7 +100,6 @@ public:
   void oneSec(void);
   bool screen(bool bOn);
   void service(void);
-  void goDark(void);
   void updateTemps(bool bForce);
   void updateNotification(bool bRef);
   bool getGrapthPoints(gPoint *pt, int n);
@@ -111,7 +110,6 @@ public:
 private:
   void drawDigit(uint8_t digit, uint8_t pos, int16_t x, int16_t y, uint8_t h, uint16_t fg, uint16_t bg);
   void buttonCmd(uint8_t btn);
-  void dimmer(void);
   void updateModes(bool bForce); // update any displayed settings
   void buttonRepeat(void);
   void refreshAll(void);
@@ -128,7 +126,6 @@ private:
   void outlineAllButtons(void);
 
   uint16_t m_backlightTimer = DISPLAY_TIMEOUT; // backlight timer, seconds
-  uint8_t m_bright; // current brightness
   uint8_t m_lockDelay;
   uint8_t m_displayLocal; // local temp/rh display mode/timer
 #define GPTS 640 // 480 px width - (10+10) padding
