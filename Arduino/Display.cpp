@@ -11,9 +11,9 @@ Music mus;
 #include "Media.h"
 #include <TFT_eSPI.h> // TFT_espi library
 TFT_eSPI tft = TFT_eSPI();
+TFT_eSprite sprite = TFT_eSprite(&tft);
 static_assert(USER_SETUP_ID==201, "User setup incorrect in TFT_eSPI");
 
-//#include "digitalFont.h"
 #include "forecast.h"
 
 // FT6206, FT6336U - touchscreen library                  // modified -> Wire.begin(18, 19)
@@ -29,7 +29,7 @@ ScreenSavers ss;
 
 void Display::init(void)
 {
-  goDark();                // black out while display is noise 
+  analogWrite(TFT_BL, 0);  // black out while display is noise 
 
   memset(m_points, 0, sizeof(m_points));
   pinMode(39, INPUT); // touch int
@@ -38,6 +38,7 @@ void Display::init(void)
   tft.init();                         // TFT_eSPI
   tft.setRotation(1);                 // set desired rotation
   tft.setTextDatum(TL_DATUM);
+  sprite.createSprite(DISPLAY_WIDTH, DISPLAY_HEIGHT);
   mus.init();
   media.init();
   FC.init();
@@ -61,16 +62,15 @@ bool Display::screen(bool bOn)
     if( bOn == bOldOn )
       return false; // no change occurred
     m_currPage = Page_Thermostat;
-    goDark();
     media.loadImage("bg", 0, 0);
-    tft.fillRect(m_btn[Btn_SetTempH].x + 25, m_btn[Btn_SetTempH].y, m_btn[Btn_SetTempH].w, m_btn[Btn_SetTempH].h, TFT_BLACK );
-    tft.fillRect(m_btn[Btn_SetTempL].x + 25, m_btn[Btn_SetTempL].y, m_btn[Btn_SetTempL].w, m_btn[Btn_SetTempL].h, TFT_BLACK );
+    sprite.fillRect(m_btn[Btn_SetTempH].x + 25, m_btn[Btn_SetTempH].y, m_btn[Btn_SetTempH].w, m_btn[Btn_SetTempH].h, TFT_BLACK );
+    sprite.fillRect(m_btn[Btn_SetTempL].x + 25, m_btn[Btn_SetTempL].y, m_btn[Btn_SetTempL].w, m_btn[Btn_SetTempL].h, TFT_BLACK );
     refreshAll();
+    sprite.pushSprite(0, 0);
   }
   else
   {
     m_currPage = Page_ScreenSaver;
-    goDark();
     ss.select( random(0, SS_Count) );
   }
   bOldOn = bOn;
@@ -82,7 +82,6 @@ void Display::service(void)
   static int8_t currBtn;
   static bool bPress;
 
-  dimmer();
   mus.service(); // sound handler
 
   if(m_currPage == Page_ScreenSaver)
@@ -95,6 +94,7 @@ void Display::service(void)
   {
     bool bSkip = (m_brightness < ee.brightLevel[1]);
     m_brightness = ee.brightLevel[1]; // increase brightness for any touch
+    analogWrite(TFT_BL, m_brightness);
 
     m_backlightTimer = DISPLAY_TIMEOUT;
  
@@ -110,7 +110,7 @@ void Display::service(void)
     if(bPress == false) // only need 1 touch
     {
       if(bSkip); // just brigthten, ignore input
-      else if(m_currPage) // not on thermostat
+      else if(m_currPage != Page_Thermostat) // not on thermostat
       {
         screen(true); // switch back to thermostat screen
       }
@@ -171,6 +171,7 @@ void Display::buttonCmd(uint8_t btn)
       m_bLink = !m_bLink;
       m_adjustMode = btn - Btn_SetTempH;
       updateTemps(false);
+      sprite.pushSprite(0, 0);
       break;
 
     case Btn_Up: // Up button mode = 1
@@ -195,21 +196,25 @@ void Display::buttonCmd(uint8_t btn)
       if(ee.b.bLock) break;
       hvac.setFan( (hvac.getFan() == FM_On) ? FM_Auto : FM_On ); // Todo: Add 3rd icon
       updateModes(false); // faster feedback
+      sprite.pushSprite(0, 0);
       break;
     case Btn_Mode:
       if(ee.b.bLock) break;
       hvac.setMode( (hvac.getSetMode() + 1) & 3 );
       updateModes(false); // faster feedback
+      sprite.pushSprite(0, 0);
       break;
     case Btn_HeatMode:
       if(ee.b.bLock) break;
       hvac.setHeatMode( (hvac.getHeatMode() + 1) % 3 );
       updateModes(false); // faster feedback
+      sprite.pushSprite(0, 0);
       break;
     case Btn_Humid:
       if(ee.b.bLock) break;
       hvac.setHumidifierMode( hvac.getHumidifierMode() + 1 );
       updateModes(false); // faster feedback
+      sprite.pushSprite(0, 0);
       break;
 
     case Btn_Note:
@@ -218,7 +223,6 @@ void Display::buttonCmd(uint8_t btn)
       break;
     case Btn_Time: // time
 //      m_currPage = Page_ScreenSaver;
-//      goDark();
 //      ss.select( SS_Clock );
       break;
     case Btn_TargetTemp:
@@ -239,36 +243,20 @@ void Display::buttonCmd(uint8_t btn)
         m_lockDelay = 30; // press and hold ~5 seconds
       break;
   }
-  mus.add(6000, 20); // beep after any long screen loads
+  mus.add(6000, 20); // beep on button press
 }
 
 // called each second
 void Display::oneSec()
 {
-  drawTime();    // time update every second
-  updateModes(false);    // mode, heat mode, fan mode
-  updateTemps(false);    // 
-  updateNotification(false);
-  updateRSSI();     //
-  if(m_currPage == Page_Forecast)
-  FC.forecastAnimate();
   if( m_backlightTimer ) // the dimmer thing
   {
     if(--m_backlightTimer == 0)
     {
       m_brightness = ee.brightLevel[0]; // dim level
+      analogWrite(TFT_BL, m_brightness);
       screen(false);
     }
-  }
-
-  if(m_displayLocal) // timer for remote temp display
-    m_displayLocal--;
-
-  static uint8_t dly = 1;
-  if(--dly == 0)
-  {
-    dly = 60; // uppdate it every minute
-    drawOutTemp();
   }
 
   static uint8_t lastState;
@@ -280,15 +268,38 @@ void Display::oneSec()
     lastFan = hvac.getFanRunning();
   }
 
-  if(m_currPage == Page_Thermostat && FC.m_bFcstUpdated)
+  if(m_currPage == Page_Forecast)
+    FC.forecastAnimate();
+
+  if(m_currPage != Page_Thermostat)
+    return;
+
+  drawTime();    // time update every second
+  updateModes(false);    // mode, heat mode, fan mode
+  updateTemps(false);    // 
+  updateNotification(false);
+  updateRSSI();     //
+
+  if(m_displayLocal) // timer for remote temp display
+    m_displayLocal--;
+
+  static uint8_t dly = 1;
+  if(--dly == 0)
+  {
+    dly = 60; // uppdate it every minute
+    drawOutTemp();
+  }
+
+  if(FC.m_bFcstUpdated)
   {
     FC.m_bFcstUpdated = false;
     drawOutTemp();
   }
+  sprite.pushSprite(0, 0);
 
   if( m_bShowFC ) // Show FC page when update occurs
   {
-    m_bShowFC = false;    
+    m_bShowFC = false;
     if(FC.forecastPage())
       m_currPage = Page_Forecast;
   }
@@ -361,25 +372,25 @@ void Display::drawDigit(uint8_t digit, uint8_t pos, int16_t x, int16_t y, uint8_
 
   if(digit == 10)
   {
-    tft.drawWideLine( x-3, yh2-1, x-2, yh2, thick, fg); // decimal
+    sprite.drawWideLine( x-3, yh2-1, x-2, yh2, thick, fg); // decimal
     return;
   }
 
-  if((bit & 0x01) == 0) tft.drawWideLine( x+ 3, y   , xw+1, y    , thick, bg); // T
-  if((bit & 0x02) == 0) tft.drawWideLine( xw+2, y +1, xw+1, yh -1, thick, bg); // R1
-  if((bit & 0x04) == 0) tft.drawWideLine( xw+1, yh+1, xw  , yh2-1, thick, bg); // R2
-  if((bit & 0x08) == 0) tft.drawWideLine( x+ 1, yh2 , xw-1, yh2  , thick, bg); // B
-  if((bit & 0x10) == 0) tft.drawWideLine( x+ 1, yh+1, x   , yh2-1, thick, bg); // L2
-  if((bit & 0x20) == 0) tft.drawWideLine( x+ 2, y +1, x +1, yh -1, thick, bg); // L1
-  if((bit & 0x40) == 0) tft.drawWideLine( x+ 2, yh  , xw  , yh   , thick, bg); // C
+  if((bit & 0x01) == 0) sprite.drawWideLine( x+ 3, y   , xw+1, y    , thick, bg); // T
+  if((bit & 0x02) == 0) sprite.drawWideLine( xw+2, y +1, xw+1, yh -1, thick, bg); // R1
+  if((bit & 0x04) == 0) sprite.drawWideLine( xw+1, yh+1, xw  , yh2-1, thick, bg); // R2
+  if((bit & 0x08) == 0) sprite.drawWideLine( x+ 1, yh2 , xw-1, yh2  , thick, bg); // B
+  if((bit & 0x10) == 0) sprite.drawWideLine( x+ 1, yh+1, x   , yh2-1, thick, bg); // L2
+  if((bit & 0x20) == 0) sprite.drawWideLine( x+ 2, y +1, x +1, yh -1, thick, bg); // L1
+  if((bit & 0x40) == 0) sprite.drawWideLine( x+ 2, yh  , xw  , yh   , thick, bg); // C
  
-  if((bit & 0x01)) tft.drawWideLine( x+ 3, y   , xw+1, y    , thick, fg); // T
-  if((bit & 0x02)) tft.drawWideLine( xw+2, y +1, xw+1, yh -1, thick, fg); // R1
-  if((bit & 0x04)) tft.drawWideLine( xw+1, yh+1, xw  , yh2-1, thick, fg); // R2
-  if((bit & 0x08)) tft.drawWideLine( x+ 1, yh2 , xw-1, yh2  , thick, fg); // B
-  if((bit & 0x10)) tft.drawWideLine( x+ 1, yh+1, x   , yh2-1, thick, fg); // L2
-  if((bit & 0x20)) tft.drawWideLine( x+ 2, y +1, x +1, yh -1, thick, fg); // L1
-  if((bit & 0x40)) tft.drawWideLine( x+ 2, yh  , xw  , yh   , thick, fg); // C
+  if(bit & 0x01) sprite.drawWideLine( x+ 3, y   , xw+1, y    , thick, fg); // T
+  if(bit & 0x02) sprite.drawWideLine( xw+2, y +1, xw+1, yh -1, thick, fg); // R1
+  if(bit & 0x04) sprite.drawWideLine( xw+1, yh+1, xw  , yh2-1, thick, fg); // R2
+  if(bit & 0x08) sprite.drawWideLine( x+ 1, yh2 , xw-1, yh2  , thick, fg); // B
+  if(bit & 0x10) sprite.drawWideLine( x+ 1, yh+1, x   , yh2-1, thick, fg); // L2
+  if(bit & 0x20) sprite.drawWideLine( x+ 2, y +1, x +1, yh -1, thick, fg); // L1
+  if(bit & 0x40) sprite.drawWideLine( x+ 2, yh  , xw  , yh   , thick, fg); // C
 }
 
 void Display::updateTemps(bool bForce)
@@ -404,9 +415,9 @@ void Display::updateTemps(bool bForce)
   if(last[2] != rh)
   {
     drawFakeFloat((last[2] = rh), m_btn[Btn_Rh].x, m_btn[Btn_Rh].y, 17, fg );
-    tft.setFreeFont(&FreeSans12pt7b);
-    tft.setTextColor(fg);
-    tft.drawString("%", m_btn[Btn_Rh].x + 130, m_btn[Btn_Rh].y );
+    sprite.setFreeFont(&FreeSans12pt7b);
+    sprite.setTextColor(fg);
+    sprite.drawString("%", m_btn[Btn_Rh].x + 130, m_btn[Btn_Rh].y );
   }
 
   uint8_t nMode = hvac.getSetMode();
@@ -456,8 +467,8 @@ void Display::updateTemps(bool bForce)
   {
     last[6] = (m_adjustMode<<1) | m_bLink;
     int8_t am = m_adjustMode;
-    tft.drawRect(m_btn[Btn_SetTempH+am].x + 25, m_btn[Btn_SetTempH+am].y, m_btn[Btn_SetTempH+am].w, m_btn[Btn_SetTempH+am].h, rgb16(0,31,0));
-    tft.drawRect(m_btn[Btn_SetTempH+(am^1)].x + 25, m_btn[Btn_SetTempH+(am^1)].y, m_btn[Btn_SetTempH+(am^1)].w, m_btn[Btn_SetTempH+(am^1)].h, (m_bLink) ? rgb16(0,31,0) : TFT_BLACK);
+    sprite.drawRect(m_btn[Btn_SetTempH+am].x + 25, m_btn[Btn_SetTempH+am].y, m_btn[Btn_SetTempH+am].w, m_btn[Btn_SetTempH+am].h, rgb16(0,31,0));
+    sprite.drawRect(m_btn[Btn_SetTempH+(am^1)].x + 25, m_btn[Btn_SetTempH+(am^1)].y, m_btn[Btn_SetTempH+(am^1)].w, m_btn[Btn_SetTempH+(am^1)].h, (m_bLink) ? rgb16(0,31,0) : TFT_BLACK);
   }
 }
 
@@ -524,9 +535,9 @@ void Display::updateModes(bool bForce) // update any displayed settings
     loadBtnImage("humid", Btn_Humid);
 
     const char szHmode[][2] = {"", "F", "R", "1", "2", ""};
-    tft.setFreeFont(&FreeSans9pt7b);
-    tft.setTextColor( rgb16(0, 63, 31) );
-    tft.drawString((char*)szHmode[hvac.getHumidifierMode()], m_btn[Btn_Humid].x + 27, m_btn[Btn_Humid].y + 28);
+    sprite.setFreeFont(&FreeSans9pt7b);
+    sprite.setTextColor( rgb16(0, 63, 31) );
+    sprite.drawString((char*)szHmode[hvac.getHumidifierMode()], m_btn[Btn_Humid].x + 27, m_btn[Btn_Humid].y + 28);
 
     if(hvac.getHumidifierRunning())
       loadBtnImage("btnled", Btn_Humid);
@@ -575,33 +586,19 @@ void Display::buttonRepeat()
 // time and dow on main page
 void Display::drawTime()
 {
-  static bool bRefresh = true;
-  static uint8_t last_day;
-
-  if(m_currPage || last_day != gLTime.tm_mday ) // not main page
-  {
-    bRefresh = true;
-    last_day = gLTime.tm_mday;
-    return;
-  }
-
   String sTime = ss.localTimeString();
   sTime += " ";
 
 #define TIME_X_OFFSET 80
-  tft.setTextColor(rgb16(16,63,0), rgb16(8,16,8) );
-  tft.setFreeFont(&FreeSans12pt7b);
-  tft.drawString(sTime, m_btn[Btn_Time].x + TIME_X_OFFSET, m_btn[Btn_Time].y);
+  sprite.setTextColor(rgb16(16,63,0), rgb16(8,16,8) );
+  sprite.setFreeFont(&FreeSans12pt7b);
+  sprite.drawString(sTime, m_btn[Btn_Time].x + TIME_X_OFFSET, m_btn[Btn_Time].y);
 
-  if(bRefresh) // Cut down on flicker a bit
-  {
-    sTime = ss.monthShortStr(gLTime.tm_mon);
-    sTime += " ";
-    sTime += String(gLTime.tm_mday);
-    tft.drawString(sTime, m_btn[Btn_Time].x, m_btn[Btn_Time].y);
-    tft.drawString(ss.dayShortStr(gLTime.tm_wday), m_btn[Btn_Dow].x, m_btn[Btn_Dow].y);
-  }
-  bRefresh = false;
+  sTime = ss.monthShortStr(gLTime.tm_mon);
+  sTime += " ";
+  sTime += String(gLTime.tm_mday);
+  sprite.drawString(sTime, m_btn[Btn_Time].x, m_btn[Btn_Time].y);
+  sprite.drawString(ss.dayShortStr(gLTime.tm_wday), m_btn[Btn_Dow].x, m_btn[Btn_Dow].y);
 }
 
 const char *pNotes[] = {
@@ -634,21 +631,14 @@ void Display::updateNotification(bool bRef)
   static uint8_t note_last = Note_None; // Needs a clear after startup
   static uint16_t nTimer = 0;
 
-  if(m_currPage)
+  if(m_currPage || (note_last == Note_None && hvac.m_notif == Note_None))
     return;
-  if(!bRef && note_last == hvac.m_notif) // nothing changed
+  if(nTimer)
   {
-    if(nTimer)
-    {
-      if(--nTimer)
-        return;
+    if(--nTimer == 0)
       hvac.m_notif = Note_None; // auto-clear notif
-    }
-    else
-      return;
   }
 
-  note_last = hvac.m_notif;
   nTimer = 0;
   String s = pNotes[hvac.m_notif];
   
@@ -669,14 +659,14 @@ void Display::updateNotification(bool bRef)
       nTimer = 60;
       break;
     case Note_Updating:
-      m_bright = 20;
-      analogWrite(TFT_BL, m_bright); // dim it a lot. flashing takes power, so this evens it out a bit
+      m_brightness = 20;
+      analogWrite(TFT_BL, m_brightness); // dim it a lot. flashing takes power, so this evens it out a bit
       break;
   }
-  tft.fillRect(m_btn[Btn_Note].x, m_btn[Btn_Note].y, m_btn[Btn_Note].w, m_btn[Btn_Note].h, rgb16(0,3,4));
-  tft.setTextColor(rgb16(31, 5, 10), rgb16(0,3,4));
-  tft.setFreeFont(&FreeSans12pt7b);
-  tft.drawString(s, m_btn[Btn_Note].x+2, m_btn[Btn_Note].y+6);
+  sprite.fillRect(m_btn[Btn_Note].x, m_btn[Btn_Note].y, m_btn[Btn_Note].w, m_btn[Btn_Note].h, rgb16(0,3,4));
+  sprite.setTextColor(rgb16(31, 5, 10), rgb16(0,3,4));
+  sprite.setFreeFont(&FreeSans12pt7b);
+  sprite.drawString(s, m_btn[Btn_Note].x+2, m_btn[Btn_Note].y+6);
   if(s.length())
   {
     if(bRef == false) // refresh shouldn't be resent
@@ -685,42 +675,24 @@ void Display::updateNotification(bool bRef)
       js.Var("text", s);
       WsSend(js.Close());
     }
-    if(bRef == false || hvac.m_notif >= Note_Network) // once / repeats if important
+    if(note_last != hvac.m_notif || hvac.m_notif >= Note_Network) // once / repeats if important
     {
       mus.add(3500, 180);
       mus.add(2500, 90); // notification sound
       mus.add(3500, 180);
     }
   }
-}
+  note_last = hvac.m_notif;
 
-// turn off LED backlight and set level to fade to (to hide drawing new screen)
-void Display::goDark()
-{
-  m_bright = 0;
-  analogWrite(TFT_BL, m_bright);
-}
-
-// smooth adjust brigthness (0-255)
-void Display::dimmer()
-{
-  if(m_bright == m_brightness)
-    return;
-
-  if(m_brightness > m_bright + 4 && ee.brightLevel[1] > 50)
-    m_bright += 5;
-  else if(m_brightness > m_bright)
-    m_bright ++;
-  else
-    m_bright --;
-
-  analogWrite(TFT_BL, m_bright);
+  if(bRef) // normally from external code
+    sprite.pushSprite(0, 0);
 }
 
 // things to update on page change to thermostat
 void Display::refreshAll()
 {
-  updateNotification(true);
+  updateNotification(false);
+  drawTime();
   updateTemps(true);
   updateModes(true);
   drawOutTemp();
@@ -771,7 +743,7 @@ void Display::updateRSSI()
 
   for (int i = 1; i < 6; i++)
   {
-    tft.fillRect( x + i*dist, y - i*dist, dist-2, i*dist, (sigStrength > i * sect) ? rgb16(0, 63,31) : rgb16(5, 10, 5) );
+    sprite.fillRect( x + i*dist, y - i*dist, dist-2, i*dist, (sigStrength > i * sect) ? rgb16(0, 63,31) : rgb16(5, 10, 5) );
   }
 }
 
@@ -813,7 +785,6 @@ void Display::addGraphPoints()
 void Display::historyPage()
 {
   m_currPage = Page_Graph; // chart thing
-  goDark();
   media.loadImage("bgBlank", 0, 0);
   
   int minTh, maxTh, maxTemp;
@@ -833,8 +804,8 @@ void Display::historyPage()
   int tmpInc = (m_tempHigh - m_tempLow) / 4;
   int temp = m_tempLow;
   int y = DISPLAY_HEIGHT-20;
-  tft.setTextColor( rgb16(0, 63, 31 ));
-  tft.setFreeFont(&FreeSans9pt7b);
+  sprite.setTextColor( rgb16(0, 63, 31 ));
+  sprite.setFreeFont(&FreeSans9pt7b);
 
   drawPointsTarget(rgb16( 6, 8, 4) ); // target (draw behind the other stuff)
 
@@ -846,22 +817,23 @@ void Display::historyPage()
     x -= 12 * 6; // move left 6 hours
     h -= 6;
     if( h <= 0) h += 12;
-    tft.drawLine(x, 10, x, DISPLAY_HEIGHT-10, rgb16(10, 20, 10) );
+    sprite.drawLine(x, 10, x, DISPLAY_HEIGHT-10, rgb16(10, 20, 10) );
     String s = String(h);
     s += ":00";
-    tft.drawString( s, x-4, 0); // draw hour above chart
+    sprite.drawString( s, x-4, 0); // draw hour above chart
   }
 
   for(int i = 0; i < 5; i++) // draw temp range over thresh
   {
-    tft.drawString( String(temp / 10), DISPLAY_WIDTH-20, y );
-    if(i > 0) tft.drawLine( 10, y+10, DISPLAY_WIDTH-RPAD, y+8, rgb16(10, 20, 10) );
+    sprite.drawString( String(temp / 10), DISPLAY_WIDTH-20, y );
+    if(i > 0) sprite.drawLine( 10, y+10, DISPLAY_WIDTH-RPAD, y+8, rgb16(10, 20, 10) );
     y -= (DISPLAY_HEIGHT - 30) /4;
     temp += tmpInc;
   }
 
   drawPointsRh( rgb16(  0, 48,  0) ); // rh green
   drawPointsTemp(); // off/cool/heat colors
+  sprite.pushSprite(0, 0);
 }
 
 void Display::drawPointsTarget(uint16_t color)
@@ -883,7 +855,7 @@ void Display::drawPointsTarget(uint16_t color)
     if(m_points[i].t.u == 0)
     {
       if(x2 != DISPLAY_WIDTH-RPAD) // draw last bit if valid
-        tft.fillRect(x, DISPLAY_HEIGHT - 10 - yH, x2 - x, yH - yL, color);
+        sprite.fillRect(x, DISPLAY_HEIGHT - 10 - yH, x2 - x, yH - yL, color);
       return;
     }
     yL = (m_points[i].t.target - m_tempLow) * h / (m_tempHigh - m_tempLow); // scale to 0~300
@@ -894,7 +866,7 @@ void Display::drawPointsTarget(uint16_t color)
       i = GPTS-1;
     if( (tOld != m_points[i].t.target && x != DISPLAY_WIDTH-RPAD) || x == 10)
     {
-      tft.fillRect(x, DISPLAY_HEIGHT - 10 - yH, x2 - x, yH - yL, color);
+      sprite.fillRect(x, DISPLAY_HEIGHT - 10 - yH, x2 - x, yH - yL, color);
       tOld = m_points[lastI].t.target;
       x2 = x;
     }
@@ -925,7 +897,7 @@ void Display::drawPointsRh(uint16_t color)
 
     if(y != y2)
     {
-      tft.drawLine(x, yOff - y, x2, yOff - y2, color);
+      sprite.drawLine(x, yOff - y, x2, yOff - y2, color);
       y2 = y;
       x2 = x;
     }
@@ -948,7 +920,7 @@ void Display::drawPointsTemp()
     y = constrain(m_points[i].t.inTemp - m_tempLow, 0, m_tempHigh - m_tempLow) * (DISPLAY_HEIGHT-20) / (m_tempHigh - m_tempLow);
     if(x != DISPLAY_WIDTH-RPAD)
     {
-      tft.drawLine(x2, yOff - y2, x, yOff - y, stateColor(m_points[i].bits) );
+      sprite.drawLine(x2, yOff - y2, x, yOff - y, stateColor(m_points[i].bits) );
     }
     y2 = y;
     x2 = x;
@@ -1011,6 +983,6 @@ void Display::outlineAllButtons()
 {
   for(int i = 0; i < Btn_Count; i++)
   {
-    tft.drawRect(m_btn[i].x, m_btn[i].y, m_btn[i].w, m_btn[i].h, rgb16(0,31,0));
+    sprite.drawRect(m_btn[i].x, m_btn[i].y, m_btn[i].w, m_btn[i].h, rgb16(0,31,0));
   }
 }
