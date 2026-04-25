@@ -1,5 +1,7 @@
 # WT32-SC01-HVAC
 WiFi Smart Omniscient Opensource Arduino ESP32 HVAC Touchscreen Thermostat using WT32-SC01 (not PLUS)  OSHPark [Rev1](https://oshpark.com/shared_projects/ljZTJh9A) $15.65  [Rev2](https://oshpark.com/shared_projects/giHlVB41)  
+
+This code is curreently too large for ESP-IDF 3.x.x but may be optimized further at some point. Another option is to replace the ESP32-WROVER-B module with the newer ESP32-WROVER-E8 or E16, which increases the code space by 2x or even 4x.
   
 This is the 3rd thermostat I've designed, only because new hardware makes it better, and tends to remove some limitations.  
 All sensors from [ESP-HVAC](https://github.com/CuriousTech/ESP-HVAC), and older models can be used as remote units by building as REMOTE. This model can be changed to remote with just a temp/humidity sensor on the i2c pins, plus speaker if desired, and use the USB for power.  
