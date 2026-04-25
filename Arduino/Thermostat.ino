@@ -22,9 +22,9 @@ SOFTWARE.
 */
 
 // Build with Arduino IDE 1.8.57.0
-//  ESP32: (2.0.17 or 3.3.7) ESP32 Dev Module, CPU Freq 80MHz (for power reduction), QIO, Default 4MB with spiffs (ESP32 partitions SPIFFS easiest)
+//  ESP32: (2.0.17) ESP32 WRover Module, CPU Freq 80MHz (for power reduction), QIO, Default 4MB with spiffs (ESP32 partitions SPIFFS easiest)
 //  In TFT_eSPI/User_Setup_Select.h use #include <User_Setups/Setup201_WT32_SC01.h>
-//  In TJPeg_Decoder.cpp remove all Serial.println() calls (to fit in 3.3.7)
+//  In TJPeg_Decoder.cpp remove all Serial.println() calls, and in User_config.h remove #define TJPGD_LOAD_SD_LIBRARY
 // For remote unit, uncomment #define REMOTE in HVAC.h
 
 #include <ESPAsyncWebServer.h> // https://github.com/ESP32Async/ESPAsyncWebServer
