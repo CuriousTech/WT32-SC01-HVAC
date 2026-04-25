@@ -231,11 +231,6 @@ void startServer()
 void findHVAC() // find the HVAC on iot domain
 {
 
- ee.hostIp[0] = 192; // update IP
- ee.hostIp[1] = 168;
- ee.hostIp[2] = 31;
- ee.hostIp[3] = 111;
-
   // Find HVAC
   int cnt = MDNS.queryService("iot", "tcp");
   for(int i = 0; i < cnt; ++i)
@@ -247,15 +242,9 @@ void findHVAC() // find the HVAC on iot domain
     if(!strcmp(szName, HOSTNAME))
     {
 #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-      ee.hostIp[0] = MDNS.address(i)[0]; // update IP
-      ee.hostIp[1] = MDNS.address(i)[1];
-      ee.hostIp[2] = MDNS.address(i)[2];
-      ee.hostIp[3] = MDNS.address(i)[3];
+      ee.hostIp = MDNS.address(i); // update IP
 #else
-      ee.hostIp[0] = MDNS.IP(i)[0]; // update IP
-      ee.hostIp[1] = MDNS.IP(i)[1];
-      ee.hostIp[2] = MDNS.IP(i)[2];
-      ee.hostIp[3] = MDNS.IP(i)[3];
+      ee.hostIp = MDNS.IP(i); // update IP
 #endif
       hvac.m_notif = Note_HVACFound;
       break;
@@ -294,6 +283,7 @@ void wsPrint(String s)
 bool secondsServer() // called once per second
 {
   bool bConn = false;
+  static uint8_t nCounter = 5;
 
   if(!bConfigDone)
   {
@@ -306,10 +296,11 @@ bool secondsServer() // called once per second
   }
   if(bConfigDone)
   {
-    if(WiFi.status() == WL_CONNECTED)
+    switch(WiFi.status())
     {
-      if(!bStarted)
-      {
+      case WL_CONNECTED:
+        if(bStarted)
+          break;
         WiFi.mode(WIFI_STA); // Stop broadcasting SSID
         MDNS.begin( hostName );
         bStarted = true;
@@ -318,30 +309,26 @@ bool secondsServer() // called once per second
         bConn = true;
 #ifdef REMOTE
         findHVAC();
-#endif
-      }
-    }
-    else if(WiFi.status() == WL_DISCONNECTED) // connection dropped
-    {
-      static uint8_t nCounter = 5;
-      if(--nCounter == 0)
-      {
-        nCounter = 5;
-        WiFi.begin(ee.szSSID, ee.szSSIDPassword);
-      }
-    }
-    else if(WiFi.status() == WL_CONNECT_FAILED || WiFi.status() == WL_NO_SSID_AVAIL) // failed to connect
-    {
-      WiFi.mode(WIFI_AP_STA);
-      WiFi.beginSmartConfig();
-      bConfigDone = false;
-      bStarted = false;
+ #endif
+        break;
+      case WL_DISCONNECTED: // connection dropped
+        if(--nCounter == 0)
+        {
+          nCounter = 5;
+          WiFi.begin(ee.szSSID, ee.szSSIDPassword);
+        }
+        break;
+      case WL_CONNECT_FAILED:
+      case WL_NO_SSID_AVAIL: // failed to connect
+        WiFi.mode(WIFI_AP_STA);
+        WiFi.beginSmartConfig();
+        bConfigDone = false;
+        bStarted = false;
+        break;
+      default:
+        return bConn;
     }
   }
-
-  if(WiFi.status() != WL_CONNECTED)
-    return bConn;
-
   ws.cleanupClients();
   static uint8_t nUpdateDelay = 5; // startup delay of 5s, then used for reattempts (60s)
   if(nUpdateDelay)
@@ -421,48 +408,37 @@ void parseParams(AsyncWebServerRequest *request)
 
   bool bPassGood;
 
-  for( uint8_t i = 0; i < request->params(); i++ ) // password may be at end
-  {
-    const AsyncWebParameter* p = request->getParam(i);
-    String s = request->urlDecode(p->value());
-
-    if(p->name() == "key")
-      bPassGood = s.equals(String(ee.password));
-  }
-
   IPAddress ip = request->client()->remoteIP();
-
-  if( (ip[0] != 192 && ip[1] != 168 && !bPassGood) || nWrongPass )
-  {
-    if(nWrongPass == 0)
-    {
-      nWrongPass = 10;
-      jsonString js("hack");
-      js.Var("ip", ip.toString() );
-      ws.textAll(js.Close());
-    }
-    else if((nWrongPass & 0xFFFFF000) == 0 ) // time doubles for every high speed wrong password attempt.  Max 1 hour
-      nWrongPass <<= 1;
-    if(ip != lastIP)  // if different IP drop it down
-       nWrongPass = 10;
-
-    lastIP = ip;
-    return;
-  }
-
-  lastIP = ip;
 
   for ( uint8_t i = 0; i < request->params(); i++ )
   {
     const AsyncWebParameter* p = request->getParam(i);
     String s = request->urlDecode(p->value());
 
-    if(p->name() == "key");
-    else if(p->name() == "restart")
+    if(p->name() == "key")
+    {
+      bPassGood = s.equals(String(ee.password));
+      if(!bPassGood)
+      {
+        if(nWrongPass == 0)
+        {
+          nWrongPass = 10;
+          jsonString js("hack");
+          js.Var("ip", ip.toString() );
+          ws.textAll(js.Close());
+        }
+        else if((nWrongPass & 0xFFFFF000) == 0 ) // time doubles for every high speed wrong password attempt.  Max 1 hour
+          nWrongPass <<= 1;
+        if(ip != lastIP)  // if different IP drop it down
+          nWrongPass = 10;
+      }
+      lastIP = ip;
+    }
+    else if(p->name() == "restart" && bPassGood)
     {
       ESP.restart();
     }
-    else
+    else if(bPassGood)
     {
       if(p->name() == "fc")
         FC.m_bUpdateFcst = true;
@@ -483,6 +459,7 @@ int nOffsets[4];
 String gptArr(gPoint& gpt, uint32_t tb)
 {
   String out = "[";         // [seconds, temp, rh, lowThresh, state, outTemp],
+  out.reserve(50);
   out += tb;
   out += ",";
   out += gpt.t.inTemp - nOffsets[0];
@@ -595,6 +572,7 @@ void appendDump(uint32_t startTime)
 {
 #ifndef REMOTE
   String out = "{\"cmd\":\"data2\",\"d\":[";
+  out.reserve(800);
 
   uint32_t tb = display.m_lastPDate;
   bool bC = false;
