@@ -7,6 +7,7 @@
 
 #include <TFT_eSPI.h> // TFT_espi library
 extern TFT_eSPI tft;
+extern TFT_eSprite sprite;
 extern ScreenSavers ss;
 extern tm gLTime;
 
@@ -700,25 +701,24 @@ bool Forecast::forecastPage()
   if(hrs <= 0) // divide by 0
     return false;
 
-  display.goDark();
   media.loadImage("bgForecast", 0, 0); // load the background image
 
   // temp scale
-  tft.setFreeFont(&FreeSans9pt7b);
-  tft.setTextColor(rgb16(0, 63, 31)); // cyan text
+  sprite.setFreeFont(&FreeSans9pt7b);
+  sprite.setTextColor(rgb16(0, 63, 31)); // cyan text
   for(int i = 0; i < 4; i++)
   {
-    tft.drawNumber(t/10, 8, y);
+    sprite.drawNumber(t/10, 8, y);
     y += incy;
     t -= dec;
   }
 
   y = FC_Height / 3 + FC_Top;
-  tft.drawLine(FC_Left, y, FC_Left+FC_Width, y, rgb16(7, 14, 7) ); // dark gray
+  sprite.drawLine(FC_Left, y, FC_Left+FC_Width, y, rgb16(7, 14, 7) ); // dark gray
   y += FC_Height / 3;
-  tft.drawLine(FC_Left, y, FC_Left+FC_Width, y, rgb16(7, 14, 7) ); // dark gray
+  sprite.drawLine(FC_Left, y, FC_Left+FC_Width, y, rgb16(7, 14, 7) ); // dark gray
 
-  tft.setTextDatum(TC_DATUM); // center day on noon
+  sprite.setTextDatum(TC_DATUM); // center day on noon
 
   uint8_t wkday = ptmE->tm_wday;              // current DOW
 
@@ -746,7 +746,7 @@ bool Forecast::forecastPage()
             break;
 
         if(ic[iconIdx].color && x >= FC_Left && x < DISPLAY_WIDTH - 20)
-          tft.fillRect(x, FC_Top+FC_Height, 10, 5, ic[iconIdx].color); // show color bar (10 wide for 3 hour)
+          sprite.fillRect(x, FC_Top+FC_Height, 10, 5, ic[iconIdx].color); // show color bar (10 wide for 3 hour)
 
         m_fcIcon[iDay].icon[h / 3] = ic[iconIdx].icon; // fix, assuming 3 hour
       }
@@ -764,15 +764,15 @@ bool Forecast::forecastPage()
 
     if(h == 12) // noon line and weekday
     {
-      tft.drawLine(x, FC_Top, x, FC_Top+FC_Height, rgb16(7, 14, 7) ); // dark gray
+      sprite.drawLine(x, FC_Top, x, FC_Top+FC_Height, rgb16(7, 14, 7) ); // dark gray
       if(x < FC_Left + FC_Width - 26) // skip last day if too far right
       {
-        tft.drawString( ss.dayShortStr(wkday), x, 10);
+        sprite.drawString( ss.dayShortStr(wkday), x, 10);
       }
     }
     else if(h == 0) // new day (draw line, prev day peaks, and prev icon)
     {
-      tft.drawLine(x, FC_Top+1, x, FC_Top+FC_Height-2, rgb16(14, 28, 14) ); // (light gray)
+      sprite.drawLine(x, FC_Top+1, x, FC_Top+FC_Height-2, rgb16(14, 28, 14) ); // (light gray)
 
       if(low != 1500) // show peaks
       {
@@ -819,7 +819,7 @@ bool Forecast::forecastPage()
     drawIcon(iDay, h1, 0);
   }
 
-  tft.setTextDatum(TL_DATUM);
+  sprite.setTextDatum(TL_DATUM);
 
   uint16_t x2, y2, rh2;
 
@@ -834,8 +834,8 @@ bool Forecast::forecastPage()
 
     if(i) // 1st run just saves pos
     {
-      tft.drawLine(x2, rh2, x1, rhY, rgb16(0, 30, 0) ); // rh (green)
-      tft.drawLine(x2, y2, x1, y1, (i== fcOff) ? rgb16(20, 0, 8) : rgb16(31, 0, 0) ); // red (current purple)
+      sprite.drawLine(x2, rh2, x1, rhY, rgb16(0, 30, 0) ); // rh (green)
+      sprite.drawLine(x2, y2, x1, y1, (i== fcOff) ? rgb16(20, 0, 8) : rgb16(31, 0, 0) ); // red (current purple)
     }
     x2 = x1;
     y2 = y1;
@@ -843,6 +843,7 @@ bool Forecast::forecastPage()
   }
 
   m_iconIdx = 0; // starting pos of icons
+  sprite.pushSprite(0, 0);
   return true;
 }
 
@@ -930,11 +931,12 @@ void Forecast::forecastAnimate()
     if(x < 90) x = 90, w = 90 - pIcon->x;
     else if(x > DISPLAY_WIDTH-90) w = min(x - (DISPLAY_WIDTH - 90), 80);
 
-    tft.fillRect(x - 80, DISPLAY_HEIGHT - 14, min(w, (uint8_t)(m_iconIdx * 10)), 2, TFT_BLUE); // progress bar
+    sprite.fillRect(x - 80, DISPLAY_HEIGHT - 14, min(w, (uint8_t)(m_iconIdx * 10)), 2, TFT_BLUE); // progress bar
   }
 
   if(++m_iconIdx >= 8)
       m_iconIdx = 0;
+  sprite.pushSprite(0, 0);
 }
 
 void Forecast::drawIcon(uint8_t d, uint8_t h, uint16_t x)
