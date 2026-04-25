@@ -4,6 +4,7 @@
 #include <Arduino.h>
 #include <TFT_eSPI.h>
 extern TFT_eSPI tft;
+extern TFT_eSprite sprite;
 
 #define DISPLAY_WIDTH 480
 #define DISPLAY_HEIGHT 320
