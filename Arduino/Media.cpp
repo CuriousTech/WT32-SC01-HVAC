@@ -19,7 +19,7 @@ bool tft_output(int16_t x, int16_t y, uint16_t w, uint16_t h, uint16_t* bitmap)
     y -= _srcY;
   if( y < _srcY) return 1; // skip source lines not rendered
   // This function will clip the image block rendering automatically at the TFT boundaries
-  tft.pushImage(x, y, w, h, bitmap + _srcX);
+  sprite.pushImage(x, y, w, h, bitmap + _srcX);
   return 1;  // Return 1 to decode next block
 }
 
