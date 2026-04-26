@@ -399,7 +399,6 @@ void Display::updateTemps(bool bForce)
   if(m_currPage || bForce)
   {
     memset(last, 0, sizeof(last));
-    return;
   }
 
   int16_t inTemp = (m_displayLocal) ? hvac.m_localTemp : hvac.m_inTemp;
@@ -547,7 +546,7 @@ void Display::updateModes(bool bForce) // update any displayed settings
   if(bLock != ee.b.bLock || bForce)
   {
     loadBtnImage( ( (ee.b.bLock) ? "lock" : "unlock" ), Btn_Lock);
-    bLock != ee.b.bLock;
+    bLock = ee.b.bLock;
   }
   loadBtnImage( "over", Btn_Override);
   if((hvac.m_overrideTimer ? true:false) != bOverride)
@@ -669,7 +668,7 @@ void Display::updateNotification(bool bRef)
   sprite.drawString(s, m_btn[Btn_Note].x+2, m_btn[Btn_Note].y+6);
   if(s.length())
   {
-    if(bRef == false) // refresh shouldn't be resent
+    if(note_last != hvac.m_notif) // don't send multiples
     {
       jsonString js("alert");
       js.Var("text", s);
@@ -731,8 +730,8 @@ void Display::updateRSSI()
   rssiAvg /= RSSI_CNT;
   if(rssiAvg == rssiT)
     return;
-
-  int sigStrength = 127 + rssiT;
+  rssiT = rssiAvg;
+  int sigStrength = 127 + rssiAvg;
   int wh = m_btn[Btn_RSSI].w; // width and height
   int x = m_btn[Btn_RSSI].x; // X/Y position
   int y = m_btn[Btn_RSSI].y;
