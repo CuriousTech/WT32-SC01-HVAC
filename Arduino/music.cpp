@@ -1,3 +1,4 @@
+// Uses 800 bytes
 #include "music.h"
 
 extern void WsPrint(String s);
@@ -287,25 +288,27 @@ bool Music::play(int song)
   return true;
 }
 
+void Music::stop()
+{
+  ledcWrite(SPEAKER, 0);
+#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
+  ledcWriteTone(SPEAKER, 0);
+#else
+  ledcWriteTone(0, 0);
+#endif
+  m_toneEnd = 0;
+  m_bPlaying = false;
+}
+
 void Music::service()
 {
   if(m_bPlaying == false)
     return;
   else if(millis() >= m_toneEnd)
-  {
-    ledcWrite(SPEAKER, 0);
-#if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-    ledcWriteTone(SPEAKER, 0);
-#else
-    ledcWriteTone(0, 0);
-#endif
-    m_toneEnd = 0;
-    m_bPlaying = false;
-  }
+    stop();
   else
-  {
     return;
-  }
+
   if(m_idx <= 0)
     return;
   playNote(m_arr[0].note, m_arr[0].ms);
