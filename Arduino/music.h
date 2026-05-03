@@ -112,6 +112,7 @@ public:
   bool add(uint16_t freq, uint16_t delay);
   void service(void);
   bool play(int song);
+  void stop(void);
 protected:
   void playNote(int freq, int duration);
 #define MUS_LEN 99
