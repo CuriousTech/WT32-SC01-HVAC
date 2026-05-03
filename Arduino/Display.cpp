@@ -52,7 +52,7 @@ bool Display::screen(bool bOn)
   if(bOldOn && m_currPage) // not in sync
     bOldOn = false;
 
-  if(bOn == false && m_currPage == Page_Graph) // last sequence was graph
+  if(bOn == false && m_currPage == Page_ScreenSaver) // alternate the thermo page and ss
     bOn = true;
 
   m_backlightTimer = DISPLAY_TIMEOUT; // update the auto backlight timer
@@ -63,8 +63,8 @@ bool Display::screen(bool bOn)
       return false; // no change occurred
     m_currPage = Page_Thermostat;
     media.loadImage("bg", 0, 0);
-    sprite.fillRect(m_btn[Btn_SetTempH].x + 25, m_btn[Btn_SetTempH].y, m_btn[Btn_SetTempH].w, m_btn[Btn_SetTempH].h, TFT_BLACK );
-    sprite.fillRect(m_btn[Btn_SetTempL].x + 25, m_btn[Btn_SetTempL].y, m_btn[Btn_SetTempL].w, m_btn[Btn_SetTempL].h, TFT_BLACK );
+    sprite.fillRect(m_btn[Btn_SetTempH].x + 16, m_btn[Btn_SetTempH].y, m_btn[Btn_SetTempH].w, m_btn[Btn_SetTempH].h, TFT_BLACK );
+    sprite.fillRect(m_btn[Btn_SetTempL].x + 16, m_btn[Btn_SetTempL].y, m_btn[Btn_SetTempL].w, m_btn[Btn_SetTempL].h, TFT_BLACK );
     refreshAll();
     sprite.pushSprite(0, 0);
   }
@@ -317,7 +317,7 @@ void Display::drawOutTemp()
 
   if(m_currPage == Page_Thermostat)
   {
-    drawFakeFloat(outTempReal, m_btn[Btn_OutTemp].x, m_btn[Btn_OutTemp].y, 17, rgb16(0, 63, 31) );
+    drawFakeFloat(outTempReal, m_btn[Btn_OutTemp].x, m_btn[Btn_OutTemp].y, 17, rgb16(0, 63, 31), TFT_BLACK, "o" );
 
     static bool bInit = false; // make first time display update fast
     if(!bInit)
@@ -329,10 +329,30 @@ void Display::drawOutTemp()
   }
 }
 
-void Display::drawFakeFloat(uint16_t val, int16_t x, int16_t y, uint8_t h, uint16_t fg, uint16_t bg)
+void Display::drawFakeFloat(uint16_t val, int16_t x, int16_t y, uint8_t h, uint16_t fg, uint16_t bg, char *pSpecialChar)
 {
   uint8_t digits[5] = {0};
   bool bNone = true;
+
+  if(pSpecialChar)
+  {
+    uint16_t xPos = x + 1 + (h * 6);
+    uint16_t yPos = y;
+    if(h > 20)
+    {
+      xPos += 16; // the big one
+      sprite.setFreeFont(&FreeSans12pt7b);
+    }
+    else
+    {
+      sprite.setFreeFont(&FreeSans9pt7b);
+    }
+    if(pSpecialChar[0] == 'o') yPos -= 4; // The font has no degree symbol, so using o. Ugh.
+    sprite.setTextColor(fg);
+    sprite.drawString(pSpecialChar, xPos, yPos );
+  }
+
+  x -= 20;
 
   for(int8_t i = 0; i < 4; i++)
   {
@@ -376,6 +396,7 @@ void Display::drawDigit(uint8_t digit, uint8_t pos, int16_t x, int16_t y, uint8_
     return;
   }
 
+  thick++;
   if((bit & 0x01) == 0) sprite.drawWideLine( x+ 3, y   , xw+1, y    , thick, bg); // T
   if((bit & 0x02) == 0) sprite.drawWideLine( xw+2, y +1, xw+1, yh -1, thick, bg); // R1
   if((bit & 0x04) == 0) sprite.drawWideLine( xw+1, yh+1, xw  , yh2-1, thick, bg); // R2
@@ -383,7 +404,8 @@ void Display::drawDigit(uint8_t digit, uint8_t pos, int16_t x, int16_t y, uint8_
   if((bit & 0x10) == 0) sprite.drawWideLine( x+ 1, yh+1, x   , yh2-1, thick, bg); // L2
   if((bit & 0x20) == 0) sprite.drawWideLine( x+ 2, y +1, x +1, yh -1, thick, bg); // L1
   if((bit & 0x40) == 0) sprite.drawWideLine( x+ 2, yh  , xw  , yh   , thick, bg); // C
- 
+
+  thick--;
   if(bit & 0x01) sprite.drawWideLine( x+ 3, y   , xw+1, y    , thick, fg); // T
   if(bit & 0x02) sprite.drawWideLine( xw+2, y +1, xw+1, yh -1, thick, fg); // R1
   if(bit & 0x04) sprite.drawWideLine( xw+1, yh+1, xw  , yh2-1, thick, fg); // R2
@@ -397,27 +419,20 @@ void Display::updateTemps(bool bForce)
 {
   static uint16_t last[7];  // only draw changes
   if(m_currPage || bForce)
-  {
     memset(last, 0, sizeof(last));
-  }
 
   int16_t inTemp = (m_displayLocal) ? hvac.m_localTemp : hvac.m_inTemp;
   int16_t rh = (m_displayLocal) ? hvac.m_localRh : hvac.m_rh;
   uint16_t fg = (m_displayLocal) ? rgb16(4, 63, 1) : rgb16(0, 63, 31);
 
   if(last[0] != inTemp)
-    drawFakeFloat((last[0] = inTemp), m_btn[Btn_InTemp].x - 20, m_btn[Btn_InTemp].y, 28, fg );
+    drawFakeFloat((last[0] = inTemp), m_btn[Btn_InTemp].x - 20, m_btn[Btn_InTemp].y, 28, fg, TFT_BLACK, "o" );
 
   if(last[1] != hvac.m_targetTemp)
-    drawFakeFloat((last[1] = hvac.m_targetTemp), m_btn[Btn_TargetTemp].x, m_btn[Btn_TargetTemp].y, 17, fg );
+    drawFakeFloat((last[1] = hvac.m_targetTemp), m_btn[Btn_TargetTemp].x, m_btn[Btn_TargetTemp].y, 17, fg, TFT_BLACK, "o" );
 
   if(last[2] != rh)
-  {
-    drawFakeFloat((last[2] = rh), m_btn[Btn_Rh].x, m_btn[Btn_Rh].y, 17, fg );
-    sprite.setFreeFont(&FreeSans12pt7b);
-    sprite.setTextColor(fg);
-    sprite.drawString("%", m_btn[Btn_Rh].x + 130, m_btn[Btn_Rh].y );
-  }
+    drawFakeFloat((last[2] = rh), m_btn[Btn_Rh].x, m_btn[Btn_Rh].y, 17, fg, TFT_BLACK, "%" );
 
   uint8_t nMode = hvac.getSetMode();
 
@@ -439,24 +454,24 @@ void Display::updateTemps(bool bForce)
     case Mode_Cool:
       if(last[3] != ee.coolTemp[1])
       {
-        drawFakeFloat((last[3] = ee.coolTemp[1]), m_btn[Btn_SetTempH].x+1, m_btn[Btn_SetTempH].y+2, 17, fgm );
+        drawFakeFloat((last[3] = ee.coolTemp[1]), m_btn[Btn_SetTempH].x, m_btn[Btn_SetTempH].y+2, 17, fgm, TFT_BLACK, "o" );
         last[6] = 10; // force outline refresh 
       }
       if(last[4] != ee.coolTemp[0])
       {
-        drawFakeFloat((last[4] = ee.coolTemp[0]), m_btn[Btn_SetTempL].x+1, m_btn[Btn_SetTempL].y+2, 17, fgm );
+        drawFakeFloat((last[4] = ee.coolTemp[0]), m_btn[Btn_SetTempL].x, m_btn[Btn_SetTempL].y+2, 17, fgm, TFT_BLACK, "o" );
         last[6] = 10;
       }
       break;
     case Mode_Heat:
       if(last[3] != ee.heatTemp[1])
       {
-        drawFakeFloat((last[3] = ee.heatTemp[1]), m_btn[Btn_SetTempH].x+1, m_btn[Btn_SetTempH].y+2, 17, fgm );
+        drawFakeFloat((last[3] = ee.heatTemp[1]), m_btn[Btn_SetTempH].x, m_btn[Btn_SetTempH].y+2, 17, fgm, TFT_BLACK, "o" );
         last[6] = 10;
       }
       if(last[4] != ee.heatTemp[0])
       {
-        drawFakeFloat((last[4] = ee.heatTemp[0]), m_btn[Btn_SetTempL].x+1, m_btn[Btn_SetTempL].y+2, 17, fgm );
+        drawFakeFloat((last[4] = ee.heatTemp[0]), m_btn[Btn_SetTempL].x, m_btn[Btn_SetTempL].y+2, 17, fgm, TFT_BLACK, "o" );
         last[6] = 10;
       }
       break;
@@ -466,8 +481,8 @@ void Display::updateTemps(bool bForce)
   {
     last[6] = (m_adjustMode<<1) | m_bLink;
     int8_t am = m_adjustMode;
-    sprite.drawRect(m_btn[Btn_SetTempH+am].x + 25, m_btn[Btn_SetTempH+am].y, m_btn[Btn_SetTempH+am].w, m_btn[Btn_SetTempH+am].h, rgb16(0,31,0));
-    sprite.drawRect(m_btn[Btn_SetTempH+(am^1)].x + 25, m_btn[Btn_SetTempH+(am^1)].y, m_btn[Btn_SetTempH+(am^1)].w, m_btn[Btn_SetTempH+(am^1)].h, (m_bLink) ? rgb16(0,31,0) : TFT_BLACK);
+    sprite.drawRect(m_btn[Btn_SetTempH+am].x + 14, m_btn[Btn_SetTempH+am].y, m_btn[Btn_SetTempH+am].w, m_btn[Btn_SetTempH+am].h, rgb16(0,31,0));
+    sprite.drawRect(m_btn[Btn_SetTempH+(am^1)].x + 14, m_btn[Btn_SetTempH+(am^1)].y, m_btn[Btn_SetTempH+(am^1)].w, m_btn[Btn_SetTempH+(am^1)].h, (m_bLink) ? rgb16(0,31,0) : TFT_BLACK);
   }
 }
 
@@ -589,7 +604,7 @@ void Display::drawTime()
   sTime += " ";
 
 #define TIME_X_OFFSET 80
-  sprite.setTextColor(rgb16(16,63,0), rgb16(8,16,8) );
+  sprite.setTextColor(rgb16(0,63,16), rgb16(8,16,8) );
   sprite.setFreeFont(&FreeSans12pt7b);
   sprite.drawString(sTime, m_btn[Btn_Time].x + TIME_X_OFFSET, m_btn[Btn_Time].y);
 
