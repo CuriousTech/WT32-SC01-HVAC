@@ -777,9 +777,9 @@ bool Forecast::forecastPage()
       if(low != 1500) // show peaks
       {
         if(x > FC_Left + 23)
-          display.drawFakeFloat(high, x - 20, FC_Top+FC_Height + 10, 8, rgb16(0, 63, 31) );
+          display.drawFakeFloat(high, x, FC_Top+FC_Height + 10, 8, rgb16(0, 63, 31) );
         if(x >FC_Left + 63) // first one shouldn't go too far left
-          display.drawFakeFloat(low, x - 54, FC_Top+FC_Height + 10 + 21, 8, rgb16(0, 63, 31) );
+          display.drawFakeFloat(low, x - 34, FC_Top+FC_Height + 10 + 21, 8, rgb16(0, 63, 31) );
       }
 
       iconAni *pIcon = &m_fcIcon[iDay - 1];
@@ -809,8 +809,8 @@ bool Forecast::forecastPage()
   if(x < DISPLAY_WIDTH + 30 && low != 1500)
   {
     if(x < DISPLAY_WIDTH - 10 && high != -1000)
-      display.drawFakeFloat(high, x - 20, FC_Top+FC_Height + 10, 8, rgb16(8,16,8) );
-    display.drawFakeFloat(low, x - 54, FC_Top+FC_Height + 10 + 21, 8, rgb16(8,16,8));
+      display.drawFakeFloat(high, x, FC_Top+FC_Height + 10, 8, rgb16(8,16,8) );
+    display.drawFakeFloat(low, x - 34, FC_Top+FC_Height + 10 + 21, 8, rgb16(8,16,8));
 
     m_fcIcon[iDay].x = x;
     int8_t h1 = 0;
@@ -900,7 +900,7 @@ int16_t Forecast::getCurrentTemp(int& shiftedTemp, uint8_t shiftMins)
   return temp;
 }
 
-// get value at current minute between hours (uses 400 bytes because of floating point)
+// get value at current minute between hours
 int Forecast::tween(int16_t t1, int16_t t2, int m, int r)
 {
   if(r == 0) r = 1; // div by zero check
@@ -952,14 +952,5 @@ void Forecast::drawIcon(uint8_t d, uint8_t h, uint16_t x)
 
   String sIcon = makeName(icon, h);
 
-  if(x > DISPLAY_WIDTH-90) // right side partial image
-  {
-    x -= 80;
-    int16_t w = min(DISPLAY_WIDTH - 10 - x, 80);
-    media.loadImage(sIcon, x, DISPLAY_HEIGHT - 92, 0, 0, w, 80);
-  }
-  else if(x < 90) // left side partial image
-    media.loadImage(sIcon, 10, DISPLAY_HEIGHT - 92, 90 - x, 0, x - 10, 80);
-  else
-    media.loadImage(sIcon, x - 80, DISPLAY_HEIGHT - 92);
+  media.loadImage(sIcon, x - 80, DISPLAY_HEIGHT - 92);
 }
