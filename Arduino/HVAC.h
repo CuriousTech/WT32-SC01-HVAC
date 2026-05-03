@@ -171,6 +171,7 @@ public:
   void    loadStats(void);
   void    saveStats(void);
   void    override(int val);
+  void    shutdown(void);
 
   int16_t  m_outTemp;       // adjusted current temp *10
   int16_t  m_outRh;
@@ -203,6 +204,7 @@ private:
   void  tempCheck(void);
   bool  preCalcCycle(int16_t tempL, int16_t tempH);
   void  calcTargetTemp(int mode);
+  float sineTemp(float offset, int16_t H, int16_t L);
   void  costAdd(int secs, int mode, int hm);
   int   CmdIdx(String s);
   void  sendCmd(const char *szName, int value);
