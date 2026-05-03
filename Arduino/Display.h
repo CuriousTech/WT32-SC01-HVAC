@@ -105,7 +105,7 @@ public:
   bool getGrapthPoints(gPoint *pt, int n);
   int  minPointVal(int n, int &max);
   String makeName(uint8_t icon, uint8_t h);
-  void drawFakeFloat(uint16_t val, int16_t x, int16_t y, uint8_t h, uint16_t fg, uint16_t bg = 0);
+  void drawFakeFloat(uint16_t val, int16_t x, int16_t y, uint8_t h, uint16_t fg, uint16_t bg = 0, char *pSpecialChar = NULL);
 
 private:
   void drawDigit(uint8_t digit, uint8_t pos, int16_t x, int16_t y, uint8_t h, uint16_t fg, uint16_t bg);
@@ -142,10 +142,10 @@ private:
     {Btn_Time, 106, 8, 182, 20},
     {Btn_OutTemp, DISPLAY_WIDTH-144, 24, 103, 41},
     {Btn_InTemp, 0, 52, 164, 64},
-    {Btn_Rh, 170, 52, 90, 40},
+    {Btn_Rh, 190, 52, 90, 40},
     {Btn_TargetTemp, DISPLAY_WIDTH-204, 124, 105, 41},
-    {Btn_SetTempH, DISPLAY_WIDTH-215, 185, 105, 43},
-    {Btn_SetTempL, DISPLAY_WIDTH-215, 250, 105, 43},
+    {Btn_SetTempH, DISPLAY_WIDTH-204, 185, 108, 43},
+    {Btn_SetTempL, DISPLAY_WIDTH-204, 250, 108, 43},
 
     {Btn_History,   15, 138, 60, 60},
     {Btn_Override,  82, 138, 60, 60},
