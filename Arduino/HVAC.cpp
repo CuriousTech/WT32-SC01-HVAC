@@ -874,22 +874,10 @@ void HVAC::calcTargetTemp(int mode)
       {
         case Mode_Off:
         case Mode_Cool:
-          {
-            float m = ( (gLTime.tm_hour + 14) * 60 + gLTime.tm_min + ee.sineOffset[0] ) / 4;
-            float r = (ee.coolTemp[1] - ee.coolTemp[0]) / 2;
-            float fs = r * sin(PI * (180 - m) / 180);
-            m_targetTemp = (fs + ee.coolTemp[0] - r);
-          }
-          m_targetTemp = constrain(m_targetTemp, ee.coolTemp[0], ee.coolTemp[1]); // just for safety
+          m_targetTemp = sineTemp(ee.sineOffset[0], ee.coolTemp[0], ee.coolTemp[1]);
           break;
         case Mode_Heat:
-          {
-            float m = ( (gLTime.tm_hour + 14) * 60 + gLTime.tm_min + ee.sineOffset[1] ) / 4;
-            float r = (ee.heatTemp[1] - ee.heatTemp[0]) / 2;
-            float fs = r * sin(PI * (180 - m) / 180);
-            m_targetTemp = (fs + ee.heatTemp[0] + r);
-          }
-          m_targetTemp = constrain(m_targetTemp, ee.heatTemp[0], ee.heatTemp[1]);
+          m_targetTemp = sineTemp(ee.sineOffset[1], ee.heatTemp[0], ee.heatTemp[1]);
           break;
       }
       break;
@@ -918,6 +906,15 @@ void HVAC::calcTargetTemp(int mode)
       m_targetTemp = constrain(m_targetTemp, (ee.b.bCelcius ? 150:590), (ee.b.bCelcius ? 300:860) );
       break;
   }
+}
+
+// This uses ~5.5K because it's fp?
+float HVAC::sineTemp(float offset, int16_t H, int16_t L)
+{
+  float m = ( (gLTime.tm_hour + 14) * 60 + gLTime.tm_min + offset ) / 4;
+  float r = (H - L) / 2;
+  float fs = r * sin(PI * (180 - m) / 180);
+  return constrain((fs + L + r), L, H);
 }
 
 // Current control settings modified since last call
@@ -1250,8 +1247,9 @@ const char *cmdList[] = { "cmd",
   "brt1",
   "cd",
   "delf",
-  "createdir", // 58
+  "createdir",
   "clearhist",
+  "restart", // 60
   NULL
 };
 
@@ -1598,7 +1596,24 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       memset(m_SecsDay, 0, sizeof(m_SecsDay));
       memset(m_SecsMon, 0, sizeof(m_SecsMon));
       break;
+    case 60: // restart
+      shutdown();
+      delay(200);
+      ESP.restart();
+      break;
   }
+}
+
+void HVAC::shutdown()
+{
+#ifndef REMOTE
+  disable();
+  dayTotals(gLTime.tm_mday - 1); // save for reload
+  ee.update();
+  saveStats();
+#endif
+  mus.stop(); // silence!
+  INTERNAL_FS.end();
 }
 
 void HVAC::override(int val)
