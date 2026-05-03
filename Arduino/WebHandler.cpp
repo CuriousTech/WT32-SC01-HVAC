@@ -16,7 +16,7 @@
 #include "eeMem.h"
 #include "Media.h"
 #include "forecast.h"
-#include "pages.h"
+#include "Music.h"
 
 //-----------------
 int serverPort = 80;
@@ -30,11 +30,10 @@ void WscSend(String s);
 void startListener(void);
 #else
 const char *hostName = HOSTNAME;
-//IPAddress ipFcServer(192,168,31,100);    // local forecast server and port
-//int nFcPort = 80;
 #endif
 
 extern tm gLTime;
+extern Music mus;
 AsyncWebServer server( serverPort );
 AsyncWebSocket ws("/ws"); // access at ws://[esp ip]/ws
 
@@ -184,10 +183,6 @@ void startServer()
 
 #endif
 
-  server.on ( "/fm.html", HTTP_GET, [](AsyncWebServerRequest *request){
-    request->send ( 200, "text/html",  fileman);
-  });
-
   server.on ( "/upload", HTTP_POST, [](AsyncWebServerRequest * request)
   {
     request->send( 200);
@@ -210,19 +205,13 @@ void startServer()
   ArduinoOTA.setHostname(hostName);
   ArduinoOTA.begin();
   ArduinoOTA.onStart([]() {
-#ifndef REMOTE
-    hvac.disable();
-    hvac.dayTotals(gLTime.tm_mday - 1); // save for reload
-    ee.update();
-    hvac.saveStats();
-#endif
     jsonString js("alert");
     js.Var("text", "OTA Update Started");
     ws.textAll(js.Close());
     ws.closeAll();
     hvac.m_notif = Note_Updating; // Display a thing
     display.updateNotification(true);
-    INTERNAL_FS.end();
+    hvac.shutdown();
   });
 #endif
 }
@@ -242,9 +231,15 @@ void findHVAC() // find the HVAC on iot domain
     if(!strcmp(szName, HOSTNAME))
     {
 #if ESP_ARDUINO_VERSION >= ESP_ARDUINO_VERSION_VAL(3, 0, 0)
-      ee.hostIp = MDNS.address(i); // update IP
+      ee.hostIp[0] = MDNS.address(i)[0]; // update IP
+      ee.hostIp[1] = MDNS.address(i)[1];
+      ee.hostIp[2] = MDNS.address(i)[2];
+      ee.hostIp[3] = MDNS.address(i)[3];
 #else
-      ee.hostIp = MDNS.IP(i); // update IP
+      ee.hostIp[0] = MDNS.IP(i)[0]; // update IP
+      ee.hostIp[1] = MDNS.IP(i)[1];
+      ee.hostIp[2] = MDNS.IP(i)[2];
+      ee.hostIp[3] = MDNS.IP(i)[3];
 #endif
       hvac.m_notif = Note_HVACFound;
       break;
@@ -417,7 +412,7 @@ void parseParams(AsyncWebServerRequest *request)
 
     if(p->name() == "key")
     {
-      bPassGood = s.equals(String(ee.password));
+      bPassGood = s.equals(ee.password);
       if(!bPassGood)
       {
         if(nWrongPass == 0)
@@ -433,10 +428,6 @@ void parseParams(AsyncWebServerRequest *request)
           nWrongPass = 10;
       }
       lastIP = ip;
-    }
-    else if(p->name() == "restart" && bPassGood)
-    {
-      ESP.restart();
     }
     else if(bPassGood)
     {
