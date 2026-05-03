@@ -23,7 +23,6 @@ public:
   uint32_t freeSpace(void);
 
   void loadImage(String sName, uint16_t x, uint16_t y);
-  void loadImage(String sName, uint16_t x, uint16_t y, int16_t srcX, int16_t srcY, uint16_t w, uint16_t h);
 };
 
 extern Media media;
