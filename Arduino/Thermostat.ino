@@ -153,7 +153,7 @@ void loop()
 
     if(--read_delay == 0)
     {
-      float temp;
+      int16_t temp;
       if(ee.bCelcius)
         temp = dht.getTemperature() * 10;
       else
@@ -162,7 +162,7 @@ void loop()
       if(dht.getStatus() == DHT::ERROR_NONE)
       {
         tempMedian.add(temp);
-        if (tempMedian.getAverage(2, temp) == tempMedian.OK) {
+        if (tempMedian.getMedian(temp) == tempMedian.OK) {
           hvac.updateIndoorTemp( temp, dht.getHumidity() * 10);
         }
       }
@@ -182,19 +182,20 @@ void loop()
 
     if(--read_delay == 0)
     {
-      float temp;
-      float rh;
+      int16_t temp;
+      int16_t rh;
       if(digitalRead(AMPWR) == LOW)
       {
         digitalWrite(AMPWR, HIGH); // Power the AM2320
       }
       else if(am.measure(temp, rh))
       {
+        int16_t t2 = temp;
         if(!ee.b.bCelcius)
-          temp = temp * 9 / 5 + 32;
-        tempMedian.add(temp * 10);
-        if (tempMedian.getAverage(2, temp) == tempMedian.OK) {
-          hvac.updateIndoorTemp( temp, rh * 10 );
+          temp = temp * 9 / 5 + 320;
+        tempMedian.add(temp);
+        if (tempMedian.getMedian(temp) == tempMedian.OK) {
+          hvac.updateIndoorTemp( temp, rh );
         }
         errCnt = 0;
       }
