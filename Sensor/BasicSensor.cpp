@@ -27,24 +27,22 @@ int BasicInterface::service(int8_t tcal, int8_t rhcal)
 
   if((lastSec % 5) == 0)
   {
-    float ftemp, frh;
-    if(m_am.measure(ftemp, frh))
+    int16_t temp, rh;
+    if(m_am.measure(temp, rh))
     {
       m_status = 0;
       
       if(m_bCF)
-        ftemp = ( 1.8 * ftemp + 32.0) * 10;
-      else
-        ftemp *= 10;
-      ftemp += tcal;
-      m_tempMedian[0].add( ftemp);
-      m_tempMedian[0].getAverage(2, ftemp);
-      m_tempMedian[1].add(frh * 10);
-      m_tempMedian[1].getAverage(2, frh);
-      if(m_values[DE_TEMP] != (uint16_t)ftemp || m_values[DE_RH] != (uint16_t)frh)
+        temp = temp * 9 / 5 + 320;
+      temp += tcal;
+      m_tempMedian[0].add( temp);
+      m_tempMedian[0].getMedian(temp);
+      m_tempMedian[1].add(rh);
+      m_tempMedian[1].getMedian(rh);
+      if(m_values[DE_TEMP] != temp || m_values[DE_RH] != rh)
         m_bUpdated = true;
-      m_values[DE_TEMP] = ftemp;
-      m_values[DE_RH] = frh + rhcal;
+      m_values[DE_TEMP] = temp;
+      m_values[DE_RH] = rh + rhcal;
     }
     else
     {
