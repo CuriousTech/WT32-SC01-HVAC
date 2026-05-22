@@ -52,6 +52,7 @@ int WsRemoteID;
 IPAddress lastIP;
 IPAddress WsClientIP;
 
+bool bSmartEnabled;
 bool bConfigDone = false; // EspTouch done or creds set
 bool bStarted = false;
 
@@ -114,16 +115,13 @@ void onWsEvent(AsyncWebSocket * server, AsyncWebSocketClient * client, AwsEventT
 void setDamper(bool bOpen)
 {
   static bool bIsOpen;
-  if(ee.damperIp[0] == 0)
-    return;
-  IPAddress ip(ee.damperIp);
 
-  String s = "/s?key=";
+  String s = "s?key=";
   s += ee.password;
   s += "&";
   s += bOpen ? "half":"close";
   s += "=0";
-  FC.start(ip, 80, s);
+  FC.start("damper.local", 80, s);
 }
 
 void startServer()
@@ -135,13 +133,14 @@ void startServer()
   {
     WiFi.begin(ee.szSSID, ee.szSSIDPassword);
     WiFi.setHostname(hostName);
-    bConfigDone = true;
     hvac.m_notif = Note_Connecting;
+    WiFi.setTxPower(WIFI_POWER_8_5dBm);
   }
   else
   {
     hvac.m_notif = Note_EspTouch;
     WiFi.beginSmartConfig();
+    bSmartEnabled = true;
   }
 
   // attach AsyncWebSocket
@@ -280,50 +279,58 @@ bool secondsServer() // called once per second
   bool bConn = false;
   static uint8_t nCounter = 5;
 
-  if(!bConfigDone)
+  switch(WiFi.status())
   {
-    if( WiFi.smartConfigDone())
-    {
-      bConfigDone = true;
-      WiFi.SSID().toCharArray(ee.szSSID, sizeof(ee.szSSID)); // Get the SSID from SmartConfig or last used
-      WiFi.psk().toCharArray(ee.szSSIDPassword, sizeof(ee.szSSIDPassword) );
-    }
-  }
-  if(bConfigDone)
-  {
-    switch(WiFi.status())
-    {
-      case WL_CONNECTED:
-        if(bStarted)
-          break;
-        WiFi.mode(WIFI_STA); // Stop broadcasting SSID
-        MDNS.begin( hostName );
-        bStarted = true;
-        MDNS.addService("iot", "tcp", serverPort);
-        hvac.m_notif = Note_Connected;
-        bConn = true;
+    case WL_CONNECTED:
+      if(bSmartEnabled && WiFi.smartConfigDone())
+      {
+        bSmartEnabled = false;
+        WiFi.SSID().toCharArray(ee.szSSID, sizeof(ee.szSSID)); // Get the SSID from SmartConfig or last used
+        WiFi.psk().toCharArray(ee.szSSIDPassword, sizeof(ee.szSSIDPassword) );
+      }
+
+      if(bStarted)
+        break;
+      bStarted = true;
+      WiFi.mode(WIFI_STA); // Stop broadcasting SSID
+      MDNS.begin( hostName );
+      MDNS.addService("iot", "tcp", serverPort);
+      hvac.m_notif = Note_Connected;
+      bConn = true;
 #ifdef REMOTE
-        findHVAC();
- #endif
-        break;
-      case WL_DISCONNECTED: // connection dropped
-        if(--nCounter == 0)
-        {
-          nCounter = 5;
-          WiFi.begin(ee.szSSID, ee.szSSIDPassword);
-        }
-        break;
-      case WL_CONNECT_FAILED:
-      case WL_NO_SSID_AVAIL: // failed to connect
+      findHVAC();
+#endif
+      break;
+    case WL_CONNECT_FAILED:
+    case WL_NO_SSID_AVAIL: // failed to connect for some reason
+      if(bSmartEnabled == false)
+      {
+//      Serial.println("Connect failed. Starting SmartConfig");
         WiFi.mode(WIFI_AP_STA);
         WiFi.beginSmartConfig();
-        bConfigDone = false;
-        bStarted = false;
-        break;
-      default:
-        return bConn;
-    }
+        bSmartEnabled = true;
+      }
+      break;
+    case WL_CONNECTION_LOST:
+//    Serial.println("CONNECTION_LOST");
+      break;
+    case WL_DISCONNECTED: // connected before and stopped
+    case WL_IDLE_STATUS:
+//    Serial.println("DISCONNECTED");
+      {
+        static uint8_t nDelay = 15;
+        if(--nDelay == 0)
+        {
+//            Serial.println("reconnect");
+          WiFi.begin(ee.szSSID, ee.szSSIDPassword); // esp8266 doesn't like this
+          nDelay = 15;
+        }
+      }
+      break;
+    default:
+      return bConn;
   }
+
   ws.cleanupClients();
   static uint8_t nUpdateDelay = 5; // startup delay of 5s, then used for reattempts (60s)
   if(nUpdateDelay)
