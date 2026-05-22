@@ -40,7 +40,6 @@ void Forecast::start(IPAddress serverIP, uint16_t port, bool bCelcius, int8_t ty
 
   m_status = FCS_Busy;
   m_bCelcius = bCelcius;
-  m_serverIP = serverIP;
   if(!m_ac.connect(serverIP, port))
     m_status = FCS_ConnectError;
   m_bLocal = true;
@@ -61,15 +60,15 @@ void Forecast::start(char *pCityID, bool bCelcius)
 }
 
 // local device control, such as dampers
-void Forecast::start(IPAddress serverIP, uint16_t port, String sUri)
+void Forecast::start(char *pszName, uint16_t port, String sUri)
 {
   if(m_ac.connected() || m_ac.connecting())
     return;
 
   m_status = FCS_Busy;
-  m_serverIP = serverIP;
-  if(!m_ac.connect(serverIP, port))
+  if(!m_ac.connect(pszName, port))
     m_status = FCS_ConnectError;
+
   m_type = 2;
   m_sUri = sUri;
   m_bLocal = true;
