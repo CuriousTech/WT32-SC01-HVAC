@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <meta name="viewport" content="width=device-width, initial-scale=1"/>
 <head>
@@ -16,7 +16,8 @@ snd=new Array()
 var ws
 function startEvents()
 {
-ws=new WebSocket("ws://"+window.location.host+"/ws")
+relPath = location.href.replace(/^https?:\/\/|[^/]*$/gi, "")
+ws = new WebSocket("ws://"+relPath+"ws")
 //ws=new WebSocket("ws://192.168.31.110/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
@@ -85,6 +86,12 @@ function jmp(v)
 	window.location.assign('http://'+snd[+v.charAt(3)][0])
 }
 
+function relClick(ref)
+{
+  path=location.pathname.replace(/\/[^/]*$/, "")
+  window.location=path+ref
+}
+
 function setVar(varName, value)
 {
 	ws.send('{"key":"'+a.myToken.value+'","'+varName+'":'+value+'}')
@@ -105,7 +112,7 @@ function secsToTime(sec)
  date.setSeconds(sec)
  d=date.getDate()-1
  d=d?d+'d ':''
- return d+date.toTimeString().replace(/.*(\d:\d{2}:\d{2}).*/, "$1")
+ return d+date.toTimeString().replace(/.*(\d:\d{2}:\d{2}).*/, "$1");
 }
 
 function s2t(elap)
@@ -136,8 +143,8 @@ function t2s(v)
 <tr>
 <td style="width: 100px">Threshold</td>
 <td style="width: 90px"><input type=text size=4 id="thresh" onchange="{setVar('cyclethresh',(+this.value*10).toFixed())}"></td>
-<td style="width: 20px"></td><td><input type="submit" value=" Home " onClick="window.location='/iot';"></td></tr>
-<tr><td>Heat Thresh</td><td><input type=text size=4 id="heatthr" onchange="{setVar('eheatthresh',+this.value)}"></td><td></td><td><input type="submit" value=" Chart " onClick="window.location='/chart.html';"></td></tr>
+<td style="width: 20px"></td><td><input type="submit" value=" Home " onClick="relClick('/');"></td></tr>
+<tr><td>Heat Thresh</td><td><input type=text size=4 id="heatthr" onchange="{setVar('eheatthresh',+this.value)}"></td><td></td><td><input type="submit" value=" Chart " onClick="relClick('/chart.html');"></td></tr>
 <tr><td>AC &#x2202; Limit</td><td><input type=text size=4 id="acth" onchange="{setVar('dl',(+this.value*10).toFixed())}"></td><td></td><td></td></tr>
 <tr><td>Fan Pre</td><td><input type=text size=4 id="fanpre" onchange="{setVar('fanpretime',t2s(this.value))}"></td><td>Post</td><td><input type=text size=3 id="fandelay" onchange="{setVar('fanpostdelay',t2s(this.value))}"></td></tr>
 <tr><td>cycle Min</td><td><input type=text size=4 id="cycmin" onchange="{setVar('cyclemin',t2s(this.value))}"></td><td>Max</td><td><input type=text size=3 id="cycmax" onchange="{setVar('cyclemax',t2s(this.value))}"></td></tr>
