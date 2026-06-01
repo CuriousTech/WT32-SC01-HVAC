@@ -55,6 +55,7 @@ IPAddress WsClientIP;
 bool bSmartEnabled;
 bool bConfigDone = false; // EspTouch done or creds set
 bool bStarted = false;
+bool bReconnectWebSocket = false;
 
 #ifdef REMOTE
 const char *jsonListSettings[] = { "cmd",
@@ -149,8 +150,7 @@ void startServer()
 #ifndef REMOTE
 
   server.on ( "/", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
-    // no 404, just an empty response. In latest library version, comment out line 900:
-    // \libraries\ESP_Async_WebServer\src\WebRequest.cpp line 900: send(501, T_text_plain, "Handler did not handle the request");
+    request->send(INTERNAL_FS, "/index.html");
   });
 
   // For quick commands, sensors. Remotes have a seperate command list
@@ -173,11 +173,6 @@ void startServer()
     s += js.Close();
     s += "\r\n";
     request->send ( 200, "text/html", s );
-  });
-
-  // Main page  Hidden instead of / due to being externally accessible. Use your own here.
-  server.on ( "/iot", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
-    request->send(INTERNAL_FS, "/index.html");
   });
 
 #endif
@@ -249,7 +244,14 @@ void findHVAC() // find the HVAC on iot domain
 
 void handleServer()
 {
-#ifndef REMOTE
+#ifdef REMOTE
+  if(bReconnectWebSocket)
+  {
+    bReconnectWebSocket = false;
+    startListener();
+  }
+
+#else
   static uint8_t n;
   if(++n >= 10)
   {
@@ -789,6 +791,7 @@ void webSocketEventHandler(uint8_t event, char *data, uint16_t length)
     case WEBSOCKET_EVENT_DISCONNECTED:
       bWscConnected = false;
       hvac.m_notif = Note_Network;
+      bReconnectWebSocket = true;
       break;
     case WEBSOCKET_EVENT_DATA_TEXT:
       FC.JsonParse((char *)data, 0, jsonListSettings, remoteCallback);
