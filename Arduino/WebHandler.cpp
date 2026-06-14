@@ -117,6 +117,10 @@ void setDamper(bool bOpen)
 {
   static bool bIsOpen;
 
+  if(bOpen == bIsOpen)
+    return;
+
+  bIsOpen = bOpen;
   String s = "s?key=";
   s += ee.password;
   s += "&";
