@@ -76,7 +76,7 @@ void Forecast::start(char *pszName, uint16_t port, String sUri)
 
 int Forecast::checkStatus()
 {
-  if(m_status == FCS_Done)
+  if(m_status == FCS_Done && m_type <= 1) // only use for forecast
   {
     m_status = FCS_Idle;
     m_fc.loadDate = time(nullptr);
