@@ -27,7 +27,9 @@ int BasicInterface::service(int8_t tcal, int8_t rhcal)
 
   if((lastSec % 5) == 0)
   {
-    int16_t temp, rh;
+    int16_t temp;
+    int16_t rh;
+
     if(m_am.measure(temp, rh))
     {
       m_status = 0;
@@ -68,6 +70,11 @@ void BasicInterface::setCF(bool f)
 int BasicInterface::status()
 {
   return m_status;
+}
+
+void BasicInterface::setDST(bool bDST)
+{
+  
 }
 
 void BasicInterface::setLED(uint8_t no, bool bOn)
