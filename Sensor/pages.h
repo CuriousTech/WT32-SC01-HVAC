@@ -59,7 +59,6 @@ console.log(evt.data)
     a.nm.value=d.name
     a.SRATE.value=s2t(d.srate)
     a.LRATE.value=s2t(d.lrate)
-    a.TZ.value=d.tz
     a.WT.value=d.wt
     a.LED1.value=nms[d.l1]
     a.LED1.setAttribute('style',d.l1?'color:blue':'')
@@ -639,8 +638,7 @@ function chartY(n,rng)
 <tr>
 <td><input name="LED1" value="OFF" type='button' onclick="{led1()}">&nbsp; <input name="LED2" value="OFF" type='button' onclick="{led2()}"> &nbsp; </td>
 <td>Report <input name="CH" value="OFF" type='button' onclick="{togCall()}"> </td><td>
- OLED <input type="button" value="ON" id="OLED" onClick="{oled()}">
- &nbsp; TZ<input name="TZ" type=text size=1 value='0' onchange="setVar('TZ', this.value);">
+ OLED <input type="button" value="ON" id="OLED" onClick="{oled()}"> &nbsp; 
  &nbsp; <input name="CF" value="C" type='button' onclick="{setcf()}"></td></tr>
 <tr>
 <td>Upd Rate<input id='SRATE' type=text size=4 value='10' onchange="{setSRate()}"></td>
