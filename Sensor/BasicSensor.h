@@ -15,15 +15,16 @@ public:
   void setLED(uint8_t no, bool bOn);
   void setCF(bool f);
   int status(void);
+  void setDST(bool bDST);
   void setSignal(int db){};
   bool    m_bLED[2];
   bool    m_bUpdated;
   bool    m_bCF;
   uint16_t m_dataFlags = 3;
-  uint16_t m_values[6];
+  int16_t m_values[6];
   uint8_t m_signal;
 private:
-  RunningMedian<uint16_t, 25> m_tempMedian[2];
+  RunningMedian<int16_t, 25> m_tempMedian[2];
   AM2320 m_am;
   int m_status;
 };
