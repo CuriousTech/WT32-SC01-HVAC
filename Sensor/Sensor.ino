@@ -32,6 +32,9 @@ SOFTWARE.
 //uncomment to enable Arduino IDE Over The Air update code
 #define OTA_ENABLE
 
+#define IR_RX 5
+#define IR_TX 14
+
 #include <Wire.h>
 #ifdef USE_OLED
 #include <ssd1306_i2c.h> // https://github.com/CuriousTech/WiFi_Doorbell/tree/master/Libraries/ssd1306_i2c
@@ -111,7 +114,6 @@ String settingsJson()
 {
   jsonString js("settings");
 
-  js.Var("tz",  ee.tz);
   js.Var("name", ee.szName);
   js.Var("to", ee.time_off );
   js.Var("srate", ee.sendRate);
@@ -136,7 +138,7 @@ String dataJson()
 {
   jsonString js("state");
 
-  js.Var("t", (uint32_t)now() - tzOffset);
+  js.Var("t", (uint32_t)now() - tzOffset - (DST() ? 3600:0) );
   js.Var("df", sensor.m_dataFlags);
   js.Var("temp", String( (float)sensor.m_values[DE_TEMP] / 10, 1 ) );
   js.Var("rh", String((float)sensor.m_values[DE_RH] / 10, 1) );
@@ -258,7 +260,6 @@ void jsonCallback(int16_t iName, int iValue, char *psValue)
       ee.e.bEnableOLED = iValue;
       break;
     case 5: // TZ
-      ee.tz = iValue;
       break;
     case 6: // TO
       ee.time_off = iValue;
@@ -370,6 +371,7 @@ void jsonPushCallback(int16_t iName, int iValue, char *psValue)
       break;
     case 1: // time
       setTime(iValue + tzOffset + (DST() ? 3600:0) );
+      sensor.setDST( DST() );
       temps.m_bValidDate = true;
       break;
     case 3: // outtemp
@@ -595,6 +597,8 @@ void setup()
   ee.init();
   sensor.init(ee.e.bCF);
 
+  ee.time_off = 0;
+  ee.pirPin = 0;
   // initialize dispaly
 #ifdef USE_OLED
   display.init();
@@ -726,9 +730,6 @@ void loop()
 
   if(int err = sensor.service(ee.tempCal, ee.rhCal))
   {
-    String s = "Sensor error ";
-    s += err;
-    alert(s);
   }
 
   checkQueue();
@@ -765,11 +766,10 @@ void loop()
           CallHost(Reason_Setup, "");
         }
       }
-      else if(now() - connectTimer > 10) // failed to connect for some reason
+      else if(now() - connectTimer > 10 || WiFi.status() == WL_NO_SSID_AVAIL) // failed to connect for some reason
       {
         Serial.println("Connect failed. Starting SmartConfig");
         connectTimer = now();
-//        ee.szSSID[0] = 0;
         WiFi.mode(WIFI_AP_STA);
         WiFi.beginSmartConfig();
         bConfigDone = false;
