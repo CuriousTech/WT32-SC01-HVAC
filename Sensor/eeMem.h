@@ -29,25 +29,25 @@ public:
   uint16_t  sum = 0xAAAA;           // if sum is diiferent from memory struct, write
   char      szSSID[32] = "";
   char      szSSIDPassword[64] = "";
-  int8_t    tz = -5;               // Timezone offset
+  int8_t    res1;
   eflags    e = {0,0,1,1,0,0,0}; // PirEn, bPIR, bCall, bCF, bUseTime, bEnableOLED, res
   char      szName[32] = "Sensor1";
-  uint32_t  sensorIDxx = 0;
+  uint32_t  resevered = 0;
   int8_t    tempCal = 0;
   uint16_t  sendRate = 15;
   uint16_t  logRate = 60;
   char      szControlPassword[32] = "password";
   uint8_t   hostIP[4] = {192,168,31,100};
   uint16_t  hostPort = 80;
-  uint8_t   hvacIP[4] = {192,168,31,46};
-  uint32_t  time_off = 0;
+  uint8_t   hvacIP[4] = {192,168,31,112};
+  int32_t   time_off = 0;
   uint32_t  sleep = 30;
   uint32_t  priSecs = 60*5;
-  uint8_t   pirPin = 12;
+  uint8_t   pirPin = 0;
   uint16_t  wAlertLevel[16] =  {320, 1000, 0, 900, 0, 1000, 0, 10, 0, 20, 0, 1000, 0, 1000, 0, 1000}; // alert levels L/H
   int8_t    rhCal = 0;
   uint8_t   weight = 1;
-  uint8_t   res[30];
+  uint8_t   res[22];
   uint8_t   end;
 };
 
