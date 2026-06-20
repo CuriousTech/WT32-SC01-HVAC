@@ -43,24 +43,26 @@ class TuyaInterface
 public:
   TuyaInterface(){};
   void init(bool bCF);
-  int service(int8_t tcal, int8_t rhcal);
+  int  service(int8_t tcal, int8_t rhcal);
   void setLED(uint8_t no, bool bOn);
   void setCF(bool f);
   void setSignal(int db);
-  int status(void);
-  bool    m_bLED[2];
-  bool    m_bUpdated = false;
-  bool    m_bCF = false;
+  int  status(void);
+  void setDST(bool bDST);
+  bool m_bLED[2];
+  bool m_bUpdated = false;
+  bool m_bCF = false;
   uint16_t m_dataFlags;
   uint16_t m_values[6];
 private:
   bool writeSerial(uint8_t cmd, uint8_t *p = NULL, uint16_t len = 0);
   void checkStatus(void);
   void sendDate(void);
-  uint8_t m_cs = 2;
-  int m_status = 0;
+  int     m_status = 0;
   uint8_t m_mcuConf[2];
   uint8_t m_signal = 0;
+  uint8_t m_cs = 2;
+  bool m_bDST;
 };
 
 #endif // TUYA_H
