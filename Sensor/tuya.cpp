@@ -183,13 +183,23 @@ int TuyaInterface::service(int8_t tcal, int8_t rhcal)
                   // 09 04 00 01 01 // C/F button setting
 //                  m_bCF = inBuffer[4];
                     break;
+                  case 101:
+                    if(m_bCF)
+                      val = val * 90 / 50 + 320;
+                    val += tcal;
+                    if(val != m_values[DE_TEMP] )
+                      m_bUpdated = true;
+                    m_values[DE_TEMP] = val;
+                    break;
+                  case 102:
+                    val *= 10;
+                    val += rhcal;
+                    if(val != m_values[DE_RH])
+                      m_bUpdated = true;
+                    m_values[DE_RH] = val;
+                    break;
+                  
                   default:
-                   {
-                      String s = "{\"cmd\":\"print\",\"text\":\"unknown register ";
-                      s += inBuffer[0];
-                      s += "\"}";
-                      WsSend(s);
-                    }
                     break;
                 }
                 break;
@@ -205,12 +215,6 @@ int TuyaInterface::service(int8_t tcal, int8_t rhcal)
                 writeSerial(TC_UNK1, buf, 1);
                 break;
               default:
-                {
-                  String s = "{\"cmd\":\"print\",\"text\":\"Tuya cmd unknown ";
-                  s += cmd;
-                  s += "\"}";
-                  WsSend(s);
-                }
                 break;
             }
           }
@@ -271,17 +275,25 @@ void TuyaInterface::setCF(bool f)
 
 //  writeSerial(TC_SET_DP);
 
+void TuyaInterface::setDST(bool bDST)
+{
+  m_bDST = bDST;
+}
+
 void TuyaInterface::sendDate()
 {
   tmElements_t tm;
-  breakTime(now(), tm);
+  breakTime(now() - (m_bDST ? 3600:0), tm);
 
   uint8_t data[8];
   data[0] = 1; // must be 1
   data[1] = tm.Year - 30; // offset from 1971
   data[2] = tm.Month;
   data[3] = tm.Day;
-  data[4] = tm.Hour;
+  uint8_t h = tm.Hour;
+//  if(h > 12) h -= 12;  // mod for the 24h model
+//  if(h == 0) h = 12;
+  data[4] = h;
   data[5] = tm.Minute;
   data[6] = tm.Second;
   data[7] = weekday() - 1;
