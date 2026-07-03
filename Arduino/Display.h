@@ -56,19 +56,6 @@ struct Button
   int16_t h;
 };
 
-union gflags
-{
-  uint32_t u;
-  struct
-  {
-    uint32_t fan:1;
-    uint32_t state:3;
-    uint32_t rh:10;
-    uint32_t tmdiff:9;
-    int32_t sens4:9;
-  };
-};
-
 union temps
 {
   uint32_t u;
@@ -80,13 +67,23 @@ union temps
   };
 };
 
+union gflags
+{
+  uint32_t u;
+  struct
+  {
+    int32_t sens6:8; // do not move (gPoint.sens[6])
+    uint32_t fan:1;
+    uint32_t state:3;
+    uint32_t rh:10;
+    uint32_t tmdiff:10;
+  };
+};
+
 struct gPoint
 {
   temps t;
-  int8_t sens0;
-  int8_t sens1;
-  int8_t sens2;
-  int8_t sens3;
+  int8_t sens[6];
   gflags bits;
 };
 
@@ -128,9 +125,6 @@ private:
   uint16_t m_backlightTimer = DISPLAY_TIMEOUT; // backlight timer, seconds
   uint8_t m_lockDelay;
   uint8_t m_displayLocal; // local temp/rh display mode/timer
-#define GPTS 640 // 480 px width - (10+10) padding
-  gPoint m_points[GPTS];
-  uint16_t m_pointsIdx = 0;
   uint16_t m_temp_counter = 2*60;
   uint8_t m_btnMode = 0;
   uint8_t m_btnDelay = 40; // for up/down repeat
@@ -170,6 +164,9 @@ public:
   bool    m_bLink;         // link adjust mode
   uint8_t m_brightness = 100; // initial brightness
   bool    m_bShowFC; // Show the forecast when it updates, also updates icons for clock
+  uint16_t m_pointsIdx = 0;
+#define GPTS 640 // 480 px width - (10+10) padding
+  gPoint m_points[GPTS];
 };
 
 extern Display display;
