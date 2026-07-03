@@ -16,7 +16,7 @@ static_assert(USER_SETUP_ID==201, "User setup incorrect in TFT_eSPI");
 
 #include "forecast.h"
 
-// FT6206, FT6336U - touchscreen library                  // modified -> Wire.begin(18, 19)
+// FT6206, FT6336U - touchscreen library - modified -> Wire.begin(18, 19)
 #include "Adafruit_FT6206.h"
 Adafruit_FT6206 ts = Adafruit_FT6206();
 
@@ -782,12 +782,9 @@ void Display::addGraphPoints()
   p->t.outTemp = hvac.m_outTemp;
   p->bits.rh = hvac.m_rh;
   p->bits.fan = hvac.getFanRunning();
-  p->bits.state = hvac.getState(); 
-  p->sens0 = hvac.m_Sensor[0].temp - p->t.inTemp;
-  p->sens1 = hvac.m_Sensor[1].temp - p->t.inTemp;
-  p->sens2 = hvac.m_Sensor[2].temp - p->t.inTemp;
-  p->sens3 = hvac.m_Sensor[3].temp - p->t.inTemp;
-  p->bits.sens4 = hvac.m_Sensor[4].temp - p->t.inTemp;
+  p->bits.state = hvac.getState();
+  for(uint8_t i = 0; i < SNS_CNT-1; i++) // only 7
+    p->sens[i] = hvac.m_Sensor[i].temp - p->t.inTemp;
   if(++m_pointsIdx >= GPTS)
     m_pointsIdx = 0;
   m_points[m_pointsIdx].t.u = 0; // mark as invalid data/end
