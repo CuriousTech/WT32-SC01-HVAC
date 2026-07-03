@@ -586,7 +586,7 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
 
         jsonString js("sum");
         js.Array3("mon", pSecsMon, 12);
-        js.Array3("day", pSecsDay, 12);
+        js.Array3("day", pSecsDay, 31);
         js.Var("idx", display.m_pointsIdx);
         js.Var("tb", display.m_lastPDate);
         js.Var("th", ee.cycleThresh[ (hvac.m_modeShadow == Mode_Heat) ? 1:0]); // threshold
