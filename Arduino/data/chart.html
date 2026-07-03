@@ -277,7 +277,7 @@ function draw(){
    idx=tempIdx-1
    if(idx<0) idx+=tempLen
    for(i=1;i<tempCnt;i++){
-	c.strokeStyle=stateColor( tempView.getUint8(idx*tempSize+9)&0xf )
+	c.strokeStyle=stateColor( tempView.getUint8(idx*tempSize+4)&0xf )
 	c.beginPath()
 	c.moveTo(getXPixel(i),getYPixel( getTemp(idx) ))
 	idx2=idx+1
@@ -387,18 +387,18 @@ function draw(){
 		c.strokeStyle=ss
 		c.beginPath()
 		ixx=tempIdx
-		ofs=ixx*tempSize
+		ofs=ixx*tempSize+7
 		temp=getTemp(ixx)
-		sens = new Array(getOutTemp(ixx), tempView.getInt8(ofs+4)+temp,tempView.getInt8(ofs+5)+temp,tempView.getInt8(ofs+6)+temp,tempView.getInt8(ofs+7)+temp,tempView.getInt8(ofs+8)+temp,tempView.getInt8(ofs+9)+temp,tempView.getInt8(ofs+10)+temp)
+		sens = new Array(getOutTemp(ixx), tempView.getInt8(ofs)+temp,tempView.getInt8(ofs+1)+temp,tempView.getInt8(ofs+2)+temp,tempView.getInt8(ofs+3)+temp,tempView.getInt8(ofs+4)+temp,tempView.getInt8(ofs+5)+temp,tempView.getInt8(ofs+6)+temp)
 		c.moveTo(getXPixel(0),getYPixel(sens[os]))
 		if(sens[os]==0)
 			return
 		for(i=1;i<tempCnt;i++)
 		{
 			if(--ixx<0) ixx+=tempLen
-			ofs=ixx*tempSize
+			ofs=ixx*tempSize+7
 			temp=getTemp(ixx)
-			sens = new Array(getOutTemp(ixx), tempView.getInt8(ofs+4)+temp,tempView.getInt8(ofs+5)+temp,tempView.getInt8(ofs+6)+temp,tempView.getInt8(ofs+7)+temp,tempView.getInt8(ofs+8)+temp,tempView.getInt8(ofs+9)+temp,tempView.getInt8(ofs+10)+temp)
+			sens = new Array(getOutTemp(ixx), tempView.getInt8(ofs)+temp,tempView.getInt8(ofs+1)+temp,tempView.getInt8(ofs+2)+temp,tempView.getInt8(ofs+3)+temp,tempView.getInt8(ofs+4)+temp,tempView.getInt8(ofs+5)+temp,tempView.getInt8(ofs+6)+temp)
 			c.lineTo(getXPixel(i),getYPixel(sens[os]))
 		}
 		c.stroke()
@@ -407,7 +407,7 @@ function draw(){
 
 function getTmOff(o)
 {
-	return tempView.getUint16(o*tempSize+10,true)>>6&0x3ff
+	return tempView.getUint16(o*tempSize+6,true)>>6&0x3ff
 }
 
 function getTemp(o)
@@ -422,7 +422,7 @@ function getOutTemp(o)
 
 function getRh(o)
 {
-	return (tempView.getUint16(o*tempSize+9, true)>>4)&0x3ff
+	return (tempView.getUint16(o*tempSize+4, true)>>4)&0x3ff
 }
 
 function gettarget(o)
@@ -438,8 +438,8 @@ function getMaxY(){
 		outTemp=getOutTemp(ix)
 		target=gettarget(ix)
 		temp=getTemp(ix)
-		o=ix*tempSize
-		sens = new Array(tempView.getInt8(o+4)+temp,tempView.getInt8(o+5)+temp,tempView.getInt8(o+6)+temp,tempView.getInt8(o+7)+temp,tempView.getInt8(o+8)+temp)
+		ofs=ix*tempSize+8
+		sens = new Array(getOutTemp(ix), tempView.getInt8(ofs)+temp,tempView.getInt8(ofs+1)+temp,tempView.getInt8(ofs+2)+temp,tempView.getInt8(ofs+3)+temp,tempView.getInt8(ofs+4)+temp,tempView.getInt8(ofs+5)+temp,tempView.getInt8(ofs+6)+temp)
 
 		if(temp>max)
 		  max=temp
@@ -464,8 +464,8 @@ function getMinY(){
 		outTemp=getOutTemp(ix)
 		target=gettarget(ix)-1
 		temp=getTemp(ix)
-		o=ix*tempSize
-		sens = new Array(tempView.getInt8(o+4)+temp,tempView.getInt8(o+5)+temp,tempView.getInt8(o+6)+temp,tempView.getInt8(o+7)+temp,tempView.getInt8(o+8)+temp)
+		ofs=ix*tempSize+8
+		sens = new Array(getOutTemp(ix), tempView.getInt8(ofs)+temp,tempView.getInt8(ofs+1)+temp,tempView.getInt8(ofs+2)+temp,tempView.getInt8(ofs+3)+temp,tempView.getInt8(ofs+4)+temp,tempView.getInt8(ofs+5)+temp,tempView.getInt8(ofs+6)+temp)
 		if(temp<min)
 		  min=temp
 		if(target<min)
