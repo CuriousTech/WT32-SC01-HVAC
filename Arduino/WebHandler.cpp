@@ -129,6 +129,48 @@ void setDamper(bool bOpen)
   FC.start("damper.local", 80, s);
 }
 
+// Array of days in each month (non-leap year)
+const uint8_t days_per_month[] = { 31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31 };
+
+uint32_t makeLocalTime32(struct tm *tm_ptr)
+{
+  // 1. Calculate years since 1970
+  // tm_year is years since 1900, so subtract 70 to get years since 1970
+  int32_t year = tm_ptr->tm_year - 70; 
+
+  // 2. Count leap days for preceding years
+  // Account for the shift in the leap year cycle
+  int32_t leap_days = (year + 2) / 4 - (year + 69) / 100 + (year + 369) / 400;
+
+  // 3. Calculate total days from years
+  int32_t total_days = year * 365 + leap_days;
+
+  // 4. Add days of the current year up to the current month
+  for (int i = 0; i < tm_ptr->tm_mon; ++i) {
+      total_days += days_per_month[i];
+  }
+
+  // Account for current year being a leap year (Feb gets +1 day)
+  // Shifted year calculation matches leap year rules for standard Gregorian calendar
+  if (tm_ptr->tm_mon > 1) {
+      int32_t absolute_year = tm_ptr->tm_year + 1900;
+      if ((absolute_year % 4 == 0 && absolute_year % 100 != 0) || (absolute_year % 400 == 0)) {
+          total_days += 1; 
+      }
+  }
+
+  // 5. Add days of the current month
+  total_days += (tm_ptr->tm_mday - 1);
+
+  // 6. Calculate total seconds
+  uint32_t local_seconds = (total_days * 86400UL) + 
+                           (tm_ptr->tm_hour * 3600UL) + 
+                           (tm_ptr->tm_min * 60UL) + 
+                           tm_ptr->tm_sec;
+
+  return local_seconds;
+}
+
 void startServer()
 {
   WiFi.hostname(hostName);
@@ -160,26 +202,25 @@ void startServer()
   // For quick commands, sensors. Remotes have a seperate command list
   server.on ( "/s", HTTP_GET | HTTP_POST, [](AsyncWebServerRequest *request){
     parseParams(request);
-    String s = "OK\r\n\r\n";
-    jsonString js;
 
+    jsonString js;
     static int32_t tzOffset;
 
-    if(tzOffset == 0)
+    if(tzOffset > -2 && tzOffset < 2) // might be 1 sec off before TZ set
     {
-      tzOffset = time(nullptr) - mktime(&gLTime); // works sometimes
+      tzOffset = (int32_t)( makeLocalTime32(&gLTime) - time(nullptr));
     }
-
     js.Var("tzoffset", tzOffset );
-    js.Var("time", (uint32_t)time(nullptr));
+    js.Var("time", time(nullptr));
     js.Var("outtemp", hvac.m_outTemp);
     js.Var("outrh", hvac.m_outRh);
-    s += js.Close();
-    s += "\r\n";
-    request->send ( 200, "text/html", s );
+    request->send ( 200, "text/html", js.Close() );
   });
 
 #endif
+  server.on("/heap", HTTP_GET, [](AsyncWebServerRequest * request) { // just for checking
+    request->send(200, "text/plain", String(ESP.getFreeHeap()));
+  });
 
   server.on ( "/upload", HTTP_POST, [](AsyncWebServerRequest * request)
   {
@@ -217,8 +258,6 @@ void startServer()
 #ifdef REMOTE
 void findHVAC() // find the HVAC on iot domain
 {
-
-  // Find HVAC
   int cnt = MDNS.queryService("iot", "tcp");
   for(int i = 0; i < cnt; ++i)
   {
@@ -253,14 +292,6 @@ void handleServer()
   {
     bReconnectWebSocket = false;
     startListener();
-  }
-
-#else
-  static uint8_t n;
-  if(++n >= 10)
-  {
-    historyDump(false);
-    n = 0;
   }
 #endif
 #ifdef OTA_ENABLE
@@ -377,6 +408,7 @@ bool secondsServer() // called once per second
     FC.m_bUpdateFcst = false;
     FC.m_bUpdateFcstIdle = false;
     nUpdateDelay = 60; // delay retries by 1 minute
+    ee.hostIp[3] = 191;
     IPAddress hostIp(ee.hostIp);
 
     switch(ee.b.nFcstSource)
@@ -458,145 +490,6 @@ String dataJson()
   return hvac.getPushData();
 }
 
-int nOffsets[4];
-
-String gptArr(gPoint& gpt, uint32_t tb)
-{
-  String out = "[";         // [seconds, temp, rh, lowThresh, state, outTemp],
-  out.reserve(50);
-  out += tb;
-  out += ",";
-  out += gpt.t.inTemp - nOffsets[0];
-  out += ",";
-  out += gpt.bits.rh - nOffsets[1];
-  out += ",";
-  out += gpt.t.target - nOffsets[2];
-  out += ",";
-  out += gpt.bits.u & 7;
-  out += ",";
-  out += gpt.t.outTemp - nOffsets[3];
-
-  if(hvac.m_Sensor[0].IP)
-  {
-    out += ",";
-    out += gpt.sens0 + gpt.t.inTemp - nOffsets[0];
-    if(hvac.m_Sensor[1].IP)
-    {
-      out += ",";
-      out += gpt.sens1 + gpt.t.inTemp - nOffsets[0];
-      if(hvac.m_Sensor[2].IP)
-      {
-        out += ",";
-        out += gpt.sens2 + gpt.t.inTemp - nOffsets[0];
-        if(hvac.m_Sensor[3].IP)
-        {
-          out += ",";
-          out += gpt.sens3 + gpt.t.inTemp - nOffsets[0];
-          if(hvac.m_Sensor[4].IP)
-          {
-            out += ",";
-            out += gpt.bits.sens4 + gpt.t.inTemp - nOffsets[0];
-          }
-        }
-      }
-    }
-  }
-  out += "]";
-  return out;
-}
-
-void historyDump(bool bStart)
-{
-#ifndef REMOTE
-  static bool bSending = false;
-  static int entryIdx = 0;
-
-  if(bStart)
-    bSending = true;
-  if(bSending == false)
-    return;
-
-  gPoint gpt;
-
-  if(bStart)
-  {
-    entryIdx = 0;
-    if( display.getGrapthPoints(&gpt, 0) == false)
-    {
-      bSending = false;
-      return;
-    }
-
-    jsonString js("ref");
-    int maxv;
-    nOffsets[0] = display.minPointVal(0, maxv);
-    nOffsets[2] = display.minPointVal(1, maxv);
-    nOffsets[1] = display.minPointVal(3, maxv);
-    nOffsets[3] = display.minPointVal(4, maxv);
-  
-    js.Var("tb", display.m_lastPDate);
-    js.Var("th", ee.cycleThresh[ (hvac.m_modeShadow == Mode_Heat) ? 1:0] ); // threshold
-    js.Var("tm", nOffsets[0]); // temp min
-    js.Var("lm", nOffsets[2]); // threshold low min
-    js.Var("rm", nOffsets[1]); // rh min
-    js.Var("om", nOffsets[3]); // ot min
-    ws.text(WsClientID, js.Close());
-  }
-
-  String out;
-#define CHUNK_SIZE 800
-  out.reserve(CHUNK_SIZE + 100);
-
-  out = "{\"cmd\":\"data\",\"d\":[";
-
-  bool bC = false;
-
-  for(; entryIdx < GPTS - 1 && out.length() < CHUNK_SIZE && display.getGrapthPoints(&gpt, entryIdx); entryIdx++)
-  {
-    int len = out.length();
-    if(bC) out += ",";
-    bC = true;
-    out += gptArr(gpt, gpt.bits.tmdiff);
-    if( out.length() == len) // memory full
-      break;
-  }
-  if(bC) // don't send blank
-  {
-    out += "]}";
-    ws.text(WsClientID, out);
-  }
-  else
-    bSending = false;
-  if(bSending == false)
-    ws.text(WsClientID, "{\"cmd\":\"draw\"}"); // tell page to draw after all is sent
-#endif
-}
-
-void appendDump(uint32_t startTime)
-{
-#ifndef REMOTE
-  String out = "{\"cmd\":\"data2\",\"d\":[";
-  out.reserve(800);
-
-  uint32_t tb = display.m_lastPDate;
-  bool bC = false;
-  gPoint gpt;
-
-  for(int entryIdx = 0; entryIdx < GPTS - 1 && out.length() < CHUNK_SIZE && display.getGrapthPoints(&gpt, entryIdx) && tb > startTime; entryIdx++)
-  {
-    if(bC) out += ",";
-    bC = true;
-    out += gptArr(gpt, tb);
-    tb -= gpt.bits.tmdiff;
-  }
-  if(bC) // don't send blank
-  {
-    out += "]}";
-    ws.text(WsClientID, out);
-  }
-#endif
-}
-
 void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
 {
   static int8_t cmd = 0;
@@ -644,15 +537,14 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
           bKeyGood = true;
         }
       }
-      else if(iName == 2) // 2 = data
+      else if(iName == 2) //data
       {
-        if(iValue) appendDump(iValue);
-        else historyDump(true);
+        uint16_t idx = constrain(iValue, 0, GPTS-1);
+        if(display.m_points[idx].t.u) // only send if valid
+          ws.binary(WsClientID, (uint8_t *)&display.m_points[idx], sizeof(gPoint));
       }
       else if(iName == 3) // 3 = sum
       {
-        String out = String("{\"cmd\":\"sum\",\"mon\":[");
-
         uint32_t (*pSecsMon)[3] = hvac.m_SecsMon;
         uint16_t (*pSecsDay)[3] = hvac.m_SecsDay;
 
@@ -673,7 +565,7 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
           File F;
           if(F = INTERNAL_FS.open(sName) )
           {
-            F.read((byte*)&tempSecsDay, sizeof(tempSecsDay)); // read the requested file
+            F.read((byte*)&tempSecsDay, sizeof(tempSecsDay)); // read the requested daily file
             F.close();
             pSecsDay = tempSecsDay;
           }
@@ -685,49 +577,29 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
             sName += ".dat";
             if(F = INTERNAL_FS.open(sName) )
             {
-              F.read((byte*)&tempSecsMon, sizeof(tempSecsMon)); // read the requested file
+              F.read((byte*)&tempSecsMon, sizeof(tempSecsMon)); // read the requested yearly file
               F.close();
               pSecsMon = tempSecsMon;
             }
           }
         }
 
-        for(int i = 0; i < 12; i++)
-        {
-          if(i) out += ",";
-          out += "[";
-          out += pSecsMon[i][0];
-          out += ",";
-          out += pSecsMon[i][1];
-          out += ",";
-          out += pSecsMon[i][2];
-          out += "]";
-        }
-        out += "],\"day\":[";
-        for(int i = 0; i < 31; i++)
-        {
-          if(i) out += ",";
-          out += "[";
-          out += pSecsDay[i][0];
-          out += ",";
-          out += pSecsDay[i][1];
-          out += ",";
-          out += pSecsDay[i][2];
-          out += "]";
-        }
-        out += "],";
-        out += "\"fcDate\":";
-        out += FC.m_fc.Date;
-        out += ",\"fcFreq\":";
-        out += FC.m_fc.Freq;
-        out += ",\"fc\":[";
-        for(int i = 0; FC.m_fc.Data[i].temp != -1000 && i < FC_CNT; i++)
-        {
-          if(i) out += ",";
-          out += FC.m_fc.Data[i].temp;
-        }
-        out += "]}";
-        ws.text(WsClientID, out);
+        jsonString js("sum");
+        js.Array3("mon", pSecsMon, 12);
+        js.Array3("day", pSecsDay, 12);
+        js.Var("idx", display.m_pointsIdx);
+        js.Var("tb", display.m_lastPDate);
+        js.Var("th", ee.cycleThresh[ (hvac.m_modeShadow == Mode_Heat) ? 1:0]); // threshold
+        js.Var("fcDate", FC.m_fc.Date);
+        js.Var("fcFreq", FC.m_fc.Freq);
+
+        int16_t arr[FC_CNT];
+        uint8_t cnt;
+        for(cnt = 0; FC.m_fc.Data[cnt].temp != -1000 && cnt < FC_CNT; cnt++)
+          arr[cnt] = FC.m_fc.Data[cnt].temp;
+        js.Array("fc", arr, cnt);
+
+        ws.text(WsClientID, js.Close());
       }
       else if(iName == 4) // 4 = bin
       {
@@ -738,6 +610,9 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
             break;
           case 1: // new forecast data
             ws.binary(WsClientID, (uint8_t*)&FC.m_fc, sizeof(FC.m_fc));
+            break;
+          case 2: // temp points
+            ws.binary(WsClientID, (uint8_t *)display.m_points, sizeof(display.m_points));
             break;
         }
       }
