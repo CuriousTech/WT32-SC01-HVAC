@@ -72,19 +72,19 @@ union gflags
   uint32_t u;
   struct
   {
-    int32_t sens6:8; // do not move (gPoint.sens[6])
     uint32_t fan:1;
     uint32_t state:3;
     uint32_t rh:10;
     uint32_t tmdiff:10;
+    int32_t sens0:8; // do not move
   };
 };
 
 struct gPoint
 {
   temps t;
-  int8_t sens[6];
   gflags bits;
+  int8_t sens[8];
 };
 
 class Display
