@@ -24,53 +24,14 @@ public:
     return s;
   }
 
-  void Var(const char *key, int iVal)
+  template <typename T>
+  void Var(const char *key, T iVal)
   {
     if(m_cnt) s += ",";
     s += "\"";
     s += key;
     s += "\":";
     s += iVal;
-    m_cnt++;
-  }
-
-  void Var(const char *key, uint32_t iVal)
-  {
-    if(m_cnt) s += ",";
-    s += "\"";
-    s += key;
-    s += "\":";
-    s += iVal;
-    m_cnt++;
-  }
-
-  void Var(const char *key, long int iVal)
-  {
-    if(m_cnt) s += ",";
-    s += "\"";
-    s += key;
-    s += "\":";
-    s += iVal;
-    m_cnt++;
-  }
-
-  void Var(const char *key, float fVal)
-  {
-    if(m_cnt) s += ",";
-    s += "\"";
-    s += key;
-    s += "\":";
-    s += fVal;
-    m_cnt++;
-  }
-  
-  void Var(const char *key, bool bVal)
-  {
-    if(m_cnt) s += ",";
-    s += "\"";
-    s += key;
-    s += "\":";
-    s += bVal ? 1:0;
     m_cnt++;
   }
   
@@ -96,7 +57,8 @@ public:
     m_cnt++;
   }
 
-  void Array(const char *key, uint16_t iVal[], int n)
+  template <typename T>
+  void Array(const char *key, T iVal[], int n)
   {
     if(m_cnt) s += ",";
     s += "\"";
@@ -106,6 +68,28 @@ public:
     {
       if(i) s += ",";
       s += iVal[i];
+    }
+    s += "]";
+    m_cnt++;
+  }
+
+  template <typename T>
+  void Array3(const char *key, T iVal[][3], int n)
+  {
+    if(m_cnt) s += ",";
+    s += "\"";
+    s += key;
+    s += "\":[";
+    for(int i = 0; i < n; i++)
+    {
+      if(i) s += ",";
+      s += "[";
+      s += iVal[i][0];
+      s += ",";
+      s += iVal[i][1];
+      s += ",";
+      s += iVal[i][2];
+      s += "]";
     }
     s += "]";
     m_cnt++;
