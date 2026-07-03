@@ -96,10 +96,10 @@ void Forecast::_onConnect(AsyncClient* client)
     switch(m_type)
     {
       case 0:
-        path += "Forecast.log";
+        path += "forecast.log";
         break;
       case 1:
-        path += "Forecast.json";
+        path += "forecast.json";
         break;
       case 2:
         path += m_sUri;
