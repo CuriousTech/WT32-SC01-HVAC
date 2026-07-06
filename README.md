@@ -93,10 +93,10 @@ Brightness is the dim and bright backlight levels.
 Cal is calibration of the temp sensor.  
 The arrows control the weight averaging of the internal temp sensor and remote sensors. Set them higher in rooms you're more often using or occupancy sensors can bump the weight.  
   
-![remotepage](http://www.curioustech.net/images/hvacweb2.png)  
+![remotepage](https://www.curioustech.net/images/hvacweb2.png)  
 
 The web chart.  Dark gray is off, cyan is fan running, blue is compressor+fan, NG is red, HP is yellow, rh is green, the target/threshold is the wave.  The thermostat is in the hottest room in the house, so it does look warmer than it really is, but that's why there's a remote unit, and now multiple sensors.  
-![chartpage](http://www.curioustech.net/images/hvacchart.png)  
+![chartpage](https://www.curioustech.net/images/hvacchart.png)  
 
 Sensor web page  
-![envmon](http://www.curioustech.net/images/sensor32.png)  
+![envmon](https://www.curioustech.net/images/sensor32.png)  
