@@ -32,7 +32,6 @@ added=false
 cf=0
 showidx=0
 nms=['OFF','ON ']
-spri=['OFF','PRI','EN ']
 $(document).ready(function()
 {
   key=localStorage.getItem('key')
@@ -42,7 +41,7 @@ $(document).ready(function()
 
 function openSocket(){
 ws=new WebSocket("ws://"+window.location.host+"/ws")
-//ws=new WebSocket("ws://192.168.31.194/ws")
+//ws=new WebSocket("ws://192.168.31.195/ws")
 ws.onopen=function(evt){setVar('hist',0)}
 ws.onclose=function(evt){alert("Connection closed");}
 ws.onmessage=function(evt){
@@ -55,11 +54,9 @@ console.log(evt.data)
     a.OLED.value=oledon?'ON ':'OFF'
     a.PIR.value=d.pir?'ON ':'OFF'
     a.prisec.value=s2t(d.prisec)
-    a.PRI.value=spri[d.pri]
     a.nm.value=d.name
     a.SRATE.value=s2t(d.srate)
     a.LRATE.value=s2t(d.lrate)
-    a.WT.value=d.wt
     a.LED1.value=nms[d.l1]
     a.LED1.setAttribute('style',d.l1?'color:blue':'')
     a.LED2.value=nms[d.l2]
@@ -69,7 +66,7 @@ console.log(evt.data)
     a.CH.value=nms[d.ch]
     a.CH.setAttribute('style',d.ch?'color:red':'')
     bSi=+d.si
-  a.SIL.setAttribute('style',bSi?'color:red':'')
+    a.SIL.setAttribute('style',bSi?'color:red':'')
     break
   case 'state':
     dt=new Date(d.t*1000)
@@ -184,14 +181,6 @@ function pir(){
   setVar('pir', p)
   a.PIR.value=p?'ON ':'OFF'
 }
-function pri(){
-  p=0
-  if(a.PRI.value=='OFF') p=1
-  else if(a.PRI.value=='PRI') p=2
-  setVar('pri', p)
-  a.PRI.value=spri[p]
-}
-
 function fl(n)
 {
  showidx=n
@@ -558,11 +547,12 @@ function draw4(){ // 52 weeks
   c.textBaseline="middle"
   date=new Date()
   c.lineWidth=4
-  
+
   cd=new Date()
   oneJan=new Date(cd.getFullYear(),0,1)
   days=Math.floor((cd-oneJan)/(24*60*60*1000))
   wks=Math.ceil((cd.getDay()+1+days)/7)
+  console.log(wks)
   draw_scale(arrW,graph.width()-40,graph.height()-yPad,1,wks)
 }
 
@@ -577,7 +567,7 @@ function draw_scale(ar,w,h,o,ct)
     if(ar[i][idx]<min) min=ar[i][idx]
     if(ar[i][idx+1]>max) max=ar[i][idx+1]
   }
-
+  if(min==20000) return
   yRange=max-min
   div=1
   for(i=0;i<decs[showidx];i++) div*=10
@@ -643,11 +633,10 @@ function chartY(n,rng)
 <tr>
 <td>Upd Rate<input id='SRATE' type=text size=4 value='10' onchange="{setSRate()}"></td>
 <td>Motion<input type="button" value="ON" id="PIR" onClick="{pir()}"></td>
-<td> Mode:<input type="button" value="OFF" id="PRI" onClick="{pri()}">
- Timer: <input id='prisec' type=text size=4 value='60' onchange="{setPriSec()}"></td></tr>
+<td>Timer: <input id='prisec' type=text size=4 value='60' onchange="{setPriSec()}"></td></tr>
 <tr>
 <td>Log Rate<input id='LRATE' type=text size=4 value='10' onchange="{setLRate()}"></td>
-<td>Weight:<input name="WT" type=text size=1 value='0' onchange="{setVar('wt', this.value)}"></td><td>
+<td></td><td>
  <input value='Restart' type=button onclick="setVar('reset',0);"> &nbsp; 
  <input id="myKey" name="key" type=text size=50 placeholder="password" style="width: 128px" onChange="{localStorage.setItem('key', key = document.all.myKey.value)}">
 </td></tr>
