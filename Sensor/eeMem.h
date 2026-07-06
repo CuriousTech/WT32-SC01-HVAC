@@ -5,7 +5,7 @@
 
 struct eflags
 {
-  uint8_t PriEn:2;
+  uint8_t res2:2;
   uint8_t bPIR:1;
   uint8_t bCall:1;
   uint8_t bCF:1;
@@ -46,8 +46,7 @@ public:
   uint8_t   pirPin = 0;
   uint16_t  wAlertLevel[16] =  {320, 1000, 0, 900, 0, 1000, 0, 10, 0, 20, 0, 1000, 0, 1000, 0, 1000}; // alert levels L/H
   int8_t    rhCal = 0;
-  uint8_t   weight = 1;
-  uint8_t   res[22];
+  uint8_t   res[23];
   uint8_t   end;
 };
 
