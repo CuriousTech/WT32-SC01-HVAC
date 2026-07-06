@@ -99,12 +99,9 @@ enum ScheduleMode
 
 struct sensorFlags
 {
-  uint32_t Priority:1;
-  uint32_t Enabled:1;
-  uint32_t Weight:6;
-  uint32_t currWeight:6;
-  uint32_t Reserved:17;
-  uint32_t Warn:1;
+  uint8_t Weight:3;
+  uint8_t currWeight:3;
+  uint8_t Warn:1;
 };
 
 union usensorFlags
@@ -118,11 +115,11 @@ struct Sensor
   uint32_t tm;
   uint32_t timer; // seconds, priority timer
   uint32_t timerStart;
-  uint32_t IP; //
+  uint8_t IP[4];
   usensorFlags f;
   int16_t  temp;
   uint16_t rh;
-  char     szID[12];
+  char     szName[12];
 };
 
 #define SNS_PRI   (1 << 0) // Give extra weight to this sensor
@@ -208,7 +205,7 @@ private:
   void  costAdd(int secs, int mode, int hm);
   int   CmdIdx(String s);
   void  sendCmd(const char *szName, int value);
-  int   getSensorID(uint32_t val);
+  int   getSensorID(IPAddress ip);
   void  swapSensors(int n1, int n2);
   void  shiftSensors(void);
   void  activateSensor(int idx);
