@@ -48,7 +48,7 @@ public:
   uint16_t rhLevel[2] = {450, 750}; // rh low/high 45%, 75%
   int8_t   awayDelta[2] = {40, -40}; // temp offset in away mode[cool][heat] by 0.1
   uint16_t awayTime = 60*8;         // time limit for away offset (in seconds)
-  uint8_t  hostIp[4] = {192,168,31,100}; // Device to read local forecast info
+  uint8_t  hostIp[4] = {192,168,31,191}; // Device to read local forecast info
   uint16_t hostPort = 80;
   char     cityID[8] = "4291945";   // For OpenWeatherMap  4311646
   char     password[24] = "password"; // Web interface password
@@ -68,8 +68,9 @@ public:
   int16_t  fcOffset[2] = {-180,0};  // forecast offset adjust in minutes (cool/heat)
   uint16_t fanIdleMax = 60*4;       // fan idle max in minutes
   int16_t  sineOffset[2] = {0, 0};  // sine offset adjust (cool/heat)
-  char     szSensorActive[8][12];   // sensor IDs for restart
-  uint8_t  damperIp[4] = {192,168,31,85}; // IP of backdraft damper
+  uint8_t  sensorActive[12];        // sensor IDs for restart
+  uint8_t  sensorWeight[12];        // sensor weight for restart
+  uint8_t  reserved1[76];            //
   uint8_t  reserved[252];           // Note: To force an EEPROM update, just subtract 1 byte and flash again
   uint8_t  end;
 }; // 512 bytes
