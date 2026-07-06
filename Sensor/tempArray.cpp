@@ -230,7 +230,7 @@ bool TempArray::get(int &pidx, int n)
   return true;
 }
 
-#define CHUNK_SIZE 800
+#define CHUNK_SIZE 1000
 
 // send the log in chucks of CHUNK_SIZE
 void TempArray::historyDump(bool bStart, AsyncWebSocket &ws, int WsClientID)
