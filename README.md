@@ -90,10 +90,10 @@ PKW (price per kilowatt hour), CFM (gas cubic feet per minute), CCF (cost per 10
 FC Shift (in minutes): Shifts the forecast for the temperature adjust. Use the setting on the chart page (they don't affect the actual settings) to determine what's best. There are 2 values for heat and cool here as well.   
 Lookahead is for the forecast data. 23*3 hours default is a good range to find peaks in the current forecast. Disp is the amount to display on the unit.  
 Brightness is the dim and bright backlight levels.  
-Temp Weight is the weight of the internal temp sensor vs. remote sensors.  Set them higher in rooms you're more often using or set by occupancy sensor if used.  Cal is calibration of the temp sensor. 
-Pri/En: En enables each sensor to be weighted averaged, and Pri increases the weight.  
-
-![remotepage](http://www.curioustech.net/images/hvacweb.png)  
+Cal is calibration of the temp sensor.  
+The arrows control the weight averaging of the internal temp sensor and remote sensors. Set them higher in rooms you're more often using or occupancy sensors can bump the weight.  
+  
+![remotepage](http://www.curioustech.net/images/hvacweb2.png)  
 
 The web chart.  Dark gray is off, cyan is fan running, blue is compressor+fan, NG is red, HP is yellow, rh is green, the target/threshold is the wave.  The thermostat is in the hottest room in the house, so it does look warmer than it really is, but that's why there's a remote unit, and now multiple sensors.  
 ![chartpage](http://www.curioustech.net/images/hvacchart.png)  
