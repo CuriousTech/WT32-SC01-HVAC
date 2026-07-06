@@ -54,9 +54,10 @@ void HVAC::init()
   m_setHeat = ee.b.heatMode;
 
 #ifndef REMOTE
-  m_Sensor[0].IP= 192 | 168<<8 | 1<<24; // Setup sensor 0 as internal sensor
-  strcpy(m_Sensor[0].szID, "Internal");
-  m_Sensor[0].f.f.Enabled = 1;
+  m_Sensor[0].IP[0] = 192;
+  m_Sensor[0].IP[1] = 168;
+  m_Sensor[0].IP[3] = 1; // Setup sensor 0 as internal sensor (just non-zero)
+  strcpy(m_Sensor[0].szName, "Internal");
   m_Sensor[0].f.f.Weight = 1;
   m_Sensor[0].f.f.currWeight = 1;
 #endif
@@ -337,7 +338,7 @@ void HVAC::service()
     {
       if(--m_Sensor[i].timer == 0)
       {
-        if(m_Sensor[i].f.f.currWeight > 1)
+        if(m_Sensor[i].f.f.currWeight > 0)
         {
           m_Sensor[i].f.f.currWeight--;
           m_Sensor[i].timer = m_Sensor[i].timerStart;
@@ -531,7 +532,7 @@ void HVAC::tempCheck()
         if( m_Sensor[i].f.f.Warn == 0)
         {
           m_Sensor[i].f.f.Warn = 1;
-          String s = m_Sensor[i].szID;
+          String s = m_Sensor[i].szName;
           s += " sensor data expired";
 
           jsonString js("print");
@@ -542,13 +543,13 @@ void HVAC::tempCheck()
         {
           if(i)
           {
-            m_Sensor[i].IP = 0; // kill it
+            m_Sensor[i].IP[0] = 0; // kill it
             m_Sensor[i].f.val = 0;
             remSens = true;
           }
         }
       }
-      else if( m_Sensor[i].f.f.Priority || m_Sensor[i].f.f.Enabled)
+      else if( m_Sensor[i].f.f.currWeight)
       {
          m_Sensor[i].f.f.Warn = 0;
          sensTemp += m_Sensor[i].temp * m_Sensor[i].f.f.currWeight;
@@ -569,7 +570,6 @@ void HVAC::tempCheck()
   {
     sensTemp = m_Sensor[0].temp;
     sensRh = m_Sensor[0].rh;
-    m_Sensor[0].f.f.Enabled = 1;
     m_Sensor[0].f.f.Weight = 1;
     m_Sensor[0].f.f.currWeight = 1;
   }
@@ -1177,7 +1177,6 @@ String HVAC::getPushData()
   js.Var("rt", m_runTotal);
   js.Var("h",  m_bHumidRunning);
   js.Var("aw", m_bAway);
-
   js.Array("snd", m_Sensor);
 #endif
   return js.Close();
@@ -1271,7 +1270,7 @@ int snsComp(const void *a, const void*b)
 {
   Sensor *a1 = (Sensor *)a;
   Sensor *b1 = (Sensor *)b;
-  return strcmp(a1->szID, b1->szID);
+  return strcmp(a1->szName, b1->szName);
 }
 
 #endif
@@ -1449,37 +1448,24 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
     case 44: // rmtid (used by web page)
       for(i = 0; i < SNS_CNT; i++) // find ID
       {
-        if((m_Sensor[i].IP >> 24) == val)
+        if(m_Sensor[i].IP[3] == val)
           break;
       }
       if(i < SNS_CNT)  snsIdx = i;
       break;
     case 45: // rmttemp
       snsIdx = getSensorID(ip);
-      for(i = 0; i < SNS_CNT; i++)
-      {
-        if(!strcmp(ee.szSensorActive[i], m_Sensor[snsIdx].szID)) // find in active list
-        {
-          m_Sensor[snsIdx].f.f.Enabled = 1;
-          if(m_Sensor[snsIdx].f.f.currWeight == 0)
-          {
-            m_Sensor[snsIdx].f.f.Weight = 1;
-            m_Sensor[snsIdx].f.f.currWeight = 1;
-          }
-        }
-      }
-
       {
         char *p = psValue + strlen(psValue) - 1;
-        if(*p == 'C' && ee.b.bCelcius == false)
+        if(*p == 'C')
         {
-          val = val * 90 / 50 + 320;
+          if(ee.b.bCelcius == false) val = val * 90 / 50 + 320;
         }
-        else if(*p == 'F' && ee.b.bCelcius)
+        else if(*p == 'F')
         {
-          val = (val - 320) * 50 / 90;
+           if(ee.b.bCelcius) val = (val - 320) * 50 / 90;
         }
-        else if(*p != 'F' && *p != 'C')
+        else
         {
           deactivateSensor(snsIdx);
           break;
@@ -1488,7 +1474,7 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       if(val < (ee.b.bCelcius ? 156:600) || val > (ee.b.bCelcius ? 370:990) || (m_Sensor[snsIdx].temp && (val < m_Sensor[snsIdx].temp - 20 || val > m_Sensor[snsIdx].temp + 20)) )
       {
         String s = "Sensor deactivated ";
-        s += m_Sensor[snsIdx].szID;
+        s += m_Sensor[snsIdx].szName;
         jsonString js("print");
         js.Var("text", s);
         WsSend(js.Close());
@@ -1502,52 +1488,15 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       m_Sensor[snsIdx].rh = val;
       break;
     case 47: // rmtflg (uses last referenced rmtid)
-      {
-        usensorFlags sf;
-        sf.val = val;
-
-        if(val & SNS_NEG) // disable flags
-        {
-          if(sf.f.Enabled)
-          {
-            m_Sensor[snsIdx].f.f.Enabled = 0;
-            deactivateSensor(snsIdx);
-          }
-          if(sf.f.Priority)
-          {
-            m_Sensor[snsIdx].f.f.Priority = 0;
-            m_Sensor[snsIdx].f.f.currWeight = 1;
-          }
-        }
-        else // enable flags
-        {
-          if(sf.f.Enabled)
-          {
-            m_Sensor[snsIdx].f.f.Enabled = 1;
-            if(m_Sensor[snsIdx].f.f.currWeight == 0)
-            {
-              m_Sensor[snsIdx].f.f.Weight = 1;
-              m_Sensor[snsIdx].f.f.currWeight = 1;
-            }
-            activateSensor(snsIdx);
-          }
-          if(sf.f.Priority)
-          {
-            m_Sensor[snsIdx].f.f.Priority = 1;
-            m_Sensor[snsIdx].f.f.currWeight = m_Sensor[snsIdx].f.f.Weight;
-            m_Sensor[snsIdx].timer = m_Sensor[snsIdx].timerStart;
-          }
-        }
-      }
       break;
     case 48: // rmtname
       snsIdx = getSensorID(ip);
-      if(strcmp(m_Sensor[snsIdx].szID, psValue)) // Added, sort the list
+      if(strcmp(m_Sensor[snsIdx].szName, psValue)) // Added, sort the list
       {
-        strncpy(m_Sensor[snsIdx].szID, psValue, 11);
+        strncpy(m_Sensor[snsIdx].szName, psValue, 11);
 
         int nCnt;
-        for(nCnt = 0; nCnt < SNS_CNT && m_Sensor[nCnt].IP; nCnt++);
+        for(nCnt = 0; nCnt < SNS_CNT && m_Sensor[nCnt].IP[3]; nCnt++);
         if(nCnt > 2)
         {
           qsort(&m_Sensor[1], nCnt - 1, sizeof(Sensor), snsComp);
@@ -1561,9 +1510,13 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       m_Sensor[snsIdx].f.f.currWeight = m_Sensor[snsIdx].f.f.Weight;
       break;
     case 50: // rmtwt
-      m_Sensor[snsIdx].f.f.Weight = constrain(val, 1, 7);
+      m_Sensor[snsIdx].f.f.Weight = constrain(val, 0, 7);
       if(m_Sensor[snsIdx].timer == 0) // normal weight
         m_Sensor[snsIdx].f.f.currWeight = m_Sensor[snsIdx].f.f.Weight;
+      if(m_Sensor[snsIdx].f.f.Weight)
+        activateSensor(snsIdx);
+      else
+        deactivateSensor(snsIdx);
       break;
     case 51: // sm
       ee.b.nSchedMode = constrain(val, 0, 2);
@@ -1572,7 +1525,6 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       ee.b.nFcstSource = constrain(val, 0, 3);
       break;
     case 53: // wt
-      m_Sensor[0].f.f.currWeight = m_Sensor[0].f.f.Weight = constrain(val, 1, 7);
       break;
     case 54: // brt0
       ee.brightLevel[0] = constrain(val, 0, 60);
@@ -1648,31 +1600,33 @@ void HVAC::shiftSensors()
 {
   int nCnt;
   for(nCnt = 1; nCnt < SNS_CNT - 1; nCnt++)
-    if(m_Sensor[nCnt].IP ==  0 && m_Sensor[nCnt + 1].IP )
+    if(m_Sensor[nCnt].IP[3] == 0 && m_Sensor[nCnt + 1].IP[3] )
       swapSensors(nCnt, nCnt + 1);
 }
 
-int HVAC::getSensorID(uint32_t id)
+int HVAC::getSensorID(IPAddress ip)
 {
   int i;
 
   for(i = 1; i < SNS_CNT; i++) // find ID
   {
-    if(m_Sensor[i].IP == id)
+    if(m_Sensor[i].IP[3] == ip[3])
       break;
   }
   if(i == SNS_CNT) // not found
     for(i = 1; i < SNS_CNT; i++)
     {
-      if(m_Sensor[i].IP == 0)
+      if(m_Sensor[i].IP[3] == 0)
         break;
     }
   if(i < SNS_CNT)
   {
-    m_Sensor[i].IP = id;
+    m_Sensor[i].IP[0] = ip[0];
+    m_Sensor[i].IP[1] = ip[1];
+    m_Sensor[i].IP[2] = ip[2];
+    m_Sensor[i].IP[3] = ip[3];
     return i;
   }
-
   return 1; // Don't return internal (0)
 }
 
@@ -1682,28 +1636,39 @@ void HVAC::activateSensor(int idx)
   int8_t i;
   for(i = 0; i < SNS_CNT; i++)
   {
-    if(!strcmp(ee.szSensorActive[i], m_Sensor[idx].szID)) // find if previously active. Shouldn't be
+    if(ee.sensorActive[i] == m_Sensor[idx].IP[3]) // find if previously active
+    {
+      ee.sensorWeight[i] = m_Sensor[idx].f.f.Weight; // update the save
       found = i;
+    }
   }
   if(found < 0)
   {
     for(i = 0; i < SNS_CNT; i++)
-      if(ee.szSensorActive[i][0] == 0) // open spot
+      if(ee.sensorActive[i] == 0) // open spot
       {
-        strcpy(ee.szSensorActive[i], m_Sensor[idx].szID);
+        ee.sensorActive[i] = m_Sensor[idx].IP[3];
+        ee.sensorWeight[i] = m_Sensor[idx].f.f.Weight;
         break;
       }
+    if(i == SNS_CNT) // maybe old eeprom
+    {
+      memset(ee.sensorActive, 0, sizeof(ee.sensorActive));
+      memset(ee.sensorWeight, 0, sizeof(ee.sensorWeight));
+    }
   }
 }
 
 void HVAC::deactivateSensor(int idx)
 {
   m_Sensor[idx].f.val = 0;
+
   for(int j = 0; j < SNS_CNT; j++)
   {
-    if(!strcmp(ee.szSensorActive[j], m_Sensor[idx].szID)) // remove from eeprom set
+    if(ee.sensorActive[j] == m_Sensor[idx].IP[3]) // remove from eeprom set
     {
-      ee.szSensorActive[j][0] = 0;
+      ee.sensorActive[j] = 0;
+      m_Sensor[idx].f.f.Weight = 0;
     }
   }
 }
