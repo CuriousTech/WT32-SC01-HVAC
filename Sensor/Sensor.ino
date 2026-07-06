@@ -62,14 +62,6 @@ SOFTWARE.
 
 int serverPort = 80;
 
-enum reportReason
-{
-  Reason_Setup,
-  Reason_Status,
-  Reason_Alert,
-  Reason_Motion,
-};
-
 IPAddress lastIP;
 IPAddress verifiedIP;
 int nWrongPass;
@@ -83,7 +75,7 @@ int WsClientID;
 
 void jsonCallback(int16_t iName, int iValue, char *psValue);
 JsonParse jsonParse(jsonCallback);
-void jsonPushCallback(int16_t iName, int iValue, char *psValue);
+void jsonPushCallback(int16_t iName, int iValue, char *psValue, IPAddress ip);
 JsonClient jsonPush(jsonPushCallback);
 
 eeMem ee;
@@ -119,7 +111,6 @@ String settingsJson()
   js.Var("srate", ee.sendRate);
   js.Var("lrate", ee.logRate);
   js.Var("sleep", ee.sleep);
-  js.Var("pri", ee.e.PriEn);
   js.Var("o", ee.e.bEnableOLED);
   js.Var("l1", sensor.m_bLED[0]);
   js.Var("l2", sensor.m_bLED[1]);
@@ -130,7 +121,6 @@ String settingsJson()
   js.Var("cf", sensor.m_bCF);
   js.Var("df", sensor.m_dataFlags);
   js.Var("si", temps.m_bSilence);
-  js.Var("wt", ee.weight);
   return js.Close();
 }
 
@@ -274,7 +264,6 @@ void jsonCallback(int16_t iName, int iValue, char *psValue)
       ee.e.bPIR = iValue;
       break;
     case 10: // pri
-      ee.e.PriEn = iValue;
       break;
     case 11: // prisec
       ee.priSecs = iValue;
@@ -290,7 +279,6 @@ void jsonCallback(int16_t iName, int iValue, char *psValue)
       break;
     case 15: // ch
       ee.e.bCall = iValue;
-      if(iValue) CallHost(Reason_Setup, ""); // test
       break;
     case 16: // hostip
       ee.hostPort = 80;
@@ -299,7 +287,6 @@ void jsonCallback(int16_t iName, int iValue, char *psValue)
       ee.hostIP[2] = lastIP[2];
       ee.hostIP[3] = lastIP[3];
       ee.e.bCall = 1;
-      CallHost(Reason_Setup, ""); // test
       break;
     case 17: // hist
       temps.historyDump(true, ws, WsClientID);
@@ -325,7 +312,6 @@ void jsonCallback(int16_t iName, int iValue, char *psValue)
       ee.rhCal = iValue;
       break;
     case 25: // wt
-      ee.weight = constrain(iValue, 1, 7);
       break;
   }
 }
@@ -362,7 +348,7 @@ const char *jsonListPush[] = {
   NULL
 };
 
-void jsonPushCallback(int16_t iName, int iValue, char *psValue)
+void jsonPushCallback(int16_t iName, int iValue, char *psValue, IPAddress ip)
 {
   switch(iName)
   {
@@ -383,101 +369,11 @@ void jsonPushCallback(int16_t iName, int iValue, char *psValue)
   }
 }
 
-struct cQ
-{
-  IPAddress ip;
-  String sUri;
-  uint16_t port;
-};
-#define CQ_CNT 8
-cQ queue[CQ_CNT];
-uint8_t qI;
-
-void checkQueue()
-{
-  if(WiFi.status() != WL_CONNECTED)
-    return;
-
-  int idx;
-  for(idx = 0; idx < CQ_CNT; idx++)
-  {
-    if(queue[idx].port)
-      break;
-  }
-  if(idx == CQ_CNT || queue[idx].port == 0) // nothing to do
-    return;
-
-  if( jsonPush.begin(queue[idx].ip, queue[idx].sUri.c_str(), queue[idx].port, false, false, NULL, NULL, 1) )
-  {
-    jsonPush.setList(jsonListPush);
-    queue[idx].port = 0;
-  }
-}
-
-bool callQueue(IPAddress ip, String sUri, uint16_t port)
-{
-  int idx;
-  for(idx = 0; idx < CQ_CNT; idx++)
-  {
-    if(queue[idx].port == 0)
-      break;
-  }
-  if(idx == CQ_CNT) // nothing to do
-  {
-    jsonString js("print");
-    js.Var("text", "Q full");
-    WsSend(js.Close());
-    return false;
-  }
-
-  queue[idx].ip = ip;
-  queue[idx].sUri = sUri;
-  queue[idx].port = port;
-
-  return true;
-}
-
-void CallHost(reportReason r, String sStr)
-{
-  if(WiFi.status() != WL_CONNECTED || ee.hostIP[0] == 0 || ee.e.bCall == false)
-    return;
-
-  uriString uri("/wifi");
-  uri.Param("name", ee.szName);
-
-  switch(r)
-  {
-    case Reason_Setup:
-      uri.Param("reason", "setup");
-      uri.Param("port", serverPort);
-      break;
-    case Reason_Status:
-      if(sensor.m_values[DE_TEMP] == 0)
-        return;
-
-      uri.Param("reason", "status");
-      uri.Param("temp", String( (float)sensor.m_values[DE_TEMP]/10 , 1) );
-      uri.Param("rh", String( (float)sensor.m_values[DE_RH]/10 , 1) );
-      break;
-    case Reason_Alert:
-      uri.Param("reason", "alert");
-      uri.Param("value", sStr);
-      break;
-    case Reason_Motion:
-      uri.Param("reason", "motion");
-      break;
-  }
-
-  IPAddress ip(ee.hostIP);
-  callQueue(ip, uri.string().c_str(), ee.hostPort);
-}
-
 void sendTemp()
 {
   if(WiFi.status() != WL_CONNECTED || ee.hvacIP[0] == 0) // not set
     return;
 
-  uint8_t sentWt;
   uriString uri("/s");
   uri.Param("key", ee.szControlPassword);
   uri.Param("rmtname", ee.szName);
@@ -485,11 +381,6 @@ void sendTemp()
   s += (ee.e.bCF) ? "F" : "C";
   uri.Param("rmttemp", s);
   uri.Param("rmtrh", sensor.m_values[DE_RH]);
-  if(sentWt != ee.weight)
-  {
-    sentWt = ee.weight;
-    uri.Param("rmtwt", ee.weight);
-  }
 
   if(ee.e.bPIR && bPIRTrigger )
   {
@@ -499,7 +390,8 @@ void sendTemp()
   }
 
   IPAddress ip(ee.hvacIP);
-  callQueue(ip, uri.string(), 80);
+  jsonPush.addQueue(ip, uri.string(), 80, "");
+  jsonPush.setList(jsonListPush);
 }
 
 uint16_t stateTimer = 10;
@@ -687,8 +579,6 @@ void setup()
   if(ee.sendRate == 0) ee.sendRate = 60;
   sleepTimer = ee.sleep;
   temps.init(sensor.m_dataFlags);
-  if(ee.weight == 0)
-    ee.weight = 1;
   if(ee.pirPin)
     pinMode(ee.pirPin, INPUT);
 }
@@ -711,7 +601,6 @@ void loop()
       last_pir = digitalRead(ee.pirPin);
       if(last_pir)
       {
-        CallHost(Reason_Motion, "");
         if(ee.e.bPIR && bPIRTrigger)
           sendTemp();
         jsonString js("print");
@@ -732,7 +621,7 @@ void loop()
   {
   }
 
-  checkQueue();
+  jsonPush.service();
 
   if(sec_save != second()) // only do stuff once per second (loop is maybe 20-30 Hz)
   {
@@ -763,7 +652,6 @@ void loop()
           ee.update();
 
           findHVAC();
-          CallHost(Reason_Setup, "");
         }
       }
       else if(now() - connectTimer > 10 || WiFi.status() == WL_NO_SSID_AVAIL) // failed to connect for some reason
@@ -780,8 +668,6 @@ void loop()
     if(hour_save != hour())
     {
       hour_save = hour();
-      if((hour_save&1) == 0)
-        CallHost(Reason_Setup, "");
       ee.update(); // update EEPROM if needed while we're at it (give user time to make many adjustments)
     }
 
@@ -809,17 +695,11 @@ void loop()
     if(--stateTimer == 0 || sensor.m_bUpdated) // a 60 second keepAlive
     {
       if(sensor.m_bUpdated)
+      {
         temps.update(sensor.m_values);
-      sensor.m_bUpdated = false;
+        sensor.m_bUpdated = false;
+      }
       sendState();
-    }
-
-    static uint8_t timer = 5;
-    if(--timer == 0)
-    {
-      timer = 30;
-      if(sensor.m_values[DE_RH])
-        CallHost(Reason_Status, "");
     }
 
     static uint8_t sendTimer = 20;
