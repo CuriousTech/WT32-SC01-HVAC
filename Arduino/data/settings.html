@@ -17,8 +17,8 @@ var ws
 function startEvents()
 {
 relPath = location.href.replace(/^https?:\/\/|[^/]*$/gi, "")
-//ws = new WebSocket("ws://"+relPath+"ws")
-ws=new WebSocket("ws://192.168.31.112/ws")
+ws = new WebSocket("ws://"+relPath+"ws")
+//ws=new WebSocket("ws://192.168.31.112/ws")
 ws.onopen=function(evt){}
 ws.onclose=function(evt){alert("Connection closed.");}
 
@@ -163,13 +163,13 @@ function snsInc(n)
 </table>
 <table style="width: 300px" cellspacing=0 cellpadding=0>
 <tr id="int"><td></td><td>Weight</td><td id="loc"></td><td></td></tr>
-<tr id="snd0" style="visibility:collapse"><td id="s0"><input type="submit" ID="shr0"></td><td><button onClick="{snsDec(0)}">&#11164;</button><input type="button" value=0 id="sval0"><button onClick="{snsInc(0)}">&#10148;</button></td><td id="rt0"></td><td></td></tr>
-<tr id="snd1" style="visibility:collapse"><td id="s1"><input type="submit" ID="shr1" onClick="{jmp(this.id)}"></td><td><button onClick="{snsDec(1)}">&#11164;</button><input type="button" value=0 id="sval1"><button onClick="{snsInc(1)}">&#10148;</button></td><td id="rt1"></td><td></td></tr>
-<tr id="snd2" style="visibility:collapse"><td id="s2"><input type="submit" ID="shr2" onClick="{jmp(this.id)}"></td><td><button onClick="{snsDec(2)}">&#11164;</button><input type="button" value=0 id="sval2"><button onClick="{snsInc(2)}">&#10148;</button></td><td id="rt2"></td><td></td></tr>
-<tr id="snd3" style="visibility:collapse"><td id="s3"><input type="submit" ID="shr3" onClick="{jmp(this.id)}"></td><td><button onClick="{snsDec(3)}">&#11164;</button><input type="button" value=0 id="sval3"><button onClick="{snsInc(3)}">&#10148;</button></td><td id="rt3"></td><td></td></tr>
-<tr id="snd4" style="visibility:collapse"><td id="s4"><input type="submit" ID="shr4" onClick="{jmp(this.id)}"></td><td><button onClick="{snsDec(4)}">&#11164;</button><input type="button" value=0 id="sval4"><button onClick="{snsInc(4)}">&#10148;</button></td><td id="rt4"></td><td></td></tr>
-<tr id="snd5" style="visibility:collapse"><td id="s5"><input type="submit" ID="shr5" onClick="{jmp(this.id)}"></td><td><button onClick="{snsDec(5)}">&#11164;</button><input type="button" value=0 id="sval5"><button onClick="{snsInc(5)}">&#10148;</button></td><td id="rt5"></td><td></td></tr>
-<tr id="snd6" style="visibility:collapse"><td id="s6"><input type="submit" ID="shr6" onClick="{jmp(this.id)}"></td><td><button onClick="{snsDec(6)}">&#11164;</button><input type="button" value=0 id="sval6"><button onClick="{snsInc(6)}">&#10148;</button></td><td id="rt6" colspan=2>
+<tr id="snd0" style="visibility:collapse"><td id="s0"><input type="submit" ID="shr0"></td><td><button onClick="{snsDec(0)}">&#10094;</button><input type="button" value=0 id="sval0"><button onClick="{snsInc(0)}">&#10095;</button></td><td id="rt0"></td><td></td></tr>
+<tr id="snd1" style="visibility:collapse"><td id="s1"><input type="submit" ID="shr1" onClick="{jmp(this.id)}"></td><td><button onClick="{snsDec(1)}">&#10094;</button><input type="button" value=0 id="sval1"><button onClick="{snsInc(1)}">&#10095;</button></td><td id="rt1"></td><td></td></tr>
+<tr id="snd2" style="visibility:collapse"><td id="s2"><input type="submit" ID="shr2" onClick="{jmp(this.id)}"></td><td><button onClick="{snsDec(2)}">&#10094;</button><input type="button" value=0 id="sval2"><button onClick="{snsInc(2)}">&#10095;</button></td><td id="rt2"></td><td></td></tr>
+<tr id="snd3" style="visibility:collapse"><td id="s3"><input type="submit" ID="shr3" onClick="{jmp(this.id)}"></td><td><button onClick="{snsDec(3)}">&#10094;</button><input type="button" value=0 id="sval3"><button onClick="{snsInc(3)}">&#10095;</button></td><td id="rt3"></td><td></td></tr>
+<tr id="snd4" style="visibility:collapse"><td id="s4"><input type="submit" ID="shr4" onClick="{jmp(this.id)}"></td><td><button onClick="{snsDec(4)}">&#10094;</button><input type="button" value=0 id="sval4"><button onClick="{snsInc(4)}">&#10095;</button></td><td id="rt4"></td><td></td></tr>
+<tr id="snd5" style="visibility:collapse"><td id="s5"><input type="submit" ID="shr5" onClick="{jmp(this.id)}"></td><td><button onClick="{snsDec(5)}">&#10094;</button><input type="button" value=0 id="sval5"><button onClick="{snsInc(5)}">&#10095;</button></td><td id="rt5"></td><td></td></tr>
+<tr id="snd6" style="visibility:collapse"><td id="s6"><input type="submit" ID="shr6" onClick="{jmp(this.id)}"></td><td><button onClick="{snsDec(6)}">&#10094;</button><input type="button" value=0 id="sval6"><button onClick="{snsInc(6)}">&#10095;</button></td><td id="rt6" colspan=2>
 </td><td></td></tr>
 </table>
 <table style="width: 300px">
