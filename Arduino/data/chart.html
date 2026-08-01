@@ -40,8 +40,8 @@ xPadding=30
 yPadding=56
 drawMode=3
 schedMode=1
-tempLen=640
-const tempSize=16
+histLen=640
+const histSize=16
 var _minY
 var _maxY
 var yRange
@@ -49,12 +49,12 @@ var Json
 var a=document.all
 var ws
 cnt=0
-tempIdx=0
-tempView = 0
+histIdx=0
+histView = 0
 added=false
 var dispYear
 var dispMon
-clrs=['rgb(0,0,255)','rgb(255,255,255)','rgb(0,0,50)','#fa0','rgba(0,0,255,0.5)','rgba(255,255,255,0.7)','rgba(0,0,50,0.6)','rgba(55,0,255,0.7)','rgba(255,156,10,0.7)']
+clrs=['#00f','#fff','#000','#fa0','rgba(50,50,255,0.5)','rgba(255,155,255,0.7)','rgba(0,50,50,0.6)','rgba(55,0,255,0.7)','rgba(255,156,10,0.7)']
 
 $(document).ready(function()
 {
@@ -71,17 +71,17 @@ $(document).ready(function()
  ws.onclose=function(evt){alert("Connection closed.")}
  ws.onmessage = function(evt){
 	if(evt.data instanceof ArrayBuffer){
-		if(event.data.byteLength == tempSize)
+		if(event.data.byteLength == histSize)
 		{
 			part = new DataView(evt.data)
-			if(++tempIdx>=tempLen) tempIdx=0
-			for(i=0;i<tempSize;i++)
-				tempView.setUint8(tempIdx*tempSize+i,part.getUint8(i))
-			if(tempCnt<tempLen) tempCnt++
+			if(++histIdx>=histLen) histIdx=0
+			for(i=0;i<histSize;i++)
+				histView.setUint8(histIdx*histSize+i,part.getUint8(i))
+			if(tempCnt<histLen) tempCnt++
 		}else{
-			tempLen=event.data.byteLength/tempSize
-			tempView = new DataView(evt.data)
-			tempCnt=(getTemp(tempLen-1))?tempLen:tempIdx
+			histLen=event.data.byteLength/histSize
+			histView = new DataView(evt.data)
+			tempCnt=(getTemp(histLen-1))?histLen:histIdx
 		}
 		draw()
 		return
@@ -130,8 +130,8 @@ $(document).ready(function()
 			fc=Json.fc
 			fcDate=Json.fcDate
 			fcFreq=Json.fcFreq
-			tempIdx=Json.idx-1
-			if(tempIdx<0) tempIdx+=tempLen
+			histIdx=Json.idx-1
+			if(histIdx<0) histIdx+=histLen
 			tb=Json.tb
 			th=Json.th
 			ws.send('{bin:2}')
@@ -160,8 +160,8 @@ $(document).ready(function()
 	}
  }
  setInterval(function(){
-	index=tempIdx+1
-	if(index>=tempLen) index=0
+	index=histIdx+1
+	if(index>=histLen) index=0
 	ws.send('{data:'+index+'}'); },60000)
 });
 
@@ -208,7 +208,7 @@ function draw(){
 
   step=Math.floor(tempCnt/15)
   if(step==0) step=1
-  idx=tempIdx
+  idx=histIdx
   tm=tb
   n=step
   for(i=0;i<tempCnt;i++){
@@ -224,7 +224,7 @@ function draw(){
 		c.fillText(date.toLocaleTimeString(),0,0)
 		c.restore()
 	}
-	if(--idx<0) idx+=tempLen
+	if(--idx<0) idx+=histLen
   }
 
   // value range
@@ -252,19 +252,19 @@ function draw(){
   //threshold
   c.fillStyle = 'rgba(100,100,180,0.25)'
   c.beginPath()
-  c.moveTo(getXPixel(0),getYPixel(gettarget(tempIdx)+th))
-  idx=tempIdx-1
-  if(idx<0) idx+=tempLen
+  c.moveTo(getXPixel(0),getYPixel(gettarget(histIdx)+th))
+  idx=histIdx-1
+  if(idx<0) idx+=histLen
   for(i=1;i<tempCnt;i++)
   {
 	c.lineTo(getXPixel(i),getYPixel(gettarget(idx)+th))
-	if(--idx<0) idx+=tempLen
+	if(--idx<0) idx+=histLen
   }
-  if(++idx>=tempLen) idx=0
+  if(++idx>=histLen) idx=0
   for(i=tempCnt-1;i>=0;i--)
   {
 	c.lineTo(getXPixel(i),getYPixel(gettarget(idx)))
-	if(++idx>=tempLen) idx=0
+	if(++idx>=histLen) idx=0
   }
   c.closePath()
   c.fill()
@@ -274,14 +274,14 @@ function draw(){
    date=new Date(tb*1000)
    tm=tb
    dt=date.getDate()
-   idx=tempIdx-1
-   if(idx<0) idx+=tempLen
-   for(i=1;i<tempCnt;i++){
-	c.strokeStyle=stateColor( tempView.getUint8(idx*tempSize+4)&0xf )
+   idx=histIdx-1
+   if(idx<0) idx+=histLen
+   for(i=1;i<tempCnt-1;i++){
+	c.strokeStyle=stateColor( histView.getUint8(idx*histSize+4)&0xf )
 	c.beginPath()
 	c.moveTo(getXPixel(i),getYPixel( getTemp(idx) ))
 	idx2=idx+1
-	if(idx2>=tempLen) idx2=0
+	if(idx2>=histLen) idx2=0
 	c.lineTo(getXPixel(i-1),getYPixel( getTemp(idx2) ))
 	c.stroke()
 	tm-=getTmOff(idx)
@@ -295,7 +295,7 @@ function draw(){
 	  c.lineTo(getXPixel(i),h)
 	  c.stroke()
 	}
-	if(--idx<0) idx+=tempLen
+	if(--idx<0) idx+=histLen
    }
   }
   sh=8
@@ -318,17 +318,17 @@ function draw(){
   if(drawMode&2){
 	c.strokeStyle = '#0f0'
 	c.beginPath()
-	c.moveTo(getXPixel(0),getRHPixel( getRh(tempIdx) ))
-	idx=tempIdx
+	c.moveTo(getXPixel(0),getRHPixel( getRh(histIdx) ))
+	idx=histIdx
 	for(i=1;i<tempCnt;i ++)
 	{
-		if(--idx<0) idx+=tempLen
+		if(--idx<0) idx+=histLen
 		c.lineTo(getXPixel(i),getRHPixel( getRh(idx) ))
 	}
 	c.stroke()
   }
   dots=[]
-    idx=tempIdx
+    idx=histIdx
 	dt=tb
 	for(i=0;i<tempCnt;i++){
 		inTemp=getTemp(idx)
@@ -341,10 +341,10 @@ function draw(){
 			tip: (new Date(dt*1000)).toLocaleTimeString()+' ',
 			tip2: inTemp/10,
 			tip3: (getRh(idx))/10,
-			tip4: ((tempView.getInt32(idx*tempSize,true)>>21)&0x7ff)/10
+			tip4: ((histView.getInt32(idx*histSize,true)>>21)&0x7ff)/10
 		})
 		dt-=getTmOff(idx)
-		if(--idx<0) idx+=tempLen
+		if(--idx<0) idx+=histLen
 	}
 
 	// request mousemove events
@@ -370,13 +370,13 @@ function draw(){
 				tipCtx.textAlign="left"
 
 				tipCtx.fillText(dot.tip,4,15)
-				tipCtx.fillText(dot.tip2+'°F',4,29)
+				tipCtx.fillText('In:'+dot.tip2+'°F',4,29)
 				tipCtx.fillText(dot.tip3+'%',4,44)
-				tipCtx.fillText(dot.tip4 + '°F',4,58)
+				tipCtx.fillText('Out:'+dot.tip4 + '°F',4,58)
 				hit=true
 				popup=document.getElementById("popup")
 				popup.style.top=dot.y+"px"
-				popup.style.left=(dot.x-60)+"px"
+				popup.style.left=(dot.x-70)+"px"
 			}
 		}
 		if(!hit){popup.style.left="-200px"}
@@ -386,19 +386,19 @@ function draw(){
 	{
 		c.strokeStyle=ss
 		c.beginPath()
-		ixx=tempIdx
-		ofs=ixx*tempSize+7
+		ixx=histIdx
+		ofs=ixx*histSize+7
 		temp=getTemp(ixx)
-		sens = new Array(getOutTemp(ixx), tempView.getInt8(ofs)+temp,tempView.getInt8(ofs+1)+temp,tempView.getInt8(ofs+2)+temp,tempView.getInt8(ofs+3)+temp,tempView.getInt8(ofs+4)+temp,tempView.getInt8(ofs+5)+temp,tempView.getInt8(ofs+6)+temp)
+		sens = new Array(getOutTemp(ixx), histView.getInt8(ofs)+temp,histView.getInt8(ofs+1)+temp,histView.getInt8(ofs+2)+temp,histView.getInt8(ofs+3)+temp,histView.getInt8(ofs+4)+temp,histView.getInt8(ofs+5)+temp,histView.getInt8(ofs+6)+temp)
 		c.moveTo(getXPixel(0),getYPixel(sens[os]))
 		if(sens[os]==0)
 			return
 		for(i=1;i<tempCnt;i++)
 		{
-			if(--ixx<0) ixx+=tempLen
-			ofs=ixx*tempSize+7
+			if(--ixx<0) ixx+=histLen
+			ofs=ixx*histSize+7
 			temp=getTemp(ixx)
-			sens = new Array(getOutTemp(ixx), tempView.getInt8(ofs)+temp,tempView.getInt8(ofs+1)+temp,tempView.getInt8(ofs+2)+temp,tempView.getInt8(ofs+3)+temp,tempView.getInt8(ofs+4)+temp,tempView.getInt8(ofs+5)+temp,tempView.getInt8(ofs+6)+temp)
+			sens = new Array(getOutTemp(ixx), histView.getInt8(ofs)+temp,histView.getInt8(ofs+1)+temp,histView.getInt8(ofs+2)+temp,histView.getInt8(ofs+3)+temp,histView.getInt8(ofs+4)+temp,histView.getInt8(ofs+5)+temp,histView.getInt8(ofs+6)+temp)
 			c.lineTo(getXPixel(i),getYPixel(sens[os]))
 		}
 		c.stroke()
@@ -407,78 +407,72 @@ function draw(){
 
 function getTmOff(o)
 {
-	return tempView.getUint16(o*tempSize+6,true)>>6&0x3ff
+	return histView.getUint16(o*histSize+5,true)>>6&0x3ff
 }
 
 function getTemp(o)
 {
-	return tempView.getUint16(o*tempSize, true)&0x7ff
+	return histView.getUint16(o*histSize, true)&0x7ff
 }
 
 function getOutTemp(o)
 {
-	return tempView.getUint16(o*tempSize+2, true)>>5&0x7ff
+	return histView.getUint16(o*histSize+2, true)>>5&0x7ff
 }
 
 function getRh(o)
 {
-	return (tempView.getUint16(o*tempSize+4, true)>>4)&0x3ff
+	return (histView.getUint16(o*histSize+4, true)>>4)&0x3ff
 }
 
 function gettarget(o)
 {
-	return (tempView.getUint16(o*tempSize+1, true)>>3)&0x3ff
+	return (histView.getUint16(o*histSize+1, true)>>3)&0x3ff
 }
 
 function getMaxY(){
 	max=0
-	ix=tempIdx
-	for(m=0;m<tempCnt;m++)
+	ix=histIdx
+	for(m=0;m<tempCnt-1;m++)
 	{
-		outTemp=getOutTemp(ix)
 		target=gettarget(ix)
 		temp=getTemp(ix)
-		ofs=ix*tempSize+8
-		sens = new Array(getOutTemp(ix), tempView.getInt8(ofs)+temp,tempView.getInt8(ofs+1)+temp,tempView.getInt8(ofs+2)+temp,tempView.getInt8(ofs+3)+temp,tempView.getInt8(ofs+4)+temp,tempView.getInt8(ofs+5)+temp,tempView.getInt8(ofs+6)+temp)
+		ofs=ix*histSize+7
+		sens = new Array(getOutTemp(ix),histView.getInt8(ofs)+temp,histView.getInt8(ofs+1)+temp,histView.getInt8(ofs+2)+temp,histView.getInt8(ofs+3)+temp,histView.getInt8(ofs+4)+temp,histView.getInt8(ofs+5)+temp,histView.getInt8(ofs+6)+temp)
 
 		if(temp>max)
 		  max=temp
 		if(target+th>max)
 		  max=target+th
-		if(drawMode&4&&outTemp>max)
-		  max=outTemp
-		dm=drawMode>>3
+		dm=drawMode>>2
 		for(j=0;j<sens.length;j++)
 		  if(dm&1<<j&&sens[j]>max)
 			max=sens[j]
-		if(--ix<0) ix+=tempLen
+		if(--ix<0) ix+=histLen
 	}
 	return Math.ceil(max)
 }
 
 function getMinY(){
 	min=1500
-	ix=tempIdx
-	for(m=0;m<tempCnt;m++)
+	ix=histIdx
+	for(m=0;m<tempCnt-1;m++)
 	{
-		outTemp=getOutTemp(ix)
 		target=gettarget(ix)-1
 		temp=getTemp(ix)
-		ofs=ix*tempSize+8
-		sens = new Array(getOutTemp(ix), tempView.getInt8(ofs)+temp,tempView.getInt8(ofs+1)+temp,tempView.getInt8(ofs+2)+temp,tempView.getInt8(ofs+3)+temp,tempView.getInt8(ofs+4)+temp,tempView.getInt8(ofs+5)+temp,tempView.getInt8(ofs+6)+temp)
+		ofs=ix*histSize+7
+		sens = new Array(getOutTemp(ix),histView.getInt8(ofs)+temp,histView.getInt8(ofs+1)+temp,histView.getInt8(ofs+2)+temp,histView.getInt8(ofs+3)+temp,histView.getInt8(ofs+4)+temp,histView.getInt8(ofs+5)+temp,histView.getInt8(ofs+6)+temp)
 		if(temp<min)
 		  min=temp
 		if(target<min)
 		  min=target
-		if(drawMode&4&&outTemp<min)
-		  min=outTemp
-		dm=drawMode>>3
+		dm=drawMode>>2
 		for(j=0;j<sens.length;j++)
 		{
 			if(dm&(1<<j)&&min>sens[j])
 				min=sens[j]
 		}
-		if(--ix<0) ix+=tempLen
+		if(--ix<0) ix+=histLen
 	}
 	return Math.floor(min)
 }
@@ -908,7 +902,7 @@ function setShift(n)
 <td colspan="15">
 <div id="wrapper">
 <canvas id="graph" width="700" height="400"></canvas>
-<div id="popup"><canvas id="tip" width="90" height="78"></canvas></div>
+<div id="popup"><canvas id="tip" width="88" height="78"></canvas></div>
 </div>
 </td></tr><tr>
 <td><button class="btn" id="L1" onclick="leg(0)"/>TEMP</td>
