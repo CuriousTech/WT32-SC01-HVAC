@@ -4,7 +4,7 @@
   
 WiFi Smart Omniscient Opensource Arduino ESP32 HVAC Touchscreen Thermostat using WT32-SC01 (not PLUS)  OSHPark [Rev1](https://oshpark.com/shared_projects/ljZTJh9A) $15.65  [Rev2](https://oshpark.com/shared_projects/giHlVB41)  
 
-This code is curreently too large for ESP-IDF 3.x.x but may be optimized further at some point. Another option is to replace the ESP32-WROVER-B module with the newer ESP32-WROVER-E8 or E16, which increases the code space by 2x or even 4x.
+This code is currently too large for ESP-IDF 3.x.x but may be optimized further at some point. Another option is to replace the ESP32-WROVER-B module with the newer WROVER-E-N8R8 or N16R8, which increases the code space by 2x or even 4x.
   
 This is the 3rd thermostat I've designed, only because new hardware makes it better, and tends to remove some limitations.  
 All sensors from [ESP-HVAC](https://github.com/CuriousTech/ESP-HVAC), and older models can be used as remote units by building as REMOTE. This model can be changed to remote with just a temp/humidity sensor on the i2c pins, plus speaker if desired, and use the USB for power.  
@@ -14,7 +14,7 @@ Encoder.cpp/h was removed, but can be added back easily, with 4 extra I/O pins f
 
 The WT32-SC01 can be purchased from many vendors. It stays fairly cool, but the LM1117 is a bit inefficient, with a quiescent current of 5mA. These 2 linear regulators can be replaced with something better such as the AP2111H-3.3TRG1 to run it cooler. Soldering iron may be safer than a hot air gun unless the display is pulled away from the PCB (easy).  
   
-To pogram: Copy the User_Setup/Setup201_WT32_SC01.h over the original. Some parameters were incorrect.  
+To program: Copy the User_Setup/Setup201_WT32_SC01.h over the original. Some parameters were incorrect.  
 Uncomment #include "Setup201_WT32_SC01.h" and comment the default in TFT_eSPI/User_Setup_Select.h  
 Flash over USB first, and upload the SPIFFS data using ESP32 Sketch Data Uploader.  
 If any libraries are missing, the error should be on the line with a link to the library. Some are in my ESP-HVAC repo.  
@@ -42,7 +42,7 @@ HVAC wiring labels:
  Rc (red or orange) 24VAC power for cool  (C and Rc power the thermostat)  
  Rh (red) 24VAC power for heat. Solder the Rc-Rh jumper on the back if not used.  
  Y (yellow) cool signal  
- O (color varies) compressor reverse for heatpump 
+ O (color varies) compressor reverse for heatpump  
  W (white) heat signal  
  G (green) fan signal. Note: Heat and cool override manual fan signal.  
  H humidifier  
