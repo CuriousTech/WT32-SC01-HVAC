@@ -49,7 +49,7 @@ void Forecast::start(IPAddress serverIP, uint16_t port, bool bCelcius, int8_t ty
 // OpenWeaterMap start
 void Forecast::start(char *pCityID, bool bCelcius)
 {
-  if(m_ac.connected()  || m_ac.connecting())
+  if(m_ac.connected() || m_ac.connecting())
     return;
   m_bCelcius = bCelcius;
   strcpy(m_cityID, pCityID);
@@ -219,17 +219,17 @@ void Forecast::processOWM()
   };
 
   char *p = m_pBuffer;
-
-  if(p[0] != '{') // local copy has no headers
-    while(p[4]) // skip all the header lines
-    {
-      if(p[0] == '\r' && p[1] == '\n' && p[2] == '\r' && p[3] == '\n')
-      {
-        p += 4;
-        break;
+  if (p[0] != '{') { // local copy has no headers
+    // Safely ensure there are at least 4 bytes left to read
+    while (p[0] && p[1] && p[2] && p[3]) {
+      // Fast path: if p[1] isn't a newline, this cannot be the end of the header
+      if (p[1] == '\n' && p[0] == '\r' && p[2] == '\r' && p[3] == '\n') {
+          p += 4;
+          break;
       }
       p++;
     }
+  }
 
   processJson(p, 0, jsonListOw);
 }
@@ -421,6 +421,9 @@ void Forecast::callback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psVa
         case 0: // temp
           m_fc.Data[m_fcIdx].temp = (atof(psValue)*10);
           break;
+        case 1: // feels like
+          m_fc.Data[m_fcIdx].feelsLike = (atof(psValue)*10);
+          break;
         case 5: // humidity
           m_fc.Data[m_fcIdx].humidity = (atoi(psValue)*10);
           break;
@@ -562,8 +565,8 @@ void Forecast::processJson(char *p, int8_t event, const char **jsonList)
 
 char *Forecast::skipwhite(char *p)
 {
-  while(*p == ' ' || *p == '\t' || *p =='\r' || *p == '\n')
-    p++;
+  if (!p) return nullptr;
+  while (*p && (*p <= 32)) p++; 
   return p;
 }
 
@@ -902,9 +905,16 @@ int16_t Forecast::getCurrentTemp(int& shiftedTemp, uint8_t shiftMins)
 // get value at current minute between hours
 int Forecast::tween(int16_t t1, int16_t t2, int m, int r)
 {
-  if(r == 0) r = 1; // div by zero check
-  float t = (float)(t2 - t1) * (m * 100 / r) / 100;
-  return (int)(t + (float)t1);
+  if (r == 0) r = 1; // div by zero check
+
+//  return t1 + ((t2 - t1) * (m * 100 / r)) / 100;
+
+  int factor = (m * 100) / r;
+  int numerator = (t2 - t1) * factor;
+  
+  // Round to nearest integer instead of truncating
+  if (numerator >= 0)  return t1 + (numerator + 50) / 100;
+  else     return t1 + (numerator - 50) / 100;
 }
 
 // Animate the weather icons
