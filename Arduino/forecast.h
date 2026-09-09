@@ -12,6 +12,7 @@ struct forecastItem
 {
   int16_t temp;
   int16_t humidity;
+  int16_t feelsLike;
   int16_t id;
 };
 
@@ -57,7 +58,6 @@ public:
   void getMinMax(int16_t& tmin, int16_t& tmax, int8_t offset, int8_t range);
   int16_t getCurrentTemp(int& shiftedTemp, uint8_t shiftMins);
   void drawIcon(uint8_t d, uint8_t h, uint16_t x);
-
 private:
   void _onConnect(AsyncClient* client);
   void _onDisconnect(AsyncClient* client);
