@@ -84,6 +84,7 @@ $(document).ready(function()
 			tempCnt=(getTemp(histLen-1))?histLen:histIdx
 		}
 		draw()
+		drawFC()
 		return
     }
 	console.log(evt.data)
@@ -136,7 +137,6 @@ $(document).ready(function()
 			th=Json.th
 			ws.send('{bin:2}')
 			draw_bars()
-			drawFC()
 			break
 		case 'update':
 			switch(Json.type)
@@ -690,9 +690,13 @@ function drawFC(){
 	max=-300
 	for(i=0;i<fc.length;i++)
 	{
-		if(min>fc[i]/10) min=fc[i]/10
-		if(max<fc[i]/10) max=fc[i]/10
+		if(min>fc[i][0]) min=fc[i][0]
+		if(min>fc[i][1]) min=fc[i][1]
+		if(max<fc[i][0]) max=fc[i][0]
+		if(max<fc[i][1]) max=fc[i][1]
 	}
+	min/=10
+	max/=10
 	max++
 	yRange=max-min
 	c.textAlign="right"
@@ -723,7 +727,9 @@ function drawFC(){
 		fcFreq=10800
 		fcr=23
 	}
+
 	cPos=0
+
 	fl=(fcDate+fcFreq*(fcl-1))/60
 	date=new Date(fcDate*1000)
 	dt=date.getDate()
@@ -738,12 +744,36 @@ function drawFC(){
 	else{grd.addColorStop(0,"red");grd.addColorStop(1,"blue")}
 	for(i=1;i<fcl;i++){
 		if(fc.length){
+
+			c.strokeStyle='rgba(0,255,0,0.65)'
+			c.beginPath()
+			y=h18-((h18/1000)*fc[i][2])
+			c.moveTo(getXPixel2(i),y)
+			y=h18-((h18/1000)*fc[i-1][2])
+			c.lineTo(getXPixel2(i-1),y)
+			c.stroke()
+
+			c.strokeStyle='rgba(255,255,0,0.9)'
+			c.beginPath()
+			c.moveTo(getXPixel2(i),getYPixel2(fc[i][1]/10))
+			c.lineTo(getXPixel2(i-1),getYPixel2(fc[i-1][1]/10))
+			c.stroke()
+
 			c.strokeStyle=grd
 			c.beginPath()
-			c.moveTo(getXPixel2(i),getYPixel2(fc[i]/10))
-			c.lineTo(getXPixel2(i-1),getYPixel2(fc[i-1]/10))
+			c.moveTo(getXPixel2(i),getYPixel2(fc[i][0]/10))
+			c.lineTo(getXPixel2(i-1),getYPixel2(fc[i-1][0]/10))
 			c.stroke()
+			if(fc[i][1]-fc[i][0] > 30){
+				c.lineWidth=3
+				c.strokeStyle='rgb(0,100,200)'
+				c.beginPath()
+ 				c.arc(getXPixel2(i), getYPixel2(fc[i][1]/10), 2, 0, 2 * Math.PI)
+				c.stroke()
+				c.lineWidth=1
+			}
 		}
+
 		date = new Date((fcDate+fcFreq*i)*1000)
 		c.fillStyle='#000'
 		if(cPos==0&&date.valueOf()>=(new Date()).valueOf())
@@ -757,7 +787,8 @@ function drawFC(){
 			c.lineTo(getXPixel2(cPos)-xOff,1)
 			c.stroke()
 			c.textAlign="center"
-			c.fillText("Now",getXPixel2(cPos)-xOff,getYPixel3(iMax)-8)
+			xPosNow=(getXPixel2(cPos)-xOff).toFixed()
+			c.fillText("Now",xPosNow,getYPixel3(iMax)-8)
 		}
 		if(dt!=date.getDate()){
 			dt=date.getDate()
@@ -770,10 +801,11 @@ function drawFC(){
 			c.fillText(date.toLocaleDateString(),getXPixel2(i),graph2.height()-8)
 		}
 	}
+
 	xOff=0
 	if(schedMode==0)
 		xOff=w/((fcl-1)*(fcFreq/60))*fco
-	c.fillStyle="#9050F090"
+	c.fillStyle="rgba(120,90,120,0.5)"
 	c.beginPath()
 	strt=cPos-fcr
 	if(strt<0) strt=0
@@ -796,14 +828,17 @@ function getXPixel2(val){
 	x=xPadding+((graph2.width()-xPadding*2)/fcl)*val
 	return +x.toFixed()
 }
+function getXPixel2T(val){
+	x=xPadding+((graph2.width()-xPadding*2)/histLen)*val
+	return +x.toFixed()
+}
 
 function getYPixel2(val){
 	y=h18-((h18/yRange)*(val-min))
 	return y.toFixed()
 }
 function getYPixel3(val){
-	h=graph2.height()-18
-	o=70+ct*2
+	o=100+ct*2
 	return h18-(o/2)-((h18-o)/iRng*(val-iMin))
 }
 function getTT(i,th)
@@ -817,11 +852,11 @@ function getTT(i,th)
 	for(j=strt1;j<i+fcr;j++)
 	{
 		if(j<fc.length){
-			if(min2>fc[j]/10) min2=fc[j]/10
-			if(max2<fc[j]/10) max2=fc[j]/10
+			if(min2>fc[j][0]/10) min2=fc[j][0]/10
+			if(max2<fc[j][0]/10) max2=fc[j][0]/10
 		}
 	}
-	tt=(fc[i]/10-min2)*iRng/(max2-min2)+iMin+th
+	tt=(fc[i][0]/10-max2)*iRng/(max2-min2)+iMin+th
  }else if(schedMode==1){
 	m=((date.getHours()+14)*60+date.getMinutes()+so)/4
 	r=(iRng/2)*Math.sin(Math.PI*(180-m)/180)
@@ -829,9 +864,10 @@ function getTT(i,th)
  }else if(schedMode==2){
 	tt=iMin+th
  }
- o=70+ct*2
+ o=100+ct*2
  return h18-o/2-(h18-o)/iRng*(tt-iMin)
 }
+
 function setSched(n)
 {
  schedMode=n
