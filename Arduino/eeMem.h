@@ -70,7 +70,8 @@ public:
   int16_t  sineOffset[2] = {0, 0};  // sine offset adjust (cool/heat)
   uint8_t  sensorActive[12];        // sensor IDs for restart
   uint8_t  sensorWeight[12];        // sensor weight for restart
-  uint8_t  reserved1[76];            //
+  uint16_t flo;                     // feelsLike offset
+  uint8_t  reserved1[74];           //
   uint8_t  reserved[252];           // Note: To force an EEPROM update, just subtract 1 byte and flash again
   uint8_t  end;
 }; // 512 bytes
