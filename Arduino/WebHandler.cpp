@@ -408,7 +408,6 @@ bool secondsServer() // called once per second
     FC.m_bUpdateFcst = false;
     FC.m_bUpdateFcstIdle = false;
     nUpdateDelay = 60; // delay retries by 1 minute
-    ee.hostIp[3] = 191;
     IPAddress hostIp(ee.hostIp);
 
     switch(ee.b.nFcstSource)
@@ -593,11 +592,15 @@ void remoteCallback(int8_t iEvent, uint8_t iName, int32_t iValue, char *psValue)
         js.Var("fcDate", FC.m_fc.Date);
         js.Var("fcFreq", FC.m_fc.Freq);
 
-        int16_t arr[FC_CNT];
+        int16_t arr[FC_CNT][3];
         uint8_t cnt;
         for(cnt = 0; FC.m_fc.Data[cnt].temp != -1000 && cnt < FC_CNT; cnt++)
-          arr[cnt] = FC.m_fc.Data[cnt].temp;
-        js.Array("fc", arr, cnt);
+        {
+          arr[cnt][0] = FC.m_fc.Data[cnt].temp;
+          arr[cnt][1] = FC.m_fc.Data[cnt].feelsLike;
+          arr[cnt][2] = FC.m_fc.Data[cnt].humidity;
+        }
+        js.Array3("fc", arr, cnt);
 
         ws.text(WsClientID, js.Close());
       }
