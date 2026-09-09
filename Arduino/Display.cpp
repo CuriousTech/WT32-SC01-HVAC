@@ -378,41 +378,42 @@ void Display::drawDigit(uint8_t digit, uint8_t pos, int16_t x, int16_t y, uint8_
 {
   int8_t h2 = h << 1;
   int8_t w = h;
-  y++;                          // 0    1     2     3      4     5     6     7     8     9 
-  static uint8_t bitmask[12] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F, 0x00};
+  y++;
 
-  uint8_t bit = bitmask[digit];
-  x += pos * ( (w>>1) + w);
+  static const uint8_t bitmask[] = {0x3F, 0x06, 0x5B, 0x4F, 0x66, 0x6D, 0x7D, 0x07, 0x7F, 0x6F, 0x00};
+  uint8_t newBits = bitmask[digit];
 
+  x += pos * ((w >> 1) + w);
   int16_t yh = y + h;
-  int16_t yh2= y + h2;
+  int16_t yh2 = y + h2;
   int16_t xw = x + w;
-
   uint8_t thick = h / 5;
 
-  if(digit == 10)
-  {
-    sprite.drawWideLine( x-3, yh2-1, x-2, yh2, thick, fg); // decimal
+  if (digit == 10) {
+    sprite.drawWideLine(x - 3, yh2 - 1, x - 2, yh2, thick, fg);
     return;
   }
 
-  thick++;
-  if((bit & 0x01) == 0) sprite.drawWideLine( x+ 3, y   , xw+1, y    , thick, bg); // T
-  if((bit & 0x02) == 0) sprite.drawWideLine( xw+2, y +1, xw+1, yh -1, thick, bg); // R1
-  if((bit & 0x04) == 0) sprite.drawWideLine( xw+1, yh+1, xw  , yh2-1, thick, bg); // R2
-  if((bit & 0x08) == 0) sprite.drawWideLine( x+ 1, yh2 , xw-1, yh2  , thick, bg); // B
-  if((bit & 0x10) == 0) sprite.drawWideLine( x+ 1, yh+1, x   , yh2-1, thick, bg); // L2
-  if((bit & 0x20) == 0) sprite.drawWideLine( x+ 2, y +1, x +1, yh -1, thick, bg); // L1
-  if((bit & 0x40) == 0) sprite.drawWideLine( x+ 2, yh  , xw  , yh   , thick, bg); // C
+  struct Segment { int16_t x1, y1, x2, y2; };
+  Segment segs[] = {
+      {x + 3,  y,       xw + 1,  y       }, // T
+      {xw + 2, y + 1,   xw + 1,  yh - 1  }, // R1
+      {xw + 1, yh + 1,  xw,      yh2 - 1 }, // R2
+      {x + 1,  yh2,     xw - 1,  yh2     }, // B
+      {x + 1,  yh + 1,  x,       yh2 - 1 }, // L2
+      {x + 2,  y + 1,   x + 1,   yh - 1  }, // L1
+      {x + 2,  yh,      xw,      yh      }  // C
+  };
 
-  thick--;
-  if(bit & 0x01) sprite.drawWideLine( x+ 3, y   , xw+1, y    , thick, fg); // T
-  if(bit & 0x02) sprite.drawWideLine( xw+2, y +1, xw+1, yh -1, thick, fg); // R1
-  if(bit & 0x04) sprite.drawWideLine( xw+1, yh+1, xw  , yh2-1, thick, fg); // R2
-  if(bit & 0x08) sprite.drawWideLine( x+ 1, yh2 , xw-1, yh2  , thick, fg); // B
-  if(bit & 0x10) sprite.drawWideLine( x+ 1, yh+1, x   , yh2-1, thick, fg); // L2
-  if(bit & 0x20) sprite.drawWideLine( x+ 2, y +1, x +1, yh -1, thick, fg); // L1
-  if(bit & 0x40) sprite.drawWideLine( x+ 2, yh  , xw  , yh   , thick, fg); // C
+  for (uint8_t i = 0; i < 7; i++) {
+    if (!(newBits & (1 << i)))
+      sprite.drawWideLine(segs[i].x1, segs[i].y1, segs[i].x2, segs[i].y2, thick + 1, bg);
+  }
+
+  for (uint8_t i = 0; i < 7; i++) {
+    if (newBits & (1 << i))
+      sprite.drawWideLine(segs[i].x1, segs[i].y1, segs[i].x2, segs[i].y2, thick, fg);
+  }
 }
 
 void Display::updateTemps(bool bForce)
@@ -426,7 +427,7 @@ void Display::updateTemps(bool bForce)
   uint16_t fg = (m_displayLocal) ? rgb16(4, 63, 1) : rgb16(0, 63, 31);
 
   if(last[0] != inTemp)
-    drawFakeFloat((last[0] = inTemp), m_btn[Btn_InTemp].x - 20, m_btn[Btn_InTemp].y, 28, fg, TFT_BLACK, "o" );
+    drawFakeFloat((last[0] = inTemp), m_btn[Btn_InTemp].x, m_btn[Btn_InTemp].y, 28, fg, TFT_BLACK, "o" );
 
   if(last[1] != hvac.m_targetTemp)
     drawFakeFloat((last[1] = hvac.m_targetTemp), m_btn[Btn_TargetTemp].x, m_btn[Btn_TargetTemp].y, 17, fg, TFT_BLACK, "o" );
