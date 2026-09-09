@@ -119,7 +119,7 @@ public:
     bool bSend = false;
     for(int i = 0; i < SNS_CNT; i++)
     {
-      if(sns[i].IP)
+      if(sns[i].IP[3])
       {
         if(bSend) s += ",";
         bSend = true;
@@ -133,9 +133,9 @@ public:
         s += ",";
         s += sns[i].rh;
         s += ",";
-        s += sns[i].f.val;
+        s += sns[i].f.f.Weight;
         s += ",\"";
-        s += sns[i].szID;
+        s += sns[i].szName;
         s += "\"]";
       }
     }
