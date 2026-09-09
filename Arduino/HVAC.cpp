@@ -1146,6 +1146,7 @@ String HVAC::settingsJson()
   js.Var("ppk", ee.ppkwh);
   js.Var("ccf", ee.ccf);
   js.Var("cfm", ee.cfm);
+  js.Var("flo", ee.flo);
   js.Var("dl",  ee.diffLimit);
   js.Var("diskfree",  media.freeSpace() );
   js.Var("sdavail", 0 );
@@ -1249,6 +1250,7 @@ const char *cmdList[] = { "cmd",
   "createdir",
   "clearhist",
   "restart", // 60
+  "flo",
   NULL
 };
 
@@ -1290,7 +1292,7 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
   {
 #ifndef REMOTE
     case 0:     // fanmode
-      setFan( val );
+      setFan( val & 1);
       break;
     case 1:     // mode
       setMode( val );
@@ -1456,20 +1458,14 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
     case 45: // rmttemp
       snsIdx = getSensorID(ip);
       {
-        char *p = psValue + strlen(psValue) - 1;
-        if(*p == 'C')
-        {
-          if(ee.b.bCelcius == false) val = val * 90 / 50 + 320;
-        }
-        else if(*p == 'F')
-        {
-           if(ee.b.bCelcius) val = (val - 320) * 50 / 90;
-        }
-        else
-        {
-          deactivateSensor(snsIdx);
-          break;
-        }
+        int8_t len = strlen(psValue);
+        char unit;
+        if (len > 0)
+           unit = psValue[len - 1];
+        if (unit == 'C' && !ee.b.bCelcius)
+          val = (val * 9) / 5 + 320;
+        else if (unit == 'F' && ee.b.bCelcius)
+          val = ((val - 320) * 5) / 9;
       }
       if(val < (ee.b.bCelcius ? 156:600) || val > (ee.b.bCelcius ? 370:990) || (m_Sensor[snsIdx].temp && (val < m_Sensor[snsIdx].temp - 20 || val > m_Sensor[snsIdx].temp + 20)) )
       {
@@ -1552,6 +1548,9 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       shutdown();
       delay(200);
       ESP.restart();
+      break;
+    case 61: // flo
+      ee.flo = val;
       break;
   }
 }
