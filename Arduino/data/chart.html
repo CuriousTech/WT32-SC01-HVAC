@@ -114,6 +114,7 @@ $(document).ready(function()
 			a.lo.value=(iMin=(md==2)?h0:c0)/10
 			a.hi.value=(iMax=(md==2)?h1:c1)/10
 			a.ct.value=ct/10
+			tu=Json.tu
 			break
 		case 'state':
 			sJson=Json
@@ -728,7 +729,7 @@ function drawFC(){
 		fcr=23
 	}
 
-	cPos=0
+	cPos=-1
 
 	fl=(fcDate+fcFreq*(fcl-1))/60
 	date=new Date(fcDate*1000)
@@ -742,41 +743,39 @@ function drawFC(){
 		grd.addColorStop(fr,"blue")
 	}
 	else{grd.addColorStop(0,"red");grd.addColorStop(1,"blue")}
-	for(i=1;i<fcl;i++){
+	for(i=0;i<fcl-1;i++){
 		if(fc.length){
-
 			c.strokeStyle='rgba(0,255,0,0.65)'
 			c.beginPath()
 			y=h18-((h18/1000)*fc[i][2])
 			c.moveTo(getXPixel2(i),y)
-			y=h18-((h18/1000)*fc[i-1][2])
-			c.lineTo(getXPixel2(i-1),y)
+			y=h18-((h18/1000)*fc[i+1][2])
+			c.lineTo(getXPixel2(i+1),y)
 			c.stroke()
 
 			c.strokeStyle='rgba(255,255,0,0.9)'
+			flOff = tu?9:20
+			if(fc[i][1]-fc[i][0] < flOff && fc[i+1][1]-fc[i+1][0] > flOff && fc[i][0] < fc[i+1][0])
+			{
+				c.strokeStyle='rgb(0,100,200)'
+				c.lineWidth=2
+			}
 			c.beginPath()
 			c.moveTo(getXPixel2(i),getYPixel2(fc[i][1]/10))
-			c.lineTo(getXPixel2(i-1),getYPixel2(fc[i-1][1]/10))
+			c.lineTo(getXPixel2(i+1),getYPixel2(fc[i+1][1]/10))
 			c.stroke()
+			c.lineWidth=1
 
 			c.strokeStyle=grd
 			c.beginPath()
 			c.moveTo(getXPixel2(i),getYPixel2(fc[i][0]/10))
-			c.lineTo(getXPixel2(i-1),getYPixel2(fc[i-1][0]/10))
+			c.lineTo(getXPixel2(i+1),getYPixel2(fc[i+1][0]/10))
 			c.stroke()
-			if(fc[i][1]-fc[i][0] > 30){
-				c.lineWidth=3
-				c.strokeStyle='rgb(0,100,200)'
-				c.beginPath()
- 				c.arc(getXPixel2(i), getYPixel2(fc[i][1]/10), 2, 0, 2 * Math.PI)
-				c.stroke()
-				c.lineWidth=1
-			}
 		}
 
 		date = new Date((fcDate+fcFreq*i)*1000)
 		c.fillStyle='#000'
-		if(cPos==0&&date.valueOf()>=(new Date()).valueOf())
+		if(cPos==-1&&date.valueOf()>=(new Date()).valueOf())
 		{
 			dif=(date.valueOf()-(new Date().valueOf()))/60000
 			xOff=w/fl*dif
@@ -823,6 +822,20 @@ function drawFC(){
 	}
 	c.closePath()
 	c.fill()
+/*
+	idx=histIdx-1
+	c.strokeStyle='rgba(0,0,0,0.5)'
+	c.beginPath()
+	c.moveTo(xPosNow,getYPixel3( getTemp(idx) ))
+	for(i=0;i<200&&idx>1&&xPosNow>xPadding;i++)
+	{
+		idx--
+		xPosNow-=2
+		c.lineTo(xPosNow,getYPixel3( getTemp(idx) ))
+		console.log(xPosNow,getYPixel3( getTemp(idx) ), idx)
+	}
+	c.stroke()
+*/
 }
 function getXPixel2(val){
 	x=xPadding+((graph2.width()-xPadding*2)/fcl)*val
