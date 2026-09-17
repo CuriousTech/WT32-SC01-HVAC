@@ -219,9 +219,14 @@ bool HVAC::checkFilter(void)
 }
 
 // Update outdoor temp
-void HVAC::updateOutdoorTemp(int16_t outTemp)
+void HVAC::updateOutdoorTemp(int16_t outTemp, bool boost)
 {
   m_outTemp = outTemp;
+  if(boost)
+  {
+    m_ovrTemp = -(ee.flo);
+    m_overrideTimer = 60*60; // 1 hour
+  }
 }
 
 int16_t HVAC::getSetTemp(int mode, int hl)
@@ -894,6 +899,7 @@ void HVAC::calcTargetTemp(int mode)
       }
       break;
   }
+  
   m_targetTemp += m_ovrTemp; // override/away is normally 0, unless set remotely with a timeout
 
   switch(mode)
@@ -908,7 +914,7 @@ void HVAC::calcTargetTemp(int mode)
   }
 }
 
-// This uses ~5.5K because it's fp?
+// This uses ~5.5K
 float HVAC::sineTemp(float offset, int16_t H, int16_t L)
 {
   float m = ( (gLTime.tm_hour + 14) * 60 + gLTime.tm_min + offset ) / 4;
