@@ -310,10 +310,11 @@ void Display::drawOutTemp()
   FC.getMinMax(hvac.m_outMin, hvac.m_outMax, 0, ee.fcRange);
 
   int outTempShift;
-  int outTempReal = FC.getCurrentTemp(outTempShift, ee.fcOffset[hvac.m_modeShadow == Mode_Heat] );
+  bool boost;
+  int outTempReal = FC.getCurrentTemp(outTempShift, ee.fcOffset[hvac.m_modeShadow == Mode_Heat], boost );
 
   // Summer/winter curve.  Summer is delayed 3 hours
-  hvac.updateOutdoorTemp( outTempShift );
+  hvac.updateOutdoorTemp( outTempShift, boost );
 
   if(m_currPage == Page_Thermostat)
   {
