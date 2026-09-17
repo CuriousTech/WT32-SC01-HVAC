@@ -152,7 +152,7 @@ public:
   void    setTemp(int mode, int16_t Temp, int hl); // set temp for a mode
   void    enableRemote(void);
   void    updateIndoorTemp(int16_t Temp, int16_t rh);
-  void    updateOutdoorTemp(int16_t outTemp);
+  void    updateOutdoorTemp(int16_t outTemp, bool boost);
   void    resetFilter(void);    // reset the filter hour count
   bool    checkFilter(void);
   void    resetTotal(void);
