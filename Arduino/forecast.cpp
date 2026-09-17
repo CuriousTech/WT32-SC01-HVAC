@@ -194,12 +194,10 @@ void Forecast::_onDisconnect(AsyncClient* client)
   switch(m_type)
   {
     case 0:
-      processCDT(); // text file type
-      break;
     case 1:
       processOWM(); // json type
       break;
-    case 2:
+    case 2: // Not weather, don't process
       break;
   }
   m_fc.Data[m_fcIdx].temp = -1000; // mark past last as invalid
@@ -219,9 +217,11 @@ void Forecast::processOWM()
   };
 
   char *p = m_pBuffer;
-  if (p[0] != '{') { // local copy has no headers
+  if (p[0] != '{')
+  { // local copy has no headers
     // Safely ensure there are at least 4 bytes left to read
-    while (p[0] && p[1] && p[2] && p[3]) {
+    while (p[0] && p[1] && p[2] && p[3])
+    {
       // Fast path: if p[1] isn't a newline, this cannot be the end of the header
       if (p[1] == '\n' && p[0] == '\r' && p[2] == '\r' && p[3] == '\n') {
           p += 4;
@@ -232,54 +232,6 @@ void Forecast::processOWM()
   }
 
   processJson(p, 0, jsonListOw);
-}
-
-// read data as comma delimited 'time,temp,rh,code' per line
-void Forecast::processCDT()
-{
-/* not used
-  const char *p = m_pBuffer;
-  m_status = FCS_Done;
-
-  while(m_fcIdx < FC_CNT-1 && *p)
-  {
-    uint32_t tm = atoi(p); // this should be local time
-    if(tm > 1700516696) // skip the headers
-    {
-      if(!m_bFirst)
-      {
-        m_bFirst = true;
-        m_fcCnt = 56; // 7d @ 3h. This is the older weather.gov data
-        m_fcIdx = makeroom(tm);
-        if(m_fc.Date == 0)
-          m_fc.Date = tm;
-      }
-      else
-      {
-        m_fc.Freq = tm - m_lastTm;
-      }
-      m_lastTm = tm;
-      while(*p && *p != ',') p ++;
-      if(*p == ',') p ++;
-      else break;
-      m_fc.Data[m_fcIdx].temp = (atof(p)*10);
-      while(*p && *p != ',') p ++;
-      if(*p == ',') p ++;
-      else break;
-      m_fc.Data[m_fcIdx].humidity = (atof(p)*10);
-      while(*p && *p != ',') p ++;
-      if(*p == ',') p ++;
-      {
-        m_fc.Data[m_fcIdx].id = atoi(p);
-      }
-      m_fcIdx++;
-    }
-    while(*p && *p != '\r' && *p != '\n') p ++;
-    while(*p == '\r' || *p == '\n') p ++;
-  }
-  m_fc.Data[m_fcIdx].temp = -1000;
- */
-  delete m_pBuffer;
 }
 
 bool Forecast::getCurrentIndex(int8_t& fcOff, int8_t& fcCnt, uint32_t& tm)
@@ -558,9 +510,8 @@ void Forecast::processJson(char *p, int8_t event, const char **jsonList)
           break;
         }
       }
-    }
-
-  }
+    }// if pair
+  }// while (p)
 }
 
 char *Forecast::skipwhite(char *p)
@@ -865,12 +816,13 @@ void Forecast::getMinMax(int16_t& tmin, int16_t& tmax, int8_t offset, int8_t ran
   if(tmin == tmax) tmax++;   // div by 0 check
 }
 
-int16_t Forecast::getCurrentTemp(int& shiftedTemp, uint8_t shiftMins)
+int16_t Forecast::getCurrentTemp(int& shiftedTemp, uint8_t shiftMins, bool boost)
 {
   int8_t fcOff;
   int8_t fcCnt;
   uint32_t tmO;
 
+  boost = false;
   if(!getCurrentIndex(fcOff, fcCnt, tmO))
     return 0;
 
@@ -898,6 +850,14 @@ int16_t Forecast::getCurrentTemp(int& shiftedTemp, uint8_t shiftMins)
   if(m < 0) m = 0; // if just started up
 
   shiftedTemp = tween(m_fc.Data[fcOff].temp, m_fc.Data[fcOff+1].temp, m, r);
+
+  if(m < 20) // 20 min range to trigger
+  {
+    // if temp is increasing and feels-like is above temp by 2.0f in the future
+    int16_t flDiff = (m_bCelcius) ? 9:20;
+    boost = (m_fc.Data[fcOff].temp < m_fc.Data[fcOff + 1].temp && m_fc.Data[fcOff].feelsLike - m_fc.Data[fcOff].temp < flDiff && m_fc.Data[fcOff + 1].feelsLike - m_fc.Data[fcOff + 1].temp > flDiff);
+    if(boost) WsSend("boost");
+  }
 
   return temp;
 }
