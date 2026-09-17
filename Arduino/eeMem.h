@@ -59,7 +59,7 @@ public:
   uint8_t  furnaceWatts = 140;      // 1.84A inducer motor mostly
   uint8_t  humidWatts = 150;
   uint8_t  brightLevel[2] = {30, 100}; // brightness {dim, highest}
-  uint16_t ppkwh = 160;             // price per KWH in cents * 10000 ($0.16)
+  uint16_t ppkwh = 160;             // price per KWH in cents / 10 ($0.16)
   uint16_t ccf = 1190;              // nat gas cost per 1000 cubic feet in 10th of cents * 1000 ($1.190)
   uint16_t cfm = 820;               // cubic feet per minute * 1000 of furnace (0.82)
   uint16_t compressorWatts = 2600;  // compressorWatts
@@ -70,7 +70,7 @@ public:
   int16_t  sineOffset[2] = {0, 0};  // sine offset adjust (cool/heat)
   uint8_t  sensorActive[12];        // sensor IDs for restart
   uint8_t  sensorWeight[12];        // sensor weight for restart
-  uint16_t flo;                     // feelsLike offset
+  uint16_t flo = 30;                // feelsLike offset (boost) 3.0f
   uint8_t  reserved1[74];           //
   uint8_t  reserved[252];           // Note: To force an EEPROM update, just subtract 1 byte and flash again
   uint8_t  end;
