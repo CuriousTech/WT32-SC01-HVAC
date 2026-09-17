@@ -56,13 +56,12 @@ public:
   bool forecastPage(void);
   void forecastAnimate(void);
   void getMinMax(int16_t& tmin, int16_t& tmax, int8_t offset, int8_t range);
-  int16_t getCurrentTemp(int& shiftedTemp, uint8_t shiftMins);
+  int16_t getCurrentTemp(int& shiftedTemp, uint8_t shiftMins, bool boost);
   void drawIcon(uint8_t d, uint8_t h, uint16_t x);
 private:
   void _onConnect(AsyncClient* client);
   void _onDisconnect(AsyncClient* client);
   void _onData(AsyncClient* client, char* data, size_t len);
-  void processCDT(void);
   void processOWM(void);
   void processJson(char *p, int8_t event, const char **jsonList);
   int makeroom(uint32_t newTm);
