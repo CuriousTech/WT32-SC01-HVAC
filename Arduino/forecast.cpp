@@ -816,7 +816,7 @@ void Forecast::getMinMax(int16_t& tmin, int16_t& tmax, int8_t offset, int8_t ran
   if(tmin == tmax) tmax++;   // div by 0 check
 }
 
-int16_t Forecast::getCurrentTemp(int& shiftedTemp, uint8_t shiftMins, bool boost)
+int16_t Forecast::getCurrentTemp(int& shiftedTemp, uint8_t shiftMins, bool& boost)
 {
   int8_t fcOff;
   int8_t fcCnt;
@@ -835,6 +835,15 @@ int16_t Forecast::getCurrentTemp(int& shiftedTemp, uint8_t shiftMins, bool boost
 
   int16_t temp = tween(m_fc.Data[fcOff].temp, m_fc.Data[fcOff+1].temp, m, r);
 
+  if(m < 60) // 60 min range to trigger
+  {
+    // if temp is increasing and feels-like is above temp by 2.0f in the future +3 or 6 hours
+    int16_t flDiff = (m_bCelcius) ? 9:20;
+    boost = (m_fc.Data[fcOff].temp < m_fc.Data[fcOff + 1].temp &&
+      m_fc.Data[fcOff].feelsLike - m_fc.Data[fcOff].temp < flDiff &&
+      (m_fc.Data[fcOff + 1].feelsLike - m_fc.Data[fcOff + 1].temp > flDiff || m_fc.Data[fcOff + 2].feelsLike - m_fc.Data[fcOff + 2].temp > flDiff ));
+  }
+
   m += shiftMins; // get the adjust shift
   while(m >= r && fcOff < fcCnt - 2 && m_fc.Data[fcOff + 1].temp != -1000) // skip a window if 3h+ over range
   {
@@ -850,14 +859,6 @@ int16_t Forecast::getCurrentTemp(int& shiftedTemp, uint8_t shiftMins, bool boost
   if(m < 0) m = 0; // if just started up
 
   shiftedTemp = tween(m_fc.Data[fcOff].temp, m_fc.Data[fcOff+1].temp, m, r);
-
-  if(m < 20) // 20 min range to trigger
-  {
-    // if temp is increasing and feels-like is above temp by 2.0f in the future
-    int16_t flDiff = (m_bCelcius) ? 9:20;
-    boost = (m_fc.Data[fcOff].temp < m_fc.Data[fcOff + 1].temp && m_fc.Data[fcOff].feelsLike - m_fc.Data[fcOff].temp < flDiff && m_fc.Data[fcOff + 1].feelsLike - m_fc.Data[fcOff + 1].temp > flDiff);
-    if(boost) WsSend("boost");
-  }
 
   return temp;
 }
