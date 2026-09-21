@@ -23,6 +23,7 @@ Adafruit_FT6206 ts = Adafruit_FT6206();
 extern Forecast FC;
 extern HVAC hvac;
 extern tm gLTime;
+extern IPAddress WsClientIP;
 extern void WsSend(String s);
 
 ScreenSavers ss;
@@ -220,6 +221,9 @@ void Display::buttonCmd(uint8_t btn)
     case Btn_Note:
       if(ee.b.bLock) break;
       hvac.m_notif = Note_None;
+#ifdef REMOTE
+      hvac.sendCmd("nc", 0); // clear on main
+#endif
       break;
     case Btn_Time: // time
 //      m_currPage = Page_ScreenSaver;
@@ -620,12 +624,8 @@ void Display::drawTime()
 const char *pNotes[] = {
   "",  //  Note_None,
   "Connecting to WiFi", //  Note_Connecting,
-#ifdef REMOTE
-   "Searching for HVAC",
-#else
   "Connected",  //  Note_Connected,
-#endif
-  "", //  Note_HVAC_connected,
+  "Searching for HVAC",
   "Remote Off", //  Note_RemoteOff,
   "Remote On",  //  Note_RemoteOn,
   "Cycle Limit",  //  Note_CycleLimit,
@@ -662,7 +662,6 @@ void Display::updateNotification(bool bRef)
   {
     case Note_Connecting:
     case Note_Connected:
-    case Note_HVAC_connected:
     case Note_RemoteOff:
     case Note_RemoteOn:
       nTimer = 30;
