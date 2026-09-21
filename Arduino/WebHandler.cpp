@@ -62,7 +62,7 @@ const char *jsonListSettings[] = { "cmd",
   "m", "am", "hm", "fm", "ot", "ht", "c0", "c1", "h0", "h1", "im", "cn", "cx", "ct", "tu", "ov", "rhm", "rh0", "rh1", NULL
 };
 const char *jsonListState[] = { "cmd",
-  "r", "fr", "s", "it", "rh", "tt", "fm", "ot", "ol", "oh", "ct", "ft", "rt", "h", "lt", "lh", "rmt", NULL // state
+  "r", "fr", "s", "it", "rh", "tt", "fm", "ot", "ol", "oh", "ct", "ft", "rt", "h", "lt", "lh", "rmt", "note", NULL
 };
 
 #else
@@ -342,24 +342,20 @@ bool secondsServer() // called once per second
     case WL_NO_SSID_AVAIL: // failed to connect for some reason
       if(bSmartEnabled == false)
       {
-//      Serial.println("Connect failed. Starting SmartConfig");
         WiFi.mode(WIFI_AP_STA);
         WiFi.beginSmartConfig();
         bSmartEnabled = true;
       }
       break;
     case WL_CONNECTION_LOST:
-//    Serial.println("CONNECTION_LOST");
       break;
     case WL_DISCONNECTED: // connected before and stopped
     case WL_IDLE_STATUS:
-//    Serial.println("DISCONNECTED");
       {
         static uint8_t nDelay = 15;
         if(--nDelay == 0)
         {
-//            Serial.println("reconnect");
-          WiFi.begin(ee.szSSID, ee.szSSIDPassword); // esp8266 doesn't like this
+          WiFi.begin(ee.szSSID, ee.szSSIDPassword); // esp8266 doesn't like it fast
           nDelay = 15;
         }
       }
@@ -667,7 +663,7 @@ void webSocketEventHandler(uint8_t event, char *data, uint16_t length)
       if(bFirst)
       {
         bFirst = false;
-        hvac.m_notif = Note_HVAC_connected; // helps see things connecting
+        hvac.m_notif = Note_Connected; // helps see things connecting
       }
       break;
     case WEBSOCKET_EVENT_DISCONNECTED:
