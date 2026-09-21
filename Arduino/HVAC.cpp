@@ -173,6 +173,9 @@ void HVAC::updateVar(int iName, int iValue)// host values (sent to remote)
     case 16: // rmt
       m_bRemoteStream = false; // command to kill remote temp send
       break;
+    case 17: // note
+      m_notif = iValue;
+      break;
   }
 #endif
 }
@@ -222,7 +225,7 @@ bool HVAC::checkFilter(void)
 void HVAC::updateOutdoorTemp(int16_t outTemp, bool boost)
 {
   m_outTemp = outTemp;
-  if(boost)
+  if(boost && ee.flo)
   {
     m_ovrTemp = -(ee.flo);
     m_overrideTimer = 60*60; // 1 hour
@@ -677,16 +680,18 @@ bool HVAC::stateChange()
   static bool bFan = false;
   static uint8_t lastMode = 0;
   static uint8_t nState = 0;
+  static uint8_t nNote = 0;
 
 #ifdef REMOTE
   if(getMode() != lastMode || getState() != nState || bFan != getFanRunning())   // erase prev highlight
 #else
-  if(getMode() != lastMode || getState() != nState || bFan != getFanRunning() || m_bRemoteDisconnect)
+  if(getMode() != lastMode || getState() != nState || bFan != getFanRunning() || m_bRemoteDisconnect || nNote != m_notif)
 #endif
   {
     lastMode = getMode();
     nState = getState();
     bFan = getFanRunning();
+    nNote = m_notif;
     return true;
   }
   return false;
@@ -1182,6 +1187,7 @@ String HVAC::getPushData()
   js.Var("oh", m_outMax);
   js.Var("ft", m_fanOnTimer);
   js.Var("rt", m_runTotal);
+  js.Var("note", m_notif);
   js.Var("h",  m_bHumidRunning);
   js.Var("aw", m_bAway);
   js.Array("snd", m_Sensor);
@@ -1257,6 +1263,7 @@ const char *cmdList[] = { "cmd",
   "clearhist",
   "restart", // 60
   "flo",
+  "nc",
   NULL
 };
 
@@ -1325,7 +1332,7 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       ee.idleMin = constrain(val, 60, 60*30); // Limit 1 to 30 minutes
       break;
     case 9:    // cyclethresh
-      ee.cycleThresh[ee.b.Mode == Mode_Heat] = constrain(val, (ee.b.bCelcius ? 2:5), (ee.b.bCelcius ? 28:50) ); // Limit 0.5 to 5.0 degrees
+      ee.cycleThresh[ee.b.Mode == Mode_Heat] = constrain(val, (ee.b.bCelcius ? 5:9), (ee.b.bCelcius ? 16:30) ); // Limit 0.9-3.0F/0.5-1.6C degrees
       break;
     case 10:    // cooltempl
       setTemp(Mode_Cool, val, 0);
@@ -1556,7 +1563,10 @@ void HVAC::setVar(String sCmd, int val, char *psValue, IPAddress ip)
       ESP.restart();
       break;
     case 61: // flo
-      ee.flo = val;
+      ee.flo = constrain(val, 0, 80);
+      break;
+    case 62: // nc
+      m_notif = Note_None;
       break;
   }
 }
@@ -1795,6 +1805,7 @@ void HVAC::saveStats()
 void HVAC::setSettings(int iName, int iValue)// remote settings
 {
 #ifdef REMOTE
+
   switch(iName)
   {
     case 0:
