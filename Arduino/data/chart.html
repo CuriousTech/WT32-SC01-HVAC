@@ -755,7 +755,7 @@ function drawFC(){
 
 			c.strokeStyle='rgba(255,255,0,0.9)'
 			flOff = tu?9:20
-			if(fc[i][1]-fc[i][0] < flOff && fc[i+1][1]-fc[i+1][0] > flOff && fc[i][0] < fc[i+1][0])
+			if(i<fcl-2 && fc[i][0] < fc[i+1][0] && fc[i][1]-fc[i][0] < flOff && ( fc[i+1][1]-fc[i+1][0] > flOff || fc[i+2][1]-fc[i+2][0] > flOff) )
 			{
 				c.strokeStyle='rgb(0,100,200)'
 				c.lineWidth=2
@@ -780,14 +780,19 @@ function drawFC(){
 			dif=(date.valueOf()-(new Date().valueOf()))/60000
 			xOff=w/fl*dif
 			cPos=i;
+			c.fillStyle="rgba(20,20,20,0.25)"
 			c.strokeStyle='#fff'
 			c.beginPath()
 			c.moveTo(getXPixel2(cPos)-xOff,h18)
 			c.lineTo(getXPixel2(cPos)-xOff,1)
-			c.stroke()
+			c.lineTo(getXPixel2(cPos-1)-xOff,1)
+			c.lineTo(getXPixel2(cPos-1)-xOff,h18)
+			c.closePath()
+			c.fill()
 			c.textAlign="center"
 			xPosNow=(getXPixel2(cPos)-xOff).toFixed()
-			c.fillText("Now",xPosNow,getYPixel3(iMax)-8)
+			c.fillStyle='#000'
+			c.fillText("Now",xPosNow-6,getYPixel3(iMax)-8)
 		}
 		if(dt!=date.getDate()){
 			dt=date.getDate()
